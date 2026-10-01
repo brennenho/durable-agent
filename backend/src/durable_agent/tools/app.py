@@ -1,9 +1,15 @@
-"""Tool API signatures. Application handlers are not implemented yet."""
+"""Tools HTTP boundary and service-owned database lifetime."""
 
+import asyncio
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from durable_agent.contracts import (
     ErrorResponse,
@@ -13,8 +19,46 @@ from durable_agent.contracts import (
     ToolExecuteResponse,
     WorkspaceVersion,
 )
+from durable_agent.db.session import Database
+from durable_agent.tools.archives import InvalidWorkspace
+from durable_agent.tools.execution import execute_operation
+from durable_agent.tools.files import InvalidToolCall
+from durable_agent.tools.publication import ToolConflict
+from durable_agent.tools.workspaces import (
+    WorkspaceNotFound,
+    capture_initial_workspace,
+    list_workspace,
+    load_workspace,
+    read_workspace_file,
+    save_workspace,
+)
 
-app = FastAPI(title="Durable Agent Tools", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = Database(os.environ["DATABASE_URL"])
+    try:
+        app.state.max_bytes = int(os.environ.get("WORKSPACE_MAX_BYTES", 20 * 1024 * 1024))
+        if app.state.max_bytes <= 0:
+            raise ValueError("WORKSPACE_MAX_BYTES must be positive")
+        source = os.environ.get("WORKSPACE_INPUT_DIR")
+        archive = await asyncio.to_thread(
+            capture_initial_workspace,
+            Path(source) if source is not None else None,
+            app.state.max_bytes,
+        )
+        async with db.session() as session:
+            app.state.initial_version = await save_workspace(session, archive)
+            await session.commit()
+        app.state.database = db
+        app.state.slots = asyncio.Semaphore(4)
+        yield
+    finally:
+        app.state.database = None
+        await db.close()
+
+
+app = FastAPI(title="Durable Agent Tools", version="0.1.0", lifespan=lifespan)
 routes = APIRouter(
     responses={
         501: {"model": ErrorResponse, "description": "Handler not implemented"},
@@ -29,6 +73,31 @@ async def not_implemented(request: Request, exc: NotImplementedError) -> JSONRes
     return JSONResponse(status_code=501, content=ErrorResponse(error=error).model_dump(mode="json"))
 
 
+ERRORS = {
+    InvalidWorkspace: (400, "invalid_workspace", False),
+    InvalidToolCall: (400, "invalid_tool_call", False),
+    WorkspaceNotFound: (404, "workspace_not_found", False),
+    FileNotFoundError: (404, "file_not_found", False),
+    ToolConflict: (409, "tool_conflict", False),
+    TimeoutError: (504, "deadline_exceeded", True),
+    SQLAlchemyError: (503, "database_unavailable", True),
+    OSError: (503, "tool_unavailable", True),
+}
+
+
+async def execution_error(request: Request, exc: Exception) -> JSONResponse:
+    status, code, retryable = next(value for kind, value in ERRORS.items() if isinstance(exc, kind))
+    message = "Database unavailable" if isinstance(exc, SQLAlchemyError) else str(exc)
+    error = ExecutionError(code=code, message=message or code, retryable=retryable)
+    return JSONResponse(
+        status_code=status, content=ErrorResponse(error=error).model_dump(mode="json")
+    )
+
+
+for error_type in ERRORS:
+    app.add_exception_handler(error_type, execution_error)
+
+
 @app.get("/health/live", tags=["health"])
 async def liveness() -> dict[str, str]:
     return {"status": "ok"}
@@ -36,7 +105,7 @@ async def liveness() -> dict[str, str]:
 
 @app.get("/health/ready", tags=["health"])
 async def readiness() -> dict[str, str]:
-    raise HTTPException(503, "Service implementation has not started")
+    raise HTTPException(503, "Sandbox command execution is not implemented")
 
 
 @routes.post(
@@ -45,8 +114,10 @@ async def readiness() -> dict[str, str]:
     operation_id="execute_tool",
     responses={409: {"model": ErrorResponse, "description": "Changed input or stale generation"}},
 )
-async def execute_tool(body: ToolExecuteRequest) -> ToolExecuteResponse:
-    raise NotImplementedError("Tool execution is not implemented")
+async def execute_tool(body: ToolExecuteRequest, request: Request) -> ToolExecuteResponse:
+    if body.sandbox.workspace_max_bytes > request.app.state.max_bytes:
+        raise InvalidToolCall("Requested workspace limit exceeds the service limit")
+    return await execute_operation(request.app.state.database, body, request.app.state.slots)
 
 
 @routes.get(
@@ -54,8 +125,13 @@ async def execute_tool(body: ToolExecuteRequest) -> ToolExecuteResponse:
     response_model=WorkspaceVersion,
     operation_id="get_initial_workspace",
 )
-async def get_initial_workspace() -> WorkspaceVersion:
-    raise NotImplementedError("Workspace import is not implemented")
+async def get_initial_workspace(request: Request) -> WorkspaceVersion:
+    return WorkspaceVersion(workspace_version_id=request.app.state.initial_version)
+
+
+async def saved_archive(request: Request, version_id: UUID) -> bytes:
+    async with request.app.state.database.session() as session:
+        return await load_workspace(session, version_id)
 
 
 @routes.get(
@@ -64,8 +140,9 @@ async def get_initial_workspace() -> WorkspaceVersion:
     operation_id="list_workspace_files",
     responses={404: {"model": ErrorResponse, "description": "Workspace version not found"}},
 )
-async def list_workspace_files(version_id: UUID) -> FileListing:
-    raise NotImplementedError("Workspace file listing is not implemented")
+async def list_workspace_files(version_id: UUID, request: Request) -> FileListing:
+    archive = await saved_archive(request, version_id)
+    return await asyncio.to_thread(list_workspace, archive, request.app.state.max_bytes)
 
 
 @routes.get(
@@ -83,8 +160,19 @@ async def list_workspace_files(version_id: UUID) -> FileListing:
         404: {"model": ErrorResponse, "description": "Workspace version or file not found"},
     },
 )
-async def download_workspace_file(version_id: UUID, path: str) -> Response:
-    raise NotImplementedError("Workspace file downloads are not implemented")
+async def download_workspace_file(version_id: UUID, path: str, request: Request) -> Response:
+    archive = await saved_archive(request, version_id)
+    content = await asyncio.to_thread(
+        read_workspace_file, archive, path, request.app.state.max_bytes
+    )
+    filename = quote(Path(path).name, safe="")
+    return Response(
+        content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+        },
+    )
 
 
 app.include_router(routes)
