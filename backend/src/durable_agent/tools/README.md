@@ -12,5 +12,10 @@ budget, checked during capture and decompression. Only regular files and directo
 with ordinary permission bits are supported. Links, sparse files, special files,
 duplicate paths, and invalid directory hierarchies are rejected.
 
-These filesystem functions are synchronous. Service handlers must offload them from
-the event loop. Persistence, tool execution, and the sandbox runner are pending.
+`workspaces.py` imports an optional starting directory and reads saved files without
+restoring them. Its database functions use a caller-owned async session: saving a
+checkpoint flushes but does not commit. Existing versions are never updated.
+
+Filesystem/archive functions are synchronous; service handlers must offload them
+from the event loop, outside database transactions. HTTP handlers, tool execution,
+and the sandbox runner are pending.
