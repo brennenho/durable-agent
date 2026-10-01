@@ -3,8 +3,8 @@ import { Badge } from "./ui/badge";
 
 export function RunHistory({ operations, status }: Pick<RunDetail, "operations" | "status">) {
   return (
-    <section aria-labelledby="history-heading">
-      <h2 id="history-heading">Execution history</h2>
+    <section aria-label="Execution history" className="mt-4 border-0 p-0">
+      <h2 className="sr-only">Execution history</h2>
       {operations.length === 0 ? (
         <p className="text-muted-foreground">No operations recorded yet.</p>
       ) : (

@@ -70,7 +70,7 @@ const detail: RunDetail = {
 test("shows earlier failures, unknown outcomes, and accepted tool output", async ({ page }) => {
   await page.route(`**/api/runs/${detail.id}`, (route) => route.fulfill({ json: detail }));
   await page.goto(`/runs/${detail.id}`);
-  await page.getByRole("tab", { name: "History" }).click();
+  await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByRole("heading", { name: "1. Tool call" })).toBeVisible();
   await expect(history.locator(".attempt-list > li")).toHaveCount(3);
@@ -83,7 +83,7 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
   await expect(history.locator(".attempt-list > li").nth(2)).toContainText("Attempt 3 · accepted");
   await history.getByText("Saved tool output").click();
   await expect(history.locator("pre")).toContainText("1 test failed");
-  await expect(page.getByRole("status")).toHaveText("Status: succeeded");
+  await expect(page.getByRole("status")).toHaveText("Completed");
 });
 
 test("shows an empty history and a planned operation awaiting a worker", async ({ page }) => {
@@ -91,7 +91,7 @@ test("shows an empty history and a planned operation awaiting a worker", async (
   await page.clock.install();
   await page.route(`**/api/runs/${detail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${detail.id}`);
-  await page.getByRole("tab", { name: "History" }).click();
+  await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history).toContainText("No operations recorded yet.");
   current = {
@@ -119,7 +119,7 @@ test("shows unfinished work as stopped when the run has failed", async ({ page }
   };
   await page.route(`**/api/runs/${detail.id}`, (route) => route.fulfill({ json: failed }));
   await page.goto(`/runs/${detail.id}`);
-  await page.getByRole("tab", { name: "History" }).click();
+  await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByText("Stopped", { exact: true })).toBeVisible();
   await expect(history.getByText("Pending", { exact: true })).toHaveCount(0);

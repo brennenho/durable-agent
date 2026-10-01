@@ -126,9 +126,9 @@ test("refreshes saved files without interrupting a download of the previous vers
     .poll(() => requested?.searchParams.get("version_id"))
     .toBe(files.workspace_version_id);
   changed = true;
-  await page.getByRole("tab", { name: "History" }).click();
+  await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   await page.clock.fastForward(2_000);
-  await page.getByRole("tab", { name: "Result", exact: true }).click();
+  await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   await expect(page.getByRole("button", { name: "Download result.md" })).toBeVisible();
   await expect(page.getByRole("button", { name: `Download ${path}` })).toHaveCount(0);
   const downloaded = page.waitForEvent("download", { timeout: 3_000 });

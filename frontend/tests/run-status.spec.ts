@@ -44,16 +44,16 @@ for (const status of [408, 429, 503]) {
       });
     });
     await page.goto(url);
-    await expect(page.getByRole("status")).toHaveText("Status: running");
+    await expect(page.getByRole("status")).toHaveText("Working");
     phase = "error";
     await page.clock.fastForward(2_000);
     await expect(page.getByRole("alert", { name: "Run update error" })).toContainText(
       "Database unavailable.",
     );
-    await expect(page.getByRole("status")).toHaveText("Status: running");
+    await expect(page.getByRole("status")).toHaveText("Working");
     phase = "succeeded";
     await page.clock.fastForward(2_000);
-    await expect(page.getByRole("status")).toHaveText("Status: succeeded");
+    await expect(page.getByRole("status")).toHaveText("Completed");
     await expect(page.getByRole("region", { name: "Final output" })).toContainText(
       "<script>not executable</script>",
     );
@@ -99,7 +99,7 @@ test("shows unknown runs as errors", async ({ page }) => {
   );
   await page.goto(url);
   await expect(page.getByRole("alert", { name: "Run update error" })).toHaveText("Run not found.");
-  await expect(page.getByRole("heading", { name: "Run details" })).toHaveCount(0);
+  await expect(page.getByRole("article", { name: "Chat turn" })).toHaveCount(0);
 });
 
 test("stops polling when navigating away", async ({ page }) => {
@@ -110,8 +110,8 @@ test("stops polling when navigating away", async ({ page }) => {
     return route.fulfill({ json: runDetail });
   });
   await page.goto(url);
-  await expect(page.getByRole("status")).toHaveText("Status: queued");
-  await page.getByRole("link", { name: "New run" }).click();
+  await expect(page.getByRole("status")).toHaveText("Waiting to start");
+  await page.getByRole("link", { name: "New chat" }).click();
   await expect(page.getByRole("heading", { name: "What are we working on?" })).toBeVisible();
   const count = requests;
   await page.clock.fastForward(10_000);
@@ -127,19 +127,19 @@ test("opens the saved chat after sending a message", async ({ page }) => {
   await page.getByRole("textbox").fill(run.prompt);
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page).toHaveURL(new RegExp(`${run.id}$`));
-  await expect(page.getByRole("heading", { name: "Run details" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Chat turn" })).toBeVisible();
 });
 
-test("switches between result and history with the keyboard", async ({ page }) => {
+test("expands activity with the keyboard without hiding the answer", async ({ page }) => {
   await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
   await page.goto(url);
-  const result = page.getByRole("tab", { name: "Result", exact: true });
-  await expect(result).toHaveAttribute("aria-selected", "true");
-  await result.focus();
-  await result.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+  const activity = page.getByLabel("Activity", { exact: true }).locator(":scope > summary");
+  await expect(page.getByRole("region", { name: "Execution history" })).toBeHidden();
+  await activity.focus();
+  await activity.press("Enter");
   await expect(page.getByRole("region", { name: "Execution history" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Final output" })).toBeHidden();
-  await page.getByRole("tab", { name: "History" }).press("ArrowLeft");
+  await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
+  await activity.press("Enter");
+  await expect(page.getByRole("region", { name: "Execution history" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
 });

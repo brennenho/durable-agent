@@ -30,7 +30,7 @@ test("sends a prompt once and opens the saved chat", async ({ page }) => {
   await expect(page.getByRole("textbox")).toBeDisabled();
   release();
   await expect(page).toHaveURL(`/runs/${run.id}`);
-  await expect(page.getByRole("status")).toHaveText("Status: queued");
+  await expect(page.getByRole("status")).toHaveText("Waiting to start");
   expect(bodies).toHaveLength(1);
   expect(bodies[0].prompt).toBe(run.prompt);
   expect(bodies[0].submission_key).toMatch(/^[0-9a-f-]{36}$/);
