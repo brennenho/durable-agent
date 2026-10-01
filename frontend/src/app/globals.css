@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
   --color-background: #f7f8f6;
   --color-foreground: #202923;
@@ -29,6 +31,7 @@
     @apply border-border;
   }
   body {
+    color-scheme: light;
     @apply m-0 bg-background font-sans text-sm text-foreground antialiased;
   }
   main {
@@ -67,12 +70,6 @@
   [role="alert"] {
     @apply text-destructive;
   }
-  button:not([data-slot]) {
-    @apply cursor-pointer rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-primary-foreground;
-  }
-  button:disabled {
-    @apply cursor-wait opacity-50;
-  }
 }
 
 @layer components {
@@ -92,8 +89,7 @@
     @apply whitespace-pre-wrap wrap-anywhere;
   }
   .operation-list,
-  .attempt-list,
-  .file-list {
+  .attempt-list {
     @apply list-none p-0;
   }
   .operation-list > li + li {
@@ -104,11 +100,5 @@
   }
   .attempt-error {
     @apply text-destructive;
-  }
-  .file-list li {
-    @apply my-3 wrap-anywhere;
-  }
-  .file-download {
-    @apply max-w-full bg-card text-left text-primary wrap-anywhere;
   }
 }
