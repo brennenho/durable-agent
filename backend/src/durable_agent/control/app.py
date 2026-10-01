@@ -6,9 +6,10 @@ from urllib.parse import quote
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy import text
 
 from durable_agent.contracts import (
     Assignment,
@@ -27,6 +28,8 @@ from durable_agent.contracts import (
 )
 from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
+from durable_agent.control.leases import claim, heartbeat
+from durable_agent.control.reports import accept_report
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.control.runtime import DATABASE_UNAVAILABLE, Runtime, Settings, open_runtime
 from durable_agent.control.views import detail, list_summaries
@@ -40,19 +43,16 @@ routes = APIRouter(
 )
 
 
-async def not_implemented(request: Request, exc: NotImplementedError) -> JSONResponse:
-    error = ExecutionError(code="not_implemented", message=str(exc), retryable=False)
-    return JSONResponse(status_code=501, content=ErrorResponse(error=error).model_dump(mode="json"))
-
-
 @health.get("/health/live", tags=["health"])
 async def liveness() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @health.get("/health/ready", tags=["health"])
-async def readiness() -> dict[str, str]:
-    raise HTTPException(503, "Service implementation has not started")
+async def readiness(request: Request) -> dict[str, str]:
+    async with get_runtime(request).db.session() as session:
+        await session.execute(text("SELECT 1"))
+    return {"status": "ok"}
 
 
 @routes.post(
@@ -145,8 +145,11 @@ async def download_run_file(
 
 
 @routes.post("/internal/claims", response_model=Assignment | None, operation_id="claim_work")
-async def claim_work(body: ClaimRequest) -> Assignment | None:
-    raise NotImplementedError("Work claiming is not implemented")
+async def claim_work(body: ClaimRequest, request: Request) -> Assignment | None:
+    async with get_runtime(request).db.session() as session:
+        assignment = await claim(session, body.worker_id)
+        await session.commit()
+        return assignment
 
 
 @routes.post(
@@ -155,8 +158,13 @@ async def claim_work(body: ClaimRequest) -> Assignment | None:
     operation_id="heartbeat_attempt",
     responses={409: {"model": ErrorResponse, "description": "Expired or superseded attempt"}},
 )
-async def heartbeat_attempt(attempt_id: UUID, body: HeartbeatRequest) -> HeartbeatResponse:
-    raise NotImplementedError("Attempt heartbeats are not implemented")
+async def heartbeat_attempt(
+    attempt_id: UUID, body: HeartbeatRequest, request: Request
+) -> HeartbeatResponse:
+    async with get_runtime(request).db.session() as session:
+        response = await heartbeat(session, attempt_id, body)
+        await session.commit()
+        return response
 
 
 @routes.post(
@@ -165,8 +173,11 @@ async def heartbeat_attempt(attempt_id: UUID, body: HeartbeatRequest) -> Heartbe
     operation_id="report_attempt",
     responses={409: {"model": ErrorResponse, "description": "Stale attempt or conflicting report"}},
 )
-async def report_attempt(attempt_id: UUID, body: ReportRequest) -> ReportResponse:
-    raise NotImplementedError("Attempt reports are not implemented")
+async def report_attempt(attempt_id: UUID, body: ReportRequest, request: Request) -> ReportResponse:
+    async with get_runtime(request).db.session() as session:
+        response = await accept_report(session, attempt_id, body)
+        await session.commit()
+        return response
 
 
 def get_runtime(request: Request) -> Runtime:
@@ -204,7 +215,6 @@ def create_app(
                 del app.state.runtime
 
     application = FastAPI(title="Durable Agent Control", version="0.1.0", lifespan=lifespan)
-    application.add_exception_handler(NotImplementedError, not_implemented)
     application.add_exception_handler(ControlError, control_error)
     for exception in DATABASE_UNAVAILABLE:
         application.add_exception_handler(exception, database_error)
