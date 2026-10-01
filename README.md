@@ -1,0 +1,94 @@
+# Durable Agent
+
+Monorepo scaffold for a Next.js frontend and Python backend.
+The planned architecture is in [DESIGN.md](DESIGN.md).
+
+## Structure
+
+```text
+frontend/                       Next.js app and placeholder page
+backend/
+  src/durable_agent/
+    control/                    FastAPI entry point
+    harness/                    Empty package for the agent loop
+    worker/                     Placeholder entry point
+    tools/                      FastAPI entry point
+    db/                         Empty package for database code
+    contracts.py                Placeholder for shared payloads
+  migrations/                   Empty; no schema or migration setup
+  tests/                        Empty component and integration directories
+contracts/                      Generated OpenAPI
+scripts/                        API export
+docker/                         Dockerfiles
+compose.yaml                    Local services
+```
+
+`frontend/` owns its pnpm dependencies; `backend/` owns its uv dependencies.
+The manifests include the planned stack. No database models, queries, migrations,
+agent logic, tool implementations, or application API payloads are implemented.
+
+The APIs expose liveness (`200`) and readiness (`503`) only. Compose checks liveness
+so the scaffold can start; application readiness will be implemented later.
+The worker is a placeholder and is excluded from default startup.
+
+## Run locally
+
+With Docker running:
+
+```bash
+cp .env.example .env
+docker compose up --build frontend control tools
+```
+
+Open `http://localhost:3000`. API docs are at `http://localhost:8000/docs`
+and `http://localhost:8001/docs`. No model calls or database operations run.
+
+An optional PostgreSQL container is configured for later development:
+
+```bash
+docker compose up -d db
+```
+
+Its named volume survives `docker compose down`; `down -v` deletes it.
+
+## Develop without containers
+
+Use Node 24, pnpm 11.25.0, Python 3.12+, and uv. From the repository root:
+
+```bash
+pnpm --dir frontend install --frozen-lockfile
+uv sync --project backend --locked
+pnpm --dir frontend dev
+```
+
+Run the API entry points in separate terminals:
+
+```bash
+uv run --project backend uvicorn durable_agent.control.app:app --port 8000
+uv run --project backend uvicorn durable_agent.tools.app:app --port 8001
+```
+
+Local commands read environment variables from your shell; Compose reads `.env`.
+
+## Checks and API generation
+
+```bash
+uv run --project backend ruff check backend/src scripts
+uv run --project backend ruff format --check backend/src scripts
+pnpm --dir frontend check
+docker compose config --quiet
+```
+
+No tests have been implemented. After routes and payloads are added, regenerate types:
+
+```bash
+uv run --project backend python scripts/export_openapi.py
+pnpm --dir frontend api:generate
+```
+
+The generated files currently contain only health endpoints.
+
+## Parallel work
+
+[docs/PARALLEL_WORK.md](docs/PARALLEL_WORK.md) assigns component directories and
+shared files to their owners. [docs/API.md](docs/API.md) describes the contract handoff.

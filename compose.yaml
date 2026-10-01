@@ -1,0 +1,87 @@
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.backend
+  image: durable-agent-backend:dev
+  restart: unless-stopped
+  environment: &backend-environment
+    DATABASE_URL: postgresql://durable:durable@db:5432/durable
+  volumes:
+    - ./backend/src:/app/backend/src:ro
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: durable
+      POSTGRES_PASSWORD: durable
+      POSTGRES_DB: durable
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durable -d durable"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  control:
+    <<: *backend
+    command: ["uvicorn", "durable_agent.control.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      <<: *backend-environment
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  tools:
+    <<: *backend
+    command: ["uvicorn", "durable_agent.tools.app:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "127.0.0.1:8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  worker:
+    <<: *backend
+    profiles: ["worker"]
+    restart: "no"
+    command: ["python", "-m", "durable_agent.worker"]
+    environment:
+      CONTROL_URL: http://control:8000
+      TOOLS_URL: http://tools:8001
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      control:
+        condition: service_healthy
+      tools:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      CONTROL_URL: http://control:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./frontend/src:/app/frontend/src
+    depends_on:
+      control:
+        condition: service_started
+
+volumes:
+  postgres_data:
