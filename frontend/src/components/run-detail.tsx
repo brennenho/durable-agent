@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, requestJson, type RunDetail } from "../lib/api";
 import { RunHistory } from "./run-history";
+import { SavedFiles } from "./saved-files";
 
 export function RunDetailView({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
@@ -73,6 +74,7 @@ export function RunDetailView({ runId }: { runId: string }) {
               <pre>{run.final_answer || "The agent returned an empty answer."}</pre>
             </section>
           )}
+          <SavedFiles runId={run.id} workspaceVersionId={run.workspace_version_id} />
           <RunHistory operations={run.operations} status={run.status} />
         </>
       )}
