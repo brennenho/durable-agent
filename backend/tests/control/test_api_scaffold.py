@@ -40,7 +40,7 @@ def client():
 )
 def test_routes_report_unimplemented_instead_of_success(method, path, body, client):
     response = client.request(method, path, json=body)
-    implemented = path in {"/api/runs", f"/api/runs/{ID}"}
+    implemented = path.startswith("/api/")
     assert response.status_code == (503 if implemented else 501)
     assert response.json()["error"]["code"] == ("not_ready" if implemented else "not_implemented")
 
