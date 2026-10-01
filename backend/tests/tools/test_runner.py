@@ -9,13 +9,15 @@ from durable_agent.tools.runner import DockerRunner, SandboxConfiguration, Sandb
 
 
 @pytest.fixture
-def docker_runner():
+def docker_runner(tmp_path):
     image = os.environ.get("SANDBOX_TEST_IMAGE")
     if not image:
         pytest.skip("Set SANDBOX_TEST_IMAGE to an installed, pinned Python sandbox image")
     runner = DockerRunner(
         docker=os.environ.get("DOCKER_BIN", "docker"), owner=f"test-{uuid4().hex}"
     )
+    if os.getuid() == 0:
+        os.chown(tmp_path, runner.uid, runner.gid)
     config = SandboxConfig(image_digest=image, workspace_max_bytes=1024 * 1024, log_max_bytes=103)
     return runner, config
 
@@ -29,8 +31,9 @@ def execute(runner, config, root, command, seconds=10, cwd="/workspace"):
     return asyncio.run(run())
 
 
+@pytest.mark.parametrize("exit_code", [7, 137])
 def test_command_runs_nonroot_offline_and_without_host_secrets(
-    docker_runner, tmp_path, monkeypatch
+    docker_runner, tmp_path, monkeypatch, exit_code
 ):
     runner, config = docker_runner
     monkeypatch.setenv("TOOLS_TEST_SECRET", "must-not-enter-sandbox")
@@ -38,11 +41,11 @@ def test_command_runs_nonroot_offline_and_without_host_secrets(
         'test $(id -u) != 0 && test -z "$TOOLS_TEST_SECRET" && '
         "test ! -e /var/run/docker.sock && test ! -w /etc && "
         "test $(wc -l < /proc/net/route) = 1 && "
-        "printf saved > file && printf stdout && printf stderr >&2 && exit 7"
+        f"printf saved > file && printf stdout && printf stderr >&2 && exit {exit_code}"
     )
     result = execute(runner, config, tmp_path, command)
     assert result.value == {
-        "exit_code": 7,
+        "exit_code": exit_code,
         "stdout": "stdout",
         "stderr": "stderr",
         "truncated": False,
@@ -58,11 +61,17 @@ def test_command_runs_nonroot_offline_and_without_host_secrets(
     )
 
 
-def test_logs_are_bounded_and_background_writers_stop(docker_runner, tmp_path):
+@pytest.mark.parametrize(
+    "background",
+    [
+        "(sleep 1; touch late) &",
+        'python -c "import subprocess; subprocess.Popen('
+        "['/bin/sh', '-c', 'sleep 1; touch late'], start_new_session=True)\";",
+    ],
+)
+def test_logs_are_bounded_and_background_writers_stop(docker_runner, tmp_path, background):
     runner, config = docker_runner
-    result = execute(
-        runner, config, tmp_path, "(sleep 1; touch late) & python -c 'print(\"x\" * 1000000)'"
-    )
+    result = execute(runner, config, tmp_path, background + " python -c 'print(\"x\" * 1000000)'")
     assert result.value["truncated"] is True
     assert len(result.value["stdout"].encode()) <= 103
     asyncio.run(asyncio.sleep(1.1))
@@ -102,15 +111,10 @@ def test_interrupted_container_is_removed(docker_runner, tmp_path, failure):
             async with asyncio.timeout(5):
                 while not (tmp_path / "partial").exists():
                     await asyncio.sleep(0.02)
-            ids = (
-                (
-                    await runner._checked(
-                        "ps", "-q", "--filter", f"label=durable-agent.tools.owner={runner.owner}"
-                    )
-                )
-                .decode()
-                .split()
+            containers = await runner._checked(
+                "ps", "-q", "--filter", f"label=durable-agent.tools.owner={runner.owner}"
             )
+            ids = containers.decode().split()
             assert len(ids) == 1
             if failure == "crash":
                 await runner._checked("kill", ids[0])
@@ -130,30 +134,16 @@ def test_cleanup_is_scoped_to_its_owner(docker_runner):
     runner, config = docker_runner
 
     async def run():
-        owned = (
-            (
-                await runner._checked(
-                    "create",
-                    "--label",
-                    f"durable-agent.tools.owner={runner.owner}",
-                    config.image_digest,
-                )
-            )
-            .decode()
-            .strip()
+        owned = await runner._checked(
+            "create", "--label", f"durable-agent.tools.owner={runner.owner}", config.image_digest
         )
-        other = (
-            (
-                await runner._checked(
-                    "create",
-                    "--label",
-                    f"durable-agent.tools.owner=other-{runner.owner}",
-                    config.image_digest,
-                )
-            )
-            .decode()
-            .strip()
+        other = await runner._checked(
+            "create",
+            "--label",
+            f"durable-agent.tools.owner=other-{runner.owner}",
+            config.image_digest,
         )
+        owned, other = owned.decode().strip(), other.decode().strip()
         try:
             await runner.cleanup_abandoned()
             assert (await runner._cli("inspect", owned))[0] != 0

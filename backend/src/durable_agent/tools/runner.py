@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+from contextlib import suppress
 from pathlib import Path
 from uuid import uuid4
 
@@ -56,7 +57,8 @@ class DockerRunner:
             return await process.wait(), stdout, stderr
         finally:
             if process.returncode is None:
-                process.kill()
+                with suppress(ProcessLookupError):
+                    process.kill()
             for reader in readers:
                 reader.cancel()
             await asyncio.gather(*readers, return_exceptions=True)
@@ -71,7 +73,7 @@ class DockerRunner:
     async def check_image(self, image: str) -> None:
         validate_image(image)
         async with asyncio.timeout(10):
-            code, _, stderr = await self._cli("image", "inspect", image)
+            code, _, stderr = await self._cli("image", "inspect", "--format", "{{.Id}}", image)
         if code:
             error = stderr.decode(errors="replace")
             if "No such image" in error:
@@ -81,15 +83,10 @@ class DockerRunner:
     async def cleanup_abandoned(self) -> None:
         """One service instance owns this label; never share it across live instances."""
         async with asyncio.timeout(10):
-            ids = (
-                (
-                    await self._checked(
-                        "ps", "-aq", "--filter", f"label=durable-agent.tools.owner={self.owner}"
-                    )
-                )
-                .decode()
-                .split()
+            output = await self._checked(
+                "ps", "-aq", "--filter", f"label=durable-agent.tools.owner={self.owner}"
             )
+            ids = output.decode().split()
             if ids:
                 await self._checked("rm", "-f", *ids)
 
@@ -114,43 +111,25 @@ class DockerRunner:
                 await self.check_image(config.image_digest)
                 await self._checked(
                     "create",
-                    "--name",
-                    name,
-                    "--pull",
-                    "never",
-                    "--label",
-                    f"durable-agent.tools.owner={self.owner}",
-                    "--user",
-                    f"{self.uid}:{self.gid}",
-                    "--network",
-                    "none",
+                    f"--name={name}",
+                    "--pull=never",
+                    f"--label=durable-agent.tools.owner={self.owner}",
+                    f"--user={self.uid}:{self.gid}",
+                    "--network=none",
                     "--read-only",
-                    "--cap-drop",
-                    "ALL",
-                    "--security-opt",
-                    "no-new-privileges",
-                    "--memory",
-                    "512m",
-                    "--memory-swap",
-                    "512m",
-                    "--cpus",
-                    "1",
-                    "--pids-limit",
-                    "64",
-                    "--ulimit",
-                    f"fsize={config.workspace_max_bytes}",
-                    "--tmpfs",
-                    "/tmp:rw,nosuid,nodev,size=64m,mode=1777",
-                    "--mount",
-                    f"type=bind,source={workspace},target=/workspace",
-                    "--workdir",
-                    "/workspace",
-                    "--env",
-                    "HOME=/tmp",
-                    "--env",
-                    "PYTHONDONTWRITEBYTECODE=1",
-                    "--entrypoint",
-                    "python",
+                    "--cap-drop=ALL",
+                    "--security-opt=no-new-privileges",
+                    "--memory=512m",
+                    "--memory-swap=512m",
+                    "--cpus=1",
+                    "--pids-limit=64",
+                    f"--ulimit=fsize={config.workspace_max_bytes}",
+                    "--tmpfs=/tmp:rw,nosuid,nodev,size=64m,mode=1777",
+                    f"--mount=type=bind,source={workspace},target=/workspace",
+                    "--workdir=/workspace",
+                    "--env=HOME=/tmp",
+                    "--env=PYTHONDONTWRITEBYTECODE=1",
+                    "--entrypoint=python",
                     config.image_digest,
                     "-I",
                     "-c",
