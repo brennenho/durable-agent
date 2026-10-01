@@ -15,6 +15,9 @@ from durable_agent.control.views import (
 )
 from durable_agent.db.models import Attempt, Operation, Run
 
+from .test_leases import claimed, queued
+from .test_reports import report, report_body
+
 
 def model(*calls):
     return ModelResult(
@@ -91,5 +94,33 @@ def test_detail_returns_ordered_attempts_and_final_answer(database, config):
                 with pytest.raises(ControlError) as caught:
                     await detail(session, uuid4())
                 assert caught.value.status == 404
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("view", ["list", "detail"])
+def test_views_refresh_rows_loaded_before_another_transaction_reports(database, config, view):
+    async def exercise():
+        async with database() as db:
+            run_id = await queued(db, config)
+            assignment = await claimed(db)
+            body = await report_body(db, assignment)
+            async with db.session() as session:
+                run = await session.get(Run, run_id)
+                operation = await session.get(Operation, assignment.operation_id)
+                attempt = await session.get(Attempt, assignment.attempt_id)
+                assert run.status == attempt.status == "running"
+                assert operation.result is None
+                await report(db, assignment, body)
+                if view == "list":
+                    listed = (await list_summaries(session))[0]
+                    assert listed.status == "succeeded"
+                    assert listed.last_progress_at is not None
+                else:
+                    saved = await detail(session, run_id)
+                    assert saved.status == "succeeded"
+                    assert saved.final_answer == "Done"
+                    assert saved.operations[0].result == body.outcome.result
+                    assert saved.operations[0].attempts[0].status == "accepted"
 
     asyncio.run(exercise())
