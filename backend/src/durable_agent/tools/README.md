@@ -16,6 +16,11 @@ duplicate paths, and invalid directory hierarchies are rejected.
 restoring them. Its database functions use a caller-owned async session: saving a
 checkpoint flushes but does not commit. Existing versions are never updated.
 
+`publication.py` registers immutable operation inputs and fences result publication
+with a row lock and the latest registered generation. Callers commit registration
+before executing, then commit the validated checkpoint and result together. A retry
+returns the existing completion; publication never replaces it.
+
 Filesystem/archive functions are synchronous; service handlers must offload them
 from the event loop, outside database transactions. HTTP handlers, tool execution,
 and the sandbox runner are pending.
