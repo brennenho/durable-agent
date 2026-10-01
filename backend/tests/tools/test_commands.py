@@ -1,9 +1,10 @@
 import asyncio
 
 import pytest
+from durable_agent.contracts import SandboxConfig
 from durable_agent.tools.archives import InvalidWorkspace, capture_workspace, unpack_workspace
 from durable_agent.tools.commands import InvalidCommand, execute_command_tool
-from durable_agent.tools.runner import SandboxFailure
+from durable_agent.tools.runner import DockerRunner, SandboxFailure
 from durable_agent.tools.workspaces import read_workspace_file
 
 
@@ -90,6 +91,8 @@ def test_timeout_discards_partial_edits_and_retry_restores_saved_input(saved_inp
 @pytest.mark.parametrize(
     "arguments", [{}, {"command": 123}, {"command": "\0"}, {"command": "true", "extra": 1}]
 )
-def test_invalid_command_schema_fails_before_launch(saved_input, docker_runner, arguments):
+def test_invalid_command_schema_fails_before_launch(saved_input, arguments):
+    runner = DockerRunner(docker="must-not-launch")
+    config = SandboxConfig(image_digest="sha256:test", workspace_max_bytes=1024, log_max_bytes=100)
     with pytest.raises(InvalidCommand):
-        execute(saved_input, docker_runner, arguments)
+        execute(saved_input, (runner, config), arguments)
