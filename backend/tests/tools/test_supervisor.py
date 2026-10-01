@@ -2,6 +2,7 @@ import asyncio
 import json
 import shlex
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -74,7 +75,7 @@ def test_standalone_protocol_distinguishes_command_exit_from_supervisor_failure(
             str(Path(supervisor.__file__)),
             command,
             str(tmp_path),
-            str(timeout),
+            str(time.time() + timeout),
             "100",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -88,3 +89,6 @@ def test_standalone_protocol_distinguishes_command_exit_from_supervisor_failure(
     code, stdout = asyncio.run(execute("sleep 10", 0.05))
     assert code != 0
     assert not stdout
+    code, _ = asyncio.run(execute("touch too-late", -1))
+    assert code != 0
+    assert not (tmp_path / "too-late").exists()

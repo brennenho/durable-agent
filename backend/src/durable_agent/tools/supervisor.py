@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import sys
+import time
 
 
 def stop_children(pid: int) -> None:
@@ -84,7 +85,7 @@ async def supervise(command: str, cwd: str, timeout: float, log_limit: int) -> d
 
 
 if __name__ == "__main__":
-    command, cwd, timeout, log_limit = sys.argv[1:]
+    command, cwd, deadline, log_limit = sys.argv[1:]
     # A supervisor failure emits no completed result and exits nonzero.
-    result = asyncio.run(supervise(command, cwd, float(timeout), int(log_limit)))
+    result = asyncio.run(supervise(command, cwd, float(deadline) - time.time(), int(log_limit)))
     print(json.dumps(result), flush=True)
