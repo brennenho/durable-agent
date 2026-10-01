@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, FileText, LoaderCircle } from "lucide-react";
 import { request, requestJson, type RunFileListing } from "../lib/api";
 import { Button } from "./ui/button";
+import { FilePreview } from "./file-preview";
 
 export function SavedFiles({
   runId,
@@ -17,6 +18,8 @@ export function SavedFiles({
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
+  const previewTrigger = useRef<HTMLButtonElement | null>(null);
   const downloadController = useRef<AbortController | null>(null);
   const base = `/api/runs/${encodeURIComponent(runId)}`;
 
@@ -68,6 +71,7 @@ export function SavedFiles({
   }
 
   const files = listing?.entries.filter((entry) => entry.kind === "file");
+  const preview = files?.find((entry) => entry.path === previewPath);
   if (files?.length === 0 && !error && !downloadError && !downloading) return null;
 
   return (
@@ -94,17 +98,29 @@ export function SavedFiles({
       {files && (
         <ul className="m-0 flex flex-wrap gap-2 p-0">
           {files.map((entry) => (
-            <li key={entry.path} className="min-w-0 max-w-full">
+            <li key={entry.path} className="flex min-w-0 max-w-full rounded-md border">
               <Button
-                variant="outline"
-                className="h-auto max-w-full justify-start gap-2 px-3 py-2 text-left whitespace-normal shadow-none"
+                variant="ghost"
+                className="h-auto min-w-0 justify-start gap-2 rounded-r-none px-3 py-2 text-left whitespace-normal"
+                onClick={(event) => {
+                  previewTrigger.current = event.currentTarget;
+                  setDownloadError(null);
+                  setPreviewPath(entry.path);
+                }}
+                aria-label={`Preview ${entry.path}`}
+              >
+                <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-all text-xs font-normal">{entry.path}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-auto rounded-l-none border-l"
                 disabled={downloading !== null}
                 aria-busy={downloading === entry.path}
                 onClick={() => download(entry.path)}
                 aria-label={`Download ${entry.path}`}
               >
-                <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" />
-                <span className="min-w-0 break-all text-xs font-normal">{entry.path}</span>
                 {downloading === entry.path ? (
                   <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
                 ) : (
@@ -114,6 +130,18 @@ export function SavedFiles({
             </li>
           ))}
         </ul>
+      )}
+      {listing && preview && (
+        <FilePreview
+          runId={runId}
+          versionId={listing.workspace_version_id}
+          entry={preview}
+          onClose={() => setPreviewPath(null)}
+          onDownload={() => download(preview.path)}
+          downloading={downloading !== null}
+          downloadError={downloadError}
+          trigger={previewTrigger}
+        />
       )}
       {downloadError && (
         <p
