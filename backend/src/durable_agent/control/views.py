@@ -76,6 +76,7 @@ async def list_summaries(session: AsyncSession) -> list[RunSummary]:
         .outerjoin(Operation, Run.id == Operation.run_id)
         .group_by(Run.id)
         .order_by(Run.created_at.desc(), Run.id.desc())
+        .execution_options(populate_existing=True)
     )
     return [summary(run, progress) for run, progress in rows]
 
@@ -83,14 +84,22 @@ async def list_summaries(session: AsyncSession) -> list[RunSummary]:
 async def load_operations(session: AsyncSession, run_id: UUID) -> list[Operation]:
     return list(
         await session.scalars(
-            select(Operation).where(Operation.run_id == run_id).order_by(Operation.position)
+            select(Operation)
+            .where(Operation.run_id == run_id)
+            .order_by(Operation.position)
+            .execution_options(populate_existing=True)
         )
     )
 
 
 async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
     # All progress writers lock this row. SHARE keeps this multi-query view consistent.
-    run = await session.scalar(select(Run).where(Run.id == run_id).with_for_update(read=True))
+    run = await session.scalar(
+        select(Run)
+        .where(Run.id == run_id)
+        .with_for_update(read=True)
+        .execution_options(populate_existing=True)
+    )
     if run is None:
         raise ControlError(404, "run_not_found", "Run not found")
     operations = await load_operations(session, run_id)
@@ -99,6 +108,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
         .join(Operation)
         .where(Operation.run_id == run_id)
         .order_by(Operation.position, Attempt.attempt_no)
+        .execution_options(populate_existing=True)
     )
     by_operation = {op.id: [] for op in operations}
     for attempt in attempts:
