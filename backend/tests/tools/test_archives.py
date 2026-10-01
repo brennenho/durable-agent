@@ -64,6 +64,35 @@ def test_empty_workspace_and_exact_size_limit(tmp_path):
     assert not (tmp_path / "too-big").exists()
 
 
+def test_private_capture_preserves_unreadable_modes_and_restores_them_on_failure(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    directory = source / "private"
+    directory.mkdir()
+    file = directory / "secret"
+    file.write_bytes(b"private")
+    file.chmod(0)
+    directory.chmod(0)
+    try:
+        data = capture_workspace(source, 7, allow_permission_changes=True)
+        assert stat.S_IMODE(directory.stat().st_mode) == 0
+        with pytest.raises(InvalidWorkspace, match="file-size"):
+            capture_workspace(source, 6, allow_permission_changes=True)
+        assert stat.S_IMODE(directory.stat().st_mode) == 0
+    finally:
+        directory.chmod(0o700)
+    assert stat.S_IMODE(file.stat().st_mode) == 0
+    assert file.stat().st_size == 7
+    destination = tmp_path / "restored"
+    restore_workspace(data, destination, 7)
+    assert stat.S_IMODE((destination / "private").stat().st_mode) == 0
+    (destination / "private").chmod(0o700)
+    restored = destination / "private/secret"
+    assert stat.S_IMODE(restored.stat().st_mode) == 0
+    restored.chmod(0o600)
+    assert restored.read_bytes() == b"private"
+
+
 @pytest.mark.parametrize("kind", ["symlink", "directory-link", "hardlink", "fifo"])
 def test_capture_rejects_links_and_special_files(tmp_path, kind):
     source = tmp_path / "source"

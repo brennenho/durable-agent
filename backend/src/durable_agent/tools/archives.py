@@ -8,6 +8,7 @@ import stat
 import tarfile
 import zlib
 from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path, PurePosixPath
 
 METADATA_BUDGET = 4 * 1024 * 1024
@@ -32,23 +33,41 @@ def workspace_path(name: str) -> PurePosixPath:
     return path
 
 
-def _walk(root: Path) -> Iterator[Path]:
-    with os.scandir(root) as entries:
+@contextmanager
+def _readable(path: Path, bits: int, allow_permission_changes: bool):
+    mode = stat.S_IMODE(path.lstat().st_mode)
+    changed = allow_permission_changes and mode & bits != bits
+    if changed:
+        path.chmod(mode | bits)
+    try:
+        yield
+    finally:
+        if changed:
+            path.chmod(mode)
+
+
+def _walk(root: Path, allow_permission_changes: bool) -> Iterator[Path]:
+    with _readable(root, 0o500, allow_permission_changes), os.scandir(root) as entries:
         for entry in entries:
             path = Path(entry.path)
             yield path
             if entry.is_dir(follow_symlinks=False):
-                yield from _walk(path)
+                yield from _walk(path, allow_permission_changes)
 
 
-def capture_workspace(root: Path, max_bytes: int) -> bytes:
+def capture_workspace(
+    root: Path, max_bytes: int, *, allow_permission_changes: bool = False
+) -> bytes:
     """Capture files and directories after all writers have stopped."""
     if max_bytes < 0 or not stat.S_ISDIR(root.lstat().st_mode):
         raise InvalidWorkspace("Expected a directory and a nonnegative size limit")
     raw = io.BytesIO()
     total = 0
-    with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as archive:
-        for path in _walk(root):
+    with (
+        closing(_walk(root, allow_permission_changes)) as paths,
+        tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as archive,
+    ):
+        for path in paths:
             name = path.relative_to(root).as_posix()
             workspace_path(name)
             info = path.lstat()
@@ -63,7 +82,7 @@ def capture_workspace(root: Path, max_bytes: int) -> bytes:
             if total > max_bytes:
                 raise InvalidWorkspace("Workspace exceeds its file-size limit")
             if member.isfile():
-                with path.open("rb") as source:
+                with _readable(path, 0o400, allow_permission_changes), path.open("rb") as source:
                     archive.addfile(member, source)
             else:
                 archive.addfile(member)
