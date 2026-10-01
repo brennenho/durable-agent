@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ApiError, requestJson, type RunDetail } from "../lib/api";
+import { RunHistory } from "./run-history";
 
 export function RunDetailView({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
@@ -72,6 +73,7 @@ export function RunDetailView({ runId }: { runId: string }) {
               <pre>{run.final_answer || "The agent returned an empty answer."}</pre>
             </section>
           )}
+          <RunHistory operations={run.operations} status={run.status} />
         </>
       )}
     </div>
