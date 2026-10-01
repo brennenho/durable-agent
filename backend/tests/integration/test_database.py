@@ -5,7 +5,14 @@ from uuid import uuid4
 
 import pytest
 from alembic import command
-from durable_agent.db.models import Attempt, Operation, Run, ToolRequest, WorkspaceVersion
+from durable_agent.db.models import (
+    Attempt,
+    Conversation,
+    Operation,
+    Run,
+    ToolRequest,
+    WorkspaceVersion,
+)
 from durable_agent.db.session import Database
 from sqlalchemy import delete, func, insert, inspect, select, update
 from sqlalchemy.exc import IntegrityError
@@ -15,8 +22,10 @@ NOW = datetime(2026, 10, 1, tzinfo=UTC)
 
 
 def run_values(**overrides):
+    run_id = uuid4()
     return {
-        "id": uuid4(),
+        "id": run_id,
+        "conversation_id": run_id,
         "submission_key": uuid4(),
         "prompt": "Edit a file",
         "config": {"model": "test-model"},
@@ -26,11 +35,16 @@ def run_values(**overrides):
     }
 
 
+def insert_run(connection, values):
+    connection.execute(insert(Conversation).values(id=values["conversation_id"]))
+    connection.execute(insert(Run).values(**values))
+
+
 def add_operation(engine):
     run = run_values()
     operation_id = uuid4()
     with engine.begin() as connection:
-        connection.execute(insert(Run).values(**run))
+        insert_run(connection, run)
         connection.execute(
             insert(Operation).values(
                 id=operation_id, run_id=run["id"], position=0, kind="model", request={}
@@ -48,6 +62,7 @@ def add_workspace(engine):
 
 def test_migration_matches_models_and_round_trips(postgres_engine, migration_config):
     expected = {
+        "conversations",
         "runs",
         "operations",
         "attempts",
@@ -69,9 +84,9 @@ def test_migration_matches_models_and_round_trips(postgres_engine, migration_con
 def test_duplicate_submission_key_is_rejected(postgres_engine):
     key = uuid4()
     with postgres_engine.begin() as connection:
-        connection.execute(insert(Run).values(**run_values(submission_key=key)))
+        insert_run(connection, run_values(submission_key=key))
     with pytest.raises(IntegrityError) as caught, postgres_engine.begin() as connection:
-        connection.execute(insert(Run).values(**run_values(submission_key=key)))
+        insert_run(connection, run_values(submission_key=key))
     assert caught.value.orig.diag.constraint_name == "uq_runs_submission_key"
 
 
@@ -92,14 +107,14 @@ def test_duplicate_submission_key_is_rejected(postgres_engine):
 )
 def test_run_status_requires_consistent_fields(postgres_engine, changes, constraint):
     with pytest.raises(IntegrityError) as caught, postgres_engine.begin() as connection:
-        connection.execute(insert(Run).values(**run_values(**changes)))
+        insert_run(connection, run_values(**changes))
     assert caught.value.orig.diag.constraint_name == constraint
 
 
 def test_run_can_claim_retry_and_finish(postgres_engine):
     values = run_values()
     with postgres_engine.begin() as connection:
-        connection.execute(insert(Run).values(**values))
+        insert_run(connection, values)
         for generation in (1, 2):
             connection.execute(
                 update(Run)

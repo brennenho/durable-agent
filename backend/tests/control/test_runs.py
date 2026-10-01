@@ -5,7 +5,7 @@ import pytest
 from durable_agent.contracts import SubmitRunRequest
 from durable_agent.control.errors import ControlError
 from durable_agent.control.runs import create_run, find_submission
-from durable_agent.db.models import Operation, Run
+from durable_agent.db.models import Conversation, Operation, Run
 from sqlalchemy import func, select
 
 
@@ -16,6 +16,8 @@ def test_submission_persists_first_operation_and_freezes_config(database, config
             async with db.session() as session:
                 run = await create_run(session, body, config)
                 run_id = run.id
+                assert run.conversation_id == run.id
+                assert run.turn_index == 0
                 await session.commit()
             config.model = "changed-model"
             config.tool_schemas = [{"name": "invalid"}]
@@ -45,7 +47,7 @@ def test_interruption_before_commit_discards_run_and_first_operation(database, c
                     session, SubmitRunRequest(submission_key=uuid4(), prompt="Hi"), config
                 )
             async with db.session() as session:
-                for table in (Run, Operation):
+                for table in (Conversation, Run, Operation):
                     assert await session.scalar(select(func.count()).select_from(table)) == 0
 
     asyncio.run(exercise())
@@ -74,7 +76,7 @@ def test_concurrent_submissions_create_one_run_and_operation(database, config, s
             else:
                 assert results.count(409) == 1
             async with db.session() as session:
-                for table in (Run, Operation):
+                for table in (Conversation, Run, Operation):
                     assert await session.scalar(select(func.count()).select_from(table)) == 1
 
     asyncio.run(exercise())

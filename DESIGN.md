@@ -82,13 +82,19 @@ Use Docker Compose and OpenAI. For the first version:
 <details>
 <summary>Tables and constraints</summary>
 
-Five tables in one PostgreSQL database. Control owns `runs`, `operations`, and `attempts`; tools own `tool_requests` and `workspace_versions`. Use SQLAlchemy ORM with the psycopg 3 driver and Alembic migrations. Shared models live in `db/models.py`; each service owns its queries and explicit transactions. `?` means nullable.
+Six tables in one PostgreSQL database. Control owns `conversations`, `runs`, `operations`, and `attempts`; tools own `tool_requests` and `workspace_versions`. Use SQLAlchemy ORM with the psycopg 3 driver and Alembic migrations. Shared models live in `db/models.py`; each service owns its queries and explicit transactions. `?` means nullable.
 
-**`runs`** — Lifecycle and current lease.
+**`conversations`** — Groups ordered runs. `id: uuid` is the primary key;
+`created_at: timestamptz` records creation. Derive the title from the first prompt
+and status from the latest run. Existing runs keep their IDs and become one-turn conversations.
+
+**`runs`** — One user prompt, its execution, and current lease.
 
 | Column | Type | Purpose |
 | --- | --- | --- |
 | `id` | `uuid` | Primary key. |
+| `conversation_id` | `uuid` | FK to conversations. |
+| `turn_index` | `integer` | Zero-based order within the conversation. |
 | `submission_key` | `uuid` | Unique browser submission key. |
 | `prompt` | `text` | Initial prompt. |
 | `config` | `jsonb` | Frozen model/parameters, tool schemas, image digest, seed version ID, and limits. |
@@ -154,7 +160,8 @@ Five tables in one PostgreSQL database. Control owns `runs`, `operations`, and `
 
 **Constraints**
 
-- Unique submission key, `(run_id, position)`, and `(operation_id, attempt_no)`.
+- Unique submission key, `(conversation_id, turn_index)`, `(run_id, position)`, and `(operation_id, attempt_no)`.
+- At most one queued, running, or retrying run per conversation.
 - At most one running or accepted attempt per operation, enforced by a partial unique index.
 - Operation result/completion fields are both set or both null. Tool result/output-version/completion fields are all set or all null. Accepted results and workspace archives are immutable.
 - Lock the run for claims, acceptance, and expiry recovery. Only running runs have a lease; only queued/retrying runs have a claim time; only terminal runs have a finished_at. Check status/kind values.

@@ -27,10 +27,25 @@ class Base(DeclarativeBase):
     pass
 
 
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (
         UniqueConstraint("submission_key", name="uq_runs_submission_key"),
+        UniqueConstraint("conversation_id", "turn_index", name="uq_runs_conversation_turn"),
+        CheckConstraint("turn_index >= 0", name="ck_runs_turn_index"),
+        Index(
+            "uq_runs_one_active_per_conversation",
+            "conversation_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running', 'retrying')"),
+        ),
         CheckConstraint(
             "status IN ('queued', 'running', 'retrying', 'succeeded', 'failed')",
             name="ck_runs_status",
@@ -66,6 +81,8 @@ class Run(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"))
+    turn_index: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     submission_key: Mapped[UUID] = mapped_column(Uuid)
     prompt: Mapped[str] = mapped_column(Text)
     config: Mapped[JsonObject] = mapped_column(JSONB(none_as_null=True))
