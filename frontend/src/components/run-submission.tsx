@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { requestJson, type RunSummary, type SubmitRunRequest } from "../lib/api";
+import { ApiError, requestJson, type RunSummary, type SubmitRunRequest } from "../lib/api";
 
 export function RunSubmission() {
   const [prompt, setPrompt] = useState("");
@@ -33,7 +34,7 @@ export function RunSubmission() {
       setRun(saved);
     } catch (cause) {
       setError(
-        cause instanceof Error && cause.name === "Error"
+        cause instanceof ApiError
           ? cause.message
           : "Could not confirm submission. Retry to check the same request.",
       );
@@ -49,6 +50,9 @@ export function RunSubmission() {
         <h2 id="submitted-heading">Run submitted</h2>
         <p role="status">Status: {run.status}</p>
         <p className="run-id">Run ID: {run.id}</p>
+        <p>
+          <Link href={`/runs/${encodeURIComponent(run.id)}`}>View run</Link>
+        </p>
         <button
           onClick={() => {
             pending.current = null;

@@ -27,11 +27,7 @@ h2 {
 p {
   color: #536266;
   line-height: 1.6;
-}
-.eyebrow {
-  color: #345e4c;
-  font-size: 0.875rem;
-  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 section {
   margin-top: 40px;
@@ -79,4 +75,16 @@ button:disabled {
 .run-id {
   overflow-wrap: anywhere;
   font-family: monospace;
+}
+
+a {
+  color: #234e3a;
+}
+pre,
+.preserve-whitespace {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+pre {
+  line-height: 1.6;
 }
