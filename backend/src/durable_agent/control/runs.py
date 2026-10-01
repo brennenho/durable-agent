@@ -2,13 +2,13 @@
 
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from durable_agent.contracts import AgentConfig, SubmitRunRequest
 from durable_agent.control.errors import ControlError
-from durable_agent.db.models import Operation, Run
+from durable_agent.db.models import Conversation, Operation, Run
 from durable_agent.harness import start
 
 
@@ -25,10 +25,14 @@ async def create_run(session: AsyncSession, body: SubmitRunRequest, config: Agen
     transition = start(config, body.prompt)
     if transition.status == "failed":
         raise ControlError(400, transition.error.code, transition.error.message)
+    proposed_id = uuid4()
+    session.add(Conversation(id=proposed_id))
+    await session.flush()
     run_id = await session.scalar(
         insert(Run)
         .values(
-            id=uuid4(),
+            id=proposed_id,
+            conversation_id=proposed_id,
             submission_key=body.submission_key,
             prompt=body.prompt,
             config=config.model_dump(mode="json"),
@@ -39,7 +43,8 @@ async def create_run(session: AsyncSession, body: SubmitRunRequest, config: Agen
         .returning(Run.id)
     )
     if run_id is None:
-        # The unique key serializes racing submissions; re-read after the winner commits.
+        # Remove this transaction's unused conversation after a competing submission wins.
+        await session.execute(delete(Conversation).where(Conversation.id == proposed_id))
         return await find_submission(session, body)
     session.add(
         Operation(

@@ -1,6 +1,6 @@
 # Database boundary
 
-`models.py` defines the five tables. `Database` in `session.py` owns the async psycopg
+`models.py` defines the six tables. `Database` in `session.py` owns the async psycopg
 engine and session factory. Control and Tools each create one instance at startup,
 inject it into handlers, and close it after in-flight work finishes at shutdown.
 Connections open on first use. Workers do not use this module.
@@ -37,11 +37,11 @@ Keep HTTP calls and sandbox execution outside transactions. Queries, `flush()`,
 Autoflush is disabled: flush before queries that need pending writes. Commits flush
 automatically. Loaded attributes remain accessible after commit without implicit I/O.
 
-- Control writes `runs`, `operations`, and `attempts`.
+- Control writes `conversations`, `runs`, `operations`, and `attempts`.
 - Tools writes `tool_requests` and `workspace_versions`.
 - PostgreSQL enforces foreign keys, uniqueness, and consistent completion/status fields.
 - Services enforce input/result immutability, lease fencing, and atomic progress updates.
-  These behaviors remain to be implemented; there are no triggers or automatic retries.
+  There are no database triggers.
 
 Serialize contracts with `model_dump(mode="json")` for JSONB. Assign complete JSON
 values; in-place dictionary edits are not tracked. `None` is stored as SQL `NULL`,
