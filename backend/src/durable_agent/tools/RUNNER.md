@@ -18,4 +18,7 @@ Limits are one CPU, 512 MiB memory, 64 processes, 64 MiB scratch, and the config
 maximum file size. Total workspace size is validated when capturing the checkpoint.
 
 Docker tests require `SANDBOX_TEST_IMAGE`; set `DOCKER_BIN` if Docker is outside PATH.
-HTTP integration and checkpoint handling are separate from this launcher.
+`commands.py` restores each input into a new private directory, calls the runner,
+validates a complete checkpoint, and discards the directory on every exit path.
+Only normal command completion returns updated files. HTTP publication follows
+separately and must save those files and the result in one fenced transaction.
