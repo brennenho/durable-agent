@@ -74,10 +74,7 @@ export function RunSubmission() {
   }
 
   return (
-    <section aria-labelledby="submit-heading" className="submission-panel">
-      <h2 id="submit-heading" className="mb-6">
-        Start a run
-      </h2>
+    <section aria-label="Start a run" className="submission-panel">
       <form onSubmit={submit} aria-busy={busy}>
         <label htmlFor="prompt">What should the agent do?</label>
         <Textarea

@@ -127,3 +127,17 @@ test("opens the saved run from the submission confirmation", async ({ page }) =>
   await expect(page).toHaveURL(new RegExp(`${run.id}$`));
   await expect(page.getByRole("heading", { name: "Run details" })).toBeVisible();
 });
+
+test("switches between result and history with the keyboard", async ({ page }) => {
+  await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
+  await page.goto(url);
+  const result = page.getByRole("tab", { name: "Result", exact: true });
+  await expect(result).toHaveAttribute("aria-selected", "true");
+  await result.focus();
+  await result.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "Execution history" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Final output" })).toBeHidden();
+  await page.getByRole("tab", { name: "History" }).press("ArrowLeft");
+  await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
+});

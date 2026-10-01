@@ -76,6 +76,12 @@
 }
 
 @layer components {
+  .app-header {
+    @apply flex h-16 items-center justify-between border-b bg-card px-5 sm:px-8;
+  }
+  .new-run-page {
+    @apply max-w-3xl pt-12 sm:pt-20;
+  }
   .submission-panel {
     @apply mt-8 p-5 sm:p-7;
   }
