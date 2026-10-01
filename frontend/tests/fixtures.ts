@@ -1,4 +1,4 @@
-import type { RunSummary } from "../src/lib/api";
+import type { RunDetail, RunSummary } from "../src/lib/api";
 
 export const run: RunSummary = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -11,4 +11,11 @@ export const run: RunSummary = {
   last_heartbeat_at: null,
   last_progress_at: null,
   terminal_error: null,
+};
+
+export const runDetail: RunDetail = {
+  ...run,
+  operations: [],
+  final_answer: null,
+  workspace_version_id: "00000000-0000-4000-8000-000000000002",
 };
