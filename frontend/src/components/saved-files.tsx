@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, FileText, Folder, LoaderCircle } from "lucide-react";
+import { Download, FileText, LoaderCircle } from "lucide-react";
 import { request, requestJson, type RunFileListing } from "../lib/api";
 import { Button } from "./ui/button";
 
@@ -67,14 +67,15 @@ export function SavedFiles({
     }
   }
 
+  const files = listing?.entries.filter((entry) => entry.kind === "file");
+  if (files?.length === 0 && !error && !downloadError && !downloading) return null;
+
   return (
-    <section aria-labelledby="files-heading" className="min-w-0 overflow-hidden p-0">
-      <h2 id="files-heading" className="border-b px-5 py-4">
-        Saved files
-      </h2>
-      {!listing && !error && <p className="m-0 p-5 text-muted-foreground">Loading files…</p>}
+    <section aria-label="Saved files" className="mt-5 min-w-0 border-0 bg-transparent p-0">
+      <h2 className="sr-only">Saved files</h2>
+      {!listing && !error && <p className="text-xs text-muted-foreground">Loading files…</p>}
       {error && (
-        <div className="p-5">
+        <div>
           <p role="alert" aria-label="File listing error" className="mt-0">
             {error}
           </p>
@@ -90,43 +91,26 @@ export function SavedFiles({
           </Button>
         </div>
       )}
-      {listing?.entries.length === 0 && (
-        <p className="m-0 p-5 text-muted-foreground">No files saved yet.</p>
-      )}
-      {listing && (
-        <ul className="m-0 divide-y p-0">
-          {listing.entries.map((entry) => (
-            <li key={entry.path}>
-              {entry.kind === "directory" ? (
-                <span className="flex items-center gap-2 px-5 py-2 text-xs text-muted-foreground">
-                  <Folder aria-hidden="true" className="size-4 shrink-0" />
-                  <span className="break-all">{entry.path}/</span>
-                </span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  className="h-auto w-full justify-start gap-3 rounded-none px-5 py-3 text-left whitespace-normal focus-visible:ring-inset"
-                  disabled={downloading !== null}
-                  aria-busy={downloading === entry.path}
-                  onClick={() => download(entry.path)}
-                  aria-label={`Download ${entry.path}`}
-                >
-                  <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block break-all text-xs">{entry.path}</span>
-                    {entry.size_bytes != null && (
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                        {entry.size_bytes.toLocaleString()} bytes
-                      </span>
-                    )}
-                  </span>
-                  {downloading === entry.path ? (
-                    <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
-                  ) : (
-                    <Download aria-hidden="true" className="size-3.5 text-muted-foreground" />
-                  )}
-                </Button>
-              )}
+      {files && (
+        <ul className="m-0 flex flex-wrap gap-2 p-0">
+          {files.map((entry) => (
+            <li key={entry.path} className="min-w-0 max-w-full">
+              <Button
+                variant="outline"
+                className="h-auto max-w-full justify-start gap-2 px-3 py-2 text-left whitespace-normal shadow-none"
+                disabled={downloading !== null}
+                aria-busy={downloading === entry.path}
+                onClick={() => download(entry.path)}
+                aria-label={`Download ${entry.path}`}
+              >
+                <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-all text-xs font-normal">{entry.path}</span>
+                {downloading === entry.path ? (
+                  <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
+                ) : (
+                  <Download aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                )}
+              </Button>
             </li>
           ))}
         </ul>
@@ -135,7 +119,7 @@ export function SavedFiles({
         <p
           role="alert"
           aria-label="File download error"
-          className="m-0 border-t bg-destructive/5 p-5"
+          className="mt-3 rounded-md bg-destructive/5 p-3 text-xs"
         >
           {downloadError}
         </p>
