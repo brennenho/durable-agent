@@ -1,12 +1,7 @@
-"""Connection setup only. Callers choose transaction boundaries and dispose the engine."""
+"""Service-owned connection pool and per-task async sessions."""
 
 from sqlalchemy.engine import URL, make_url
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
 def postgres_url(database_url: str) -> URL:
@@ -16,10 +11,17 @@ def postgres_url(database_url: str) -> URL:
     return url.set(drivername="postgresql+psycopg")
 
 
-def create_database_engine(database_url: str) -> AsyncEngine:
-    return create_async_engine(postgres_url(database_url), pool_pre_ping=True)
+class Database:
+    """Create once at service startup; close after sessions finish at shutdown."""
 
+    def __init__(self, database_url: str) -> None:
+        self._engine = create_async_engine(postgres_url(database_url), pool_pre_ping=True)
+        self._sessions = async_sessionmaker(self._engine, expire_on_commit=False, autoflush=False)
 
-def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
-    """Return a per-task session context; callers explicitly await commit for writes."""
-    return async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+    def session(self) -> AsyncSession:
+        """Return a fresh session. Writes require an explicit commit."""
+        return self._sessions()
+
+    async def close(self) -> None:
+        """Release pooled connections after in-flight work has stopped."""
+        await self._engine.dispose()

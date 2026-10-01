@@ -1,32 +1,31 @@
 # Database boundary
 
-`models.py` defines the five tables. `session.py` creates an async psycopg engine
-and session factory without connecting at import time. Control and Tools each
-create one engine at startup and dispose it at shutdown. Workers do not use this module.
-
-The session factory is the database abstraction. Use it directly; no repository or
-session wrapper is needed. Create it once per service and inject it into handlers:
+`models.py` defines the five tables. `Database` in `session.py` owns the async psycopg
+engine and session factory. Control and Tools each create one instance at startup,
+inject it into handlers, and close it after in-flight work finishes at shutdown.
+Connections open on first use. Workers do not use this module.
 
 ```python
-engine = create_database_engine(database_url)
-db_session = create_session_factory(engine)
+from durable_agent.db.session import Database
+
+db = Database(database_url)
 
 # Write: the caller chooses when the transaction commits.
-async with db_session() as session:
+async with db.session() as session:
     session.add(WorkspaceVersion(archive=archive_bytes))
     await session.commit()
 
 # Read: no commit needed.
-async with db_session() as session:
+async with db.session() as session:
     workspace = await session.get(WorkspaceVersion, version_id)
 
-await engine.dispose()  # At service shutdown.
+await db.close()  # At service shutdown, in the lifespan cleanup/finally block.
 ```
 
 Exiting closes the session and rolls back uncommitted work, including on exceptions
 or cancellation. A successful `commit()` cannot be undone by a later exception.
-For an explicitly scoped transaction, `async with db_session.begin() as session:`
-commits on success and rolls back on failure; do not also commit inside that block.
+For automatic commit on success and rollback on failure, use
+`async with db.session() as session, session.begin():`. Do not also commit inside that block.
 
 Use the same session type and pool for reads and writes. Separate factories add no
 value with one database; add enforced read-only transactions or replica routing only
