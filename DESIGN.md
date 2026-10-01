@@ -225,10 +225,10 @@ durable-agent/
 
 One owner per component and its tests. Integration owns contracts/generated types, database migrations, dependencies, Compose, and cross-service tests. See `docs/PARALLEL_WORK.md` and `docs/API.md` for implementation boundaries and pending scaffold changes.
 
-Compose runs the frontend, control, tools, two workers, and PostgreSQL. Backend services share one Python image. Keep PostgreSQL in a named volume. Services restart unless stopped; migrations run once. Wait for database health, migrations, and API readiness before workers start.
+Compose runs the frontend, control, tools, two workers, and PostgreSQL. Backend services share a Python base image; Tools also includes the Docker CLI. Keep PostgreSQL in a named volume. Services restart unless stopped; migrations run once. Wait for database health, migrations, and API readiness before workers start.
 
 ```bash
-docker compose up --build --scale worker=2
+./scripts/dev-up.sh
 ```
 
 The UI is at `localhost:3000`; Next.js proxies public API calls. The trusted tool runner launches sandbox containers.

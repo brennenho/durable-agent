@@ -1,60 +1,63 @@
 # Durable Agent
 
-Monorepo scaffold for a Next.js frontend and Python backend.
-The planned architecture is in [DESIGN.md](DESIGN.md).
+A Next.js UI and Python runtime for agents with recoverable tool execution.
+See [DESIGN.md](DESIGN.md) for the architecture and recovery guarantees.
+
+## Run locally
+
+Start Docker Desktop, then run from the repository root:
+
+```bash
+cp -n .env.example .env  # Keeps an existing .env.
+```
+
+Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `.env`, then:
+
+```bash
+./scripts/dev-up.sh
+```
+
+This builds the sandbox image, applies database migrations, and starts PostgreSQL,
+Control, Tools, two workers, and the frontend. Open **http://localhost:3000**.
+Submitting a prompt makes real OpenAI calls using your key.
+
+Try: “Write a Python function that adds two numbers, create a pytest test, and run it.”
+Inspect the run's operations, attempts, final answer, and saved files in the UI.
+
+```bash
+docker compose ps
+docker compose logs -f control tools worker
+docker compose down
+```
+
+Runs and saved files survive shutdown in the PostgreSQL volume. `down -v` deletes
+that data. Rerun `./scripts/dev-up.sh` to start again or rebuild after pulling changes.
+API docs are at http://localhost:8000/docs and http://localhost:8001/docs.
+
+Tools uses the local Docker socket to launch isolated sandboxes. Each sandbox gets
+only a private workspace; it has no network, credentials, or Docker socket. Temporary
+workspaces live in the ignored `.sandbox-workspaces/` directory. Runs start empty.
+
+For another checkout, set a distinct `COMPOSE_PROJECT_NAME` and unused
+`FRONTEND_PORT`, `CONTROL_PORT`, `TOOLS_PORT`, and `POSTGRES_PORT` in the shell.
 
 ## Structure
 
 ```text
-frontend/                       Next.js app and placeholder page
-backend/
-  src/durable_agent/
-    control/                    Typed FastAPI routes; handlers pending
-    harness/                    State/transition types; agent loop pending
-    worker/                     Placeholder entry point
-    tools/                      Typed FastAPI routes; handlers pending
-    db/                         SQLAlchemy models and async session setup
-    contracts.py                Shared API payloads and tool argument types
-  migrations/                   Alembic schema revisions
-  tests/                        Contract and PostgreSQL schema tests
+frontend/                       Next.js UI and API proxy
+backend/src/durable_agent/
+  control/                      Scheduling, leases, and run APIs
+  harness/                      Pure agent transitions
+  worker/                       OpenAI and tool execution
+  tools/                        Files, sandbox runner, and checkpoints
+  db/                           Shared models and sessions
+  contracts.py                  API payloads
+backend/migrations/             Alembic schema revisions
+backend/tests/                  Component and database tests
 contracts/                      Generated OpenAPI
-scripts/                        API export
-docker/                         Dockerfiles
-compose.yaml                    Local services
+scripts/                        Startup and API generation
+docker/                         Service and sandbox images
 ```
-
-`frontend/` owns its pnpm dependencies; `backend/` owns its uv dependencies.
-Shared payloads, route signatures, database models, and the initial migration are
-implemented. Service queries, agent logic, and tools are pending.
-
-The APIs expose liveness (`200`), readiness (`503`), and typed application stubs (`501`).
-Compose checks liveness so the scaffold can start; application readiness comes later.
-The worker is a placeholder and is excluded from default startup.
-
-## Run locally
-
-With Docker running:
-
-```bash
-cp .env.example .env
-docker compose up --build frontend control tools
-```
-
-Open `http://localhost:3000`. API docs are at `http://localhost:8000/docs`
-and `http://localhost:8001/docs`. No model calls or database operations run.
-
-Start PostgreSQL and apply the schema from the repository root:
-
-```bash
-docker compose up -d db
-export DATABASE_URL=postgresql://durable:durable@localhost:5432/durable
-uv run --project backend --locked alembic -c backend/alembic.ini upgrade head
-```
-
-Its named volume survives `docker compose down`; `down -v` deletes it.
-Migration setup reads `DATABASE_URL` from the shell. Services do not run migrations
-automatically yet. The five tables belong to Control and Tools as described in
-[db/README.md](backend/src/durable_agent/db/README.md).
 
 ## Develop without containers
 
@@ -111,12 +114,12 @@ tests need no services or API keys. PostgreSQL tests run when `TEST_DATABASE_URL
 is set; otherwise they are skipped. For the local database above:
 
 ```bash
-TEST_DATABASE_URL="$DATABASE_URL" uv run --project backend --locked pytest backend/tests
+TEST_DATABASE_URL=postgresql://durable:durable@localhost:5432/durable \
+  uv run --project backend --locked pytest backend/tests
 ```
 
 Each database test migrates a unique schema and drops only that schema afterward.
-The test user must be able to create schemas. These tests cover schema constraints
-and transaction rollback; service recovery tests are still pending.
+The test user must be able to create schemas. These tests cover schema constraints, transactions, scheduling, and recovery.
 
 Frontend browser tests use Playwright with Chromium. Install its browser once:
 
@@ -132,8 +135,7 @@ server in the same worktree first because they share `.next/`.
 
 Use `pnpm --dir frontend test:e2e --ui` to run and inspect individual tests, or
 `--headed` to watch Chromium. Test fixtures intercept `/api/*`; those tests verify
-frontend behavior, not backend integration. Feature tests land with the frontend
-PRs; an empty test directory fails with “No tests found.”
+frontend behavior, not backend integration.
 
 After changing routes or payloads, regenerate types:
 
