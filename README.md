@@ -118,6 +118,23 @@ Each database test migrates a unique schema and drops only that schema afterward
 The test user must be able to create schemas. These tests cover schema constraints
 and transaction rollback; service recovery tests are still pending.
 
+Frontend browser tests use Playwright with Chromium. Install its browser once:
+
+```bash
+pnpm --dir frontend exec playwright install chromium
+pnpm --dir frontend test:e2e
+```
+
+Tests live in `frontend/tests/` and start their own Next.js server on
+`http://127.0.0.1:3101`. Set `PLAYWRIGHT_PORT` to use another port in a parallel
+worktree. An occupied port fails rather than reusing another app. Stop any Next dev
+server in the same worktree first because they share `.next/`.
+
+Use `pnpm --dir frontend test:e2e --ui` to run and inspect individual tests, or
+`--headed` to watch Chromium. Test fixtures intercept `/api/*`; those tests verify
+frontend behavior, not backend integration. Feature tests land with the frontend
+PRs; an empty test directory fails with “No tests found.”
+
 After changing routes or payloads, regenerate types:
 
 ```bash
