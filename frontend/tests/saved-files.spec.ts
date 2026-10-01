@@ -67,7 +67,7 @@ test("shows a download failure instead of saving an error response", async ({ pa
   expect(downloads).toBe(0);
 });
 
-test("retries a failed listing and shows an empty workspace", async ({ page }) => {
+test("retries a failed listing and omits attachments for an empty workspace", async ({ page }) => {
   let unavailable = true;
   await page.route(`${endpoint}/files`, (route) =>
     unavailable
@@ -78,9 +78,7 @@ test("retries a failed listing and shows an empty workspace", async ({ page }) =
   await expect(page.getByRole("alert", { name: "File listing error" })).toContainText("503");
   unavailable = false;
   await page.getByRole("button", { name: "Retry file listing" }).click();
-  await expect(page.getByRole("region", { name: "Saved files" })).toContainText(
-    "No files saved yet.",
-  );
+  await expect(page.getByRole("region", { name: "Saved files" })).toHaveCount(0);
 });
 
 test("refreshes saved files without interrupting a download of the previous version", async ({
