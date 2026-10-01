@@ -9,14 +9,14 @@ The planned architecture is in [DESIGN.md](DESIGN.md).
 frontend/                       Next.js app and placeholder page
 backend/
   src/durable_agent/
-    control/                    FastAPI entry point
-    harness/                    Empty package for the agent loop
+    control/                    Typed FastAPI routes; handlers pending
+    harness/                    State/transition types; agent loop pending
     worker/                     Placeholder entry point
-    tools/                      FastAPI entry point
+    tools/                      Typed FastAPI routes; handlers pending
     db/                         Empty package for database code
-    contracts.py                Placeholder for shared payloads
+    contracts.py                Shared API payloads and tool argument types
   migrations/                   Empty; no schema or migration setup
-  tests/                        Empty component and integration directories
+  tests/                        Contract tests; component/integration behavior pending
 contracts/                      Generated OpenAPI
 scripts/                        API export
 docker/                         Dockerfiles
@@ -24,11 +24,11 @@ compose.yaml                    Local services
 ```
 
 `frontend/` owns its pnpm dependencies; `backend/` owns its uv dependencies.
-The manifests include the planned stack. No database models, queries, migrations,
-agent logic, tool implementations, or application API payloads are implemented.
+The manifests include the planned stack. Shared payloads and route signatures are
+implemented. Database models, queries, migrations, agent logic, and tools are pending.
 
-The APIs expose liveness (`200`) and readiness (`503`) only. Compose checks liveness
-so the scaffold can start; application readiness will be implemented later.
+The APIs expose liveness (`200`), readiness (`503`), and typed application stubs (`501`).
+Compose checks liveness so the scaffold can start; application readiness comes later.
 The worker is a placeholder and is excluded from default startup.
 
 ## Run locally
@@ -101,14 +101,13 @@ native install step; the frontend remains a standalone project.
 Validate Compose changes with `docker compose config --quiet`. These checks are local;
 CI and Git hooks are not configured.
 
-No tests have been implemented. After routes and payloads are added, regenerate types:
+Run contract tests with `uv run --project backend pytest backend/tests`; no services or API keys are needed.
+After changing routes or payloads, regenerate types:
 
 ```bash
 uv run --project backend python scripts/export_openapi.py
 pnpm --dir frontend api:generate
 ```
-
-The generated files currently contain only health endpoints.
 
 ## Parallel work
 
