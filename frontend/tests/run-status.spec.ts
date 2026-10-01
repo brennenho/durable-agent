@@ -112,21 +112,20 @@ test("stops polling when navigating away", async ({ page }) => {
   await page.goto(url);
   await expect(page.getByRole("status")).toHaveText("Status: queued");
   await page.getByRole("link", { name: "New run" }).click();
-  await expect(page.getByRole("heading", { name: "Start a run" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What are we working on?" })).toBeVisible();
   const count = requests;
   await page.clock.fastForward(10_000);
   expect(requests).toBe(count);
 });
 
-test("opens the saved run from the submission confirmation", async ({ page }) => {
+test("opens the saved chat after sending a message", async ({ page }) => {
   await page.route("**/api/runs", (route) =>
     route.fulfill({ json: route.request().method() === "GET" ? [] : run }),
   );
   await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
   await page.goto("/");
   await page.getByRole("textbox").fill(run.prompt);
-  await page.getByRole("button", { name: "Start run" }).click();
-  await page.getByRole("link", { name: "View run" }).click();
+  await page.getByRole("button", { name: "Send message" }).click();
   await expect(page).toHaveURL(new RegExp(`${run.id}$`));
   await expect(page.getByRole("heading", { name: "Run details" })).toBeVisible();
 });
