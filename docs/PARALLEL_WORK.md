@@ -11,7 +11,7 @@ behavior are still unimplemented. Component work starts after both foundation PR
 
 ## 1. Land the foundation first
 
-Integration prepares two small PRs for human review:
+The foundation covers two areas:
 
 1. **Contracts:** implement the agreed payloads in `contracts.py`, API route
    signatures, and harness state/transition signatures. Generate OpenAPI and
@@ -19,7 +19,10 @@ Integration prepares two small PRs for human review:
 2. **Database:** add shared SQLAlchemy models, session setup, and the initial
    Alembic migration with the DD's constraints. Verify migration on PostgreSQL.
 
-After both PRs merge, Integration records the foundation commit in its handoff.
+Future foundation changes follow the same PR sizing rules as component work; an
+entire foundation area is not automatically one PR.
+
+After the foundation PRs merge, Integration records the foundation commit in its handoff.
 Start all four component branches from that commit. Do not create competing
 contracts or migrations while waiting for the foundation.
 
@@ -38,6 +41,10 @@ The human starts one conversation fork per component. Before editing, each agent
 confirms its worktree, foundation commit, assigned scope, and proposed PR stack.
 Use Graphite as required by `AGENTS.md`. Independent components branch from trunk;
 stack only changes that depend on earlier PRs in that component.
+
+Assignments define ownership, not PR size. Start with the first complete, reviewable
+change. For every planned PR, state its behavior/invariant, test, and parent dependency.
+Follow the 150–300 reviewed-line target in `AGENTS.md`; keep tests with the behavior.
 
 Source package paths (`control/`, `harness/`, `tools/`, `worker/`, `db/`, and
 `contracts.py`) are under `backend/src/durable_agent/`. Other paths are repo-relative.
@@ -117,6 +124,10 @@ production paths must report unfinished or failed behavior honestly.
 
 ## 4. Coordinate changes and handoffs
 
+- **Review flow:** a few stacked PRs per agent are fine. Check in frequently and share
+  each complete PR immediately so the human can review while work continues. Integration
+  recommends the next PR to review, prioritizing shared dependencies and blockers.
+  Adjust stack depth to review pace; do not wait for the whole component to be finished.
 - **Shared change needed:** post the proposed change, reason, and affected consumers in
   the component chat for the human to relay to Integration. Integration owns the shared
   PR, updates the docs, and identifies which agents must update. Relay the decision to
@@ -126,12 +137,27 @@ production paths must report unfinished or failed behavior honestly.
   its missing behavior in your component or edit its files.
 - **PR ready:** self-review and run component checks, then provide PR links in review
   order, validation results, and remaining blockers. Keep unfinished PRs in draft.
+  State the one behavior or invariant the reviewer should verify first.
 - **Integration finds a defect:** return it to the component owner with a reproduction.
   That owner fixes its branch; Integration maintains the regression scenario.
 
 Use recorded model responses for automated tests. Live OpenAI checks require an
 explicit request. Never restack or submit another agent's branches. Human merges
 remain the default.
+
+Examples of review units (each includes its own tests):
+
+| Owner | Example PRs |
+| --- | --- |
+| Runtime | Pure harness transitions; run submission; fenced result acceptance. |
+| Tools | Workspace import/read storage; atomic file edits with generation fencing; bounded sandbox runner. |
+| Worker | OpenAI response adapter; heartbeat/lease-loss handling; report delivery with acknowledgment retries. |
+| Frontend | Submit a run and show status; final output; attempt/error history; saved file downloads. |
+| Integration | Session/migration setup; runtime tables and constraints; tool/workspace tables and constraints. |
+
+These are review boundaries to refine before coding, not fixed-size tasks. Split a
+unit further when it contains independent decisions; keep a transaction's correctness
+changes together. Every PR must work with its ancestors, without a later repair PR.
 
 ## 5. Integrate and verify
 

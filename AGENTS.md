@@ -31,6 +31,17 @@ change, verify it, and review the stack in order.
 - Test observable behavior and meaningful failure cases. Avoid tests that merely
   repeat the implementation or mocks that hide the behavior being tested.
 
+## Async I/O
+
+- Use async database, HTTP, and subprocess APIs in services and workers. Do not block
+  the event loop with synchronous clients, sleeps, or filesystem/archive work; offload
+  blocking work to a thread or process when needed. Keep pure harness logic synchronous.
+- Use one async database session per request or task; never share it across concurrent
+  tasks. Use the same session type for reads and writes, with explicit commits for writes.
+  Keep remote calls outside transactions. Services own their engine's startup/shutdown.
+- Bound concurrent work, enforce deadlines, and propagate cancellation after cleanup.
+  Calls within a run remain sequential. Migrations and standalone scripts may stay synchronous.
+
 ## Graphite and stacked PRs
 
 - Use Graphite (`gt`) to create, update, restack, and submit PR branches. Use
@@ -38,8 +49,9 @@ change, verify it, and review the stack in order.
   help for flags. See the [CLI reference](https://graphite.com/docs/command-reference).
   If Graphite is unavailable or unauthenticated, report the blocker; do not silently
   publish through a different workflow.
-- Before coding, give a short outline of the proposed PRs and their dependencies.
-  Keep one logical, explainable change per PR and one branch per PR.
+- Before coding, outline each proposed PR's behavior or invariant, validation, and
+  parent dependency. Plan component work as a series of small PRs.
+  Implement and submit the first complete change before building the rest of the component.
 - Stack dependent changes on their parent PR. Start independent work from trunk.
   Keep stacks shallow; do not build a long chain on an unresolved design decision.
 - Each PR must be correct and testable with its ancestors, without needing a later
@@ -51,12 +63,27 @@ change, verify it, and review the stack in order.
   Coordinate when an ancestor change affects another owner's work.
 - Address feedback in the PR that owns the change. Restack your dependent branches,
   inspect their diffs, and rerun affected checks. Keep each PR's base and description current.
-- Keep unfinished work in draft. Mark a PR ready only after self-review and relevant
-  checks pass. Leave merging to the human unless explicitly asked to merge; do not
-  enable auto-merge or dismiss reviews on their behalf.
+- Keep unfinished work in draft. After self-review and relevant checks pass, mark PRs
+  ready automatically with `gt submit --publish` so automatic review starts. Do not wait
+  for permission or the rest of the stack. Scope the command to your completed PRs.
+  Leave merging to the human; do not enable auto-merge or dismiss reviews on their behalf.
 
 ## Make review easy
 
+- Aim for 150–300 reviewed lines per PR, counting additions and deletions against its
+  immediate parent, including tests and migrations. Smaller is fine. Exclude generated
+  API schemas/types and lockfile churn from that count, but identify them in the description.
+- Above 400 reviewed lines, split before submitting unless doing so would break a
+  correct, testable change. Explain that exception briefly in the PR description;
+  the line target is a guide, not a reason to split tests from behavior or ship broken stages.
+- Give each PR one review focus: a behavior, invariant, or concrete setup step.
+  Keep its implementation, relevant tests, and required migration/generated updates together.
+  Separate independently reviewable behavior and unrelated cleanup.
+- A few stacked PRs are fine. Submit and share each complete PR as soon as it is ready;
+  do not wait for the whole stack. Use judgment about stack depth and the human
+  review pace, and address feedback before building further on disputed decisions.
+- Check in during active work at least once a minute with useful progress, blockers,
+  or scope changes. Share each PR link, validation, and next step when it is submitted.
 - Review the diff against the immediate parent, including generated files. Remove
   accidental changes, stale comments, and unnecessary churn before submitting.
 - Use a concrete title describing the resulting behavior. Describe the final change
@@ -65,7 +92,8 @@ change, verify it, and review the stack in order.
   - **What and why:** the problem and resulting behavior; a before/after example when useful.
   - **Stack:** the parent dependency and what this PR adds. Identify deferred work explicitly.
   - **Validation:** exact checks run and their results, including anything not verified.
-  - **Review notes:** the main entry point, non-obvious decisions, or material risks, when relevant.
+  - **Review notes:** where to start and the behavior or invariant to verify; identify
+    material risks, generated files, and any necessary size exception.
 - Do not ask the reviewer to infer correctness from a passing test count. Explain
   the invariant or failure case when the change affects durability or concurrency.
 - After review feedback, briefly state what changed and which checks were rerun.
