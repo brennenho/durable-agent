@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "next typegen && tsc --noEmit",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "next typegen && tsc --noEmit",
     "api:generate": "openapi-typescript ../contracts/control.openapi.json -o src/lib/api.generated.ts"
   },
   "dependencies": {
@@ -18,7 +23,11 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.3.8",
+    "eslint-config-prettier": "10.1.8",
     "openapi-typescript": "^7.10.0",
+    "prettier": "3.9.9",
     "typescript": "^5.9.0"
   },
   "packageManager": "pnpm@11.25.0",

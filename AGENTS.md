@@ -73,6 +73,18 @@ change, verify it, and review the stack in order.
 - At handoff, provide one ordered list of PR links from the bottom of each stack up,
   with a one-sentence purpose and ready/draft/blocked status. Identify what to review first.
 
+## Local checks
+
+- Run `make check` from the repository root before handing off a PR. It checks Python
+  lint/format and frontend lint/format/types. It does not replace component tests.
+- Use `make check-python` or `make check-frontend` while working on one component.
+- Frontend fixes: `pnpm --dir frontend lint:fix` and `pnpm --dir frontend format`.
+- Python fixes: `uv run --project backend ruff check --config backend/pyproject.toml --fix <paths>`,
+  then `uv run --project backend ruff format --config backend/pyproject.toml <paths>`.
+- Limit automatic fixes to your owned files; inspect the resulting diff. Regenerate
+  generated files rather than formatting them manually. Do not weaken rules to pass a check;
+  explain any narrow suppression beside the affected code.
+
 ## Runtime boundaries and checks
 
 - `contracts.py` defines wire payloads. Regenerate OpenAPI and TypeScript after contract changes.
