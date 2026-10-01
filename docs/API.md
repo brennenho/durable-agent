@@ -1,12 +1,18 @@
 # API contracts
 
-These are the agreed interfaces for the first version. The integration owner will
-implement them in `contracts.py`, add route signatures, and generate OpenAPI and
-TypeScript. Current application payloads and routes are still unimplemented.
+These interfaces are defined in `contracts.py`, typed FastAPI routes, and
+`harness/contracts.py`. OpenAPI and frontend TypeScript are generated from the routes.
+Application handlers currently return `501` with `error.code: not_implemented`;
+harness functions raise `NotImplementedError`. Service behavior is still pending.
 
 IDs are UUIDs. Timestamps are UTC. Fields marked `?` are nullable. Reject unexpected
 request fields. The browser sends only a submission key and prompt; control freezes
 configuration for the run. No service sends API keys in these payloads.
+
+Nullable run, operation, and attempt view fields are always present, using `null`
+when unknown. Retry delays, provider request IDs, usage, and file sizes may be omitted.
+Timestamps require a timezone and are normalized to UTC. Attempt numbers, lease
+generations, and execution limits are positive; operation positions are nonnegative.
 
 ## Starting workspace and environment
 
@@ -163,8 +169,9 @@ startup settings. Initial imports and checkpoint reads remain tool-owned operati
 | Invalid model/tool-call structure, unknown tool, invalid credentials/configuration, snapshot exceeds limits | Permanent execution error; fail the run. |
 | Expired or superseded lease | Stop the attempt. Control owns recovery. |
 
-Tool-service infrastructure failures use non-2xx responses with
-`{error: ExecutionError}`. A lost connection without a response is also retryable.
+Application errors use non-2xx responses with `{error: ExecutionError}`. FastAPI
+request validation uses its standard `422` response with `detail`; health endpoints
+are separate. A lost connection without a response is also retryable.
 Model-facing errors are inside a `200` completed response. Failed checkpoint capture
 never returns an unsaved tool result as completed. Apply the DD's fixed deadlines and
 attempt budget; control owns backoff and provider retry delays.

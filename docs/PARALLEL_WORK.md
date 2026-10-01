@@ -6,7 +6,8 @@ and owns its branches. The human reviews and merges PRs.
 
 Read `AGENTS.md`, `DESIGN.md`, and `docs/API.md` before starting. Repository docs are
 the current specification; earlier conversation decisions may be outdated.
-The repo is currently a scaffold. The work below is not implemented yet.
+The repo has shared contract types and API/harness stubs. Database setup and component
+behavior are still unimplemented. Component work starts after both foundation PRs merge.
 
 ## 1. Land the foundation first
 

@@ -4,6 +4,75 @@
  */
 
 export interface paths {
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs"];
+        put?: never;
+        /** Submit Run */
+        post: operations["submit_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Run File */
+        get: operations["download_run_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Run Files */
+        get: operations["list_run_files"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -38,10 +107,516 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/attempts/{attempt_id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Heartbeat Attempt */
+        post: operations["heartbeat_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/attempts/{attempt_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Attempt */
+        post: operations["report_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Work */
+        post: operations["claim_work"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** AgentConfig */
+        AgentConfig: {
+            /** Call Timeout Seconds */
+            call_timeout_seconds: number;
+            /**
+             * Initial Workspace Version Id
+             * Format: uuid
+             */
+            initial_workspace_version_id: string;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Max Turns */
+            max_turns: number;
+            /** Model */
+            model: string;
+            /** Model Params */
+            model_params: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            sandbox: components["schemas"]["SandboxConfig"];
+            /** Tool Schemas */
+            tool_schemas: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[];
+        };
+        /** Assignment */
+        Assignment: {
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /** Attempt No */
+            attempt_no: number;
+            config: components["schemas"]["AgentConfig"];
+            /**
+             * Deadline At
+             * Format: date-time
+             */
+            deadline_at: string;
+            /**
+             * Lease Expires At
+             * Format: date-time
+             */
+            lease_expires_at: string;
+            /** Lease Generation */
+            lease_generation: number;
+            /** Operation */
+            operation: components["schemas"]["ModelOperation"] | components["schemas"]["ToolOperation"];
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        /** AttemptView */
+        AttemptView: {
+            /** Attempt No */
+            attempt_no: number;
+            error: components["schemas"]["ExecutionError"] | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "accepted" | "error" | "unknown";
+        };
+        /** ClaimRequest */
+        ClaimRequest: {
+            /**
+             * Worker Id
+             * Format: uuid
+             */
+            worker_id: string;
+        };
+        /** ErrorResponse */
+        ErrorResponse: {
+            error: components["schemas"]["ExecutionError"];
+        };
+        /** ExecutionError */
+        ExecutionError: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Retry After Seconds */
+            retry_after_seconds?: number | null;
+            /** Retryable */
+            retryable: boolean;
+        };
+        /** FailedOutcome */
+        FailedOutcome: {
+            error: components["schemas"]["ExecutionError"];
+            /** Provider Request Id */
+            provider_request_id?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "failed";
+        };
+        /** FileEntry */
+        FileEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "file" | "directory";
+            /** Path */
+            path: string;
+            /** Size Bytes */
+            size_bytes?: number | null;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HeartbeatRequest */
+        HeartbeatRequest: {
+            /** Lease Generation */
+            lease_generation: number;
+            /**
+             * Worker Id
+             * Format: uuid
+             */
+            worker_id: string;
+        };
+        /** HeartbeatResponse */
+        HeartbeatResponse: {
+            /**
+             * Deadline At
+             * Format: date-time
+             */
+            deadline_at: string;
+            /**
+             * Lease Expires At
+             * Format: date-time
+             */
+            lease_expires_at: string;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+        };
+        JsonValue: unknown;
+        /** ModelOperation */
+        ModelOperation: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "model";
+            request: components["schemas"]["ModelRequest"];
+        };
+        /** ModelOutput */
+        ModelOutput: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "incomplete";
+            /** Text */
+            text: string;
+            /** Tool Calls */
+            tool_calls: components["schemas"]["ToolCall"][];
+        };
+        /** ModelRequest */
+        ModelRequest: {
+            /** History */
+            history: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"])[];
+            /** Prompt */
+            prompt: string;
+        };
+        /** ModelResult */
+        ModelResult: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "model";
+            /** Native Context */
+            native_context: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[];
+            output: components["schemas"]["ModelOutput"];
+        };
+        /** OperationView */
+        OperationView: {
+            /** Attempts */
+            attempts: components["schemas"]["AttemptView"][];
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model" | "tool";
+            /** Position */
+            position: number;
+            /** Result */
+            result: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"]) | null;
+        };
+        /** ReportRequest */
+        ReportRequest: {
+            /** Lease Generation */
+            lease_generation: number;
+            /** Outcome */
+            outcome: components["schemas"]["SuccessfulOutcome"] | components["schemas"]["FailedOutcome"];
+            /**
+             * Worker Id
+             * Format: uuid
+             */
+            worker_id: string;
+        };
+        /** ReportResponse */
+        ReportResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "recorded" | "already_recorded";
+        };
+        /** RunDetail */
+        RunDetail: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Final Answer */
+            final_answer: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Heartbeat At */
+            last_heartbeat_at: string | null;
+            /** Last Progress At */
+            last_progress_at: string | null;
+            /** Model */
+            model: string;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Operations */
+            operations: components["schemas"]["OperationView"][];
+            /** Prompt */
+            prompt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            terminal_error: components["schemas"]["ExecutionError"] | null;
+            /**
+             * Workspace Version Id
+             * Format: uuid
+             */
+            workspace_version_id: string;
+        };
+        /** RunFileListing */
+        RunFileListing: {
+            /** Entries */
+            entries: components["schemas"]["FileEntry"][];
+            /**
+             * Workspace Version Id
+             * Format: uuid
+             */
+            workspace_version_id: string;
+        };
+        /** RunSummary */
+        RunSummary: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Heartbeat At */
+            last_heartbeat_at: string | null;
+            /** Last Progress At */
+            last_progress_at: string | null;
+            /** Model */
+            model: string;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            terminal_error: components["schemas"]["ExecutionError"] | null;
+        };
+        /** SandboxConfig */
+        SandboxConfig: {
+            /** Image Digest */
+            image_digest: string;
+            /** Log Max Bytes */
+            log_max_bytes: number;
+            /** Workspace Max Bytes */
+            workspace_max_bytes: number;
+        };
+        /** SubmitRunRequest */
+        SubmitRunRequest: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Submission Key
+             * Format: uuid
+             */
+            submission_key: string;
+        };
+        /** SuccessfulOutcome */
+        SuccessfulOutcome: {
+            /** Provider Request Id */
+            provider_request_id?: string | null;
+            /** Result */
+            result: components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "succeeded";
+            /** Usage */
+            usage?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+        };
+        /** ToolCall */
+        ToolCall: {
+            /** Arguments */
+            arguments: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Call Id */
+            call_id: string;
+            /** Name */
+            name: string;
+        };
+        /** ToolError */
+        ToolError: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "error";
+        };
+        /** ToolOperation */
+        ToolOperation: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "tool";
+            request: components["schemas"]["ToolRequest"];
+        };
+        /** ToolRequest */
+        ToolRequest: {
+            call: components["schemas"]["ToolCall"];
+            /**
+             * Input Version Id
+             * Format: uuid
+             */
+            input_version_id: string;
+        };
+        /** ToolResult */
+        ToolResult: {
+            /** Call Id */
+            call_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "tool";
+            /** Output */
+            output: components["schemas"]["ToolSuccess"] | components["schemas"]["ToolError"];
+            /**
+             * Workspace Version Id
+             * Format: uuid
+             */
+            workspace_version_id: string;
+        };
+        /** ToolSuccess */
+        ToolSuccess: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            status: "ok";
+            /** Value */
+            value: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -50,6 +625,282 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_runs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"][];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"];
+                };
+            };
+            /** @description Submission key has a different prompt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_run_file: {
+        parameters: {
+            query: {
+                version_id: string;
+                path: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved file bytes */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Run, accepted version, or file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_run_files: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunFileListing"];
+                };
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     liveness_health_live_get: {
         parameters: {
             query?: never;
@@ -90,6 +941,181 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    heartbeat_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeartbeatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeartbeatResponse"];
+                };
+            };
+            /** @description Expired or superseded attempt */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    report_attempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            /** @description Stale attempt or conflicting report */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    claim_work: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Assignment"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
