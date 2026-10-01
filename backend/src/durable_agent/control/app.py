@@ -1,17 +1,21 @@
 """Control HTTP routes. Queries and transactions live in the owning modules."""
 
 from contextlib import asynccontextmanager
+from pathlib import PurePosixPath
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from durable_agent.contracts import (
     Assignment,
     ClaimRequest,
     ErrorResponse,
     ExecutionError,
+    FileListing,
     HeartbeatRequest,
     HeartbeatResponse,
     ReportRequest,
@@ -22,6 +26,7 @@ from durable_agent.contracts import (
     SubmitRunRequest,
 )
 from durable_agent.control.errors import ControlError
+from durable_agent.control.files import saved_version
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.control.runtime import DATABASE_UNAVAILABLE, Runtime, Settings, open_runtime
 from durable_agent.control.views import detail, list_summaries
@@ -93,8 +98,18 @@ async def get_run(run_id: UUID, request: Request) -> RunDetail:
     operation_id="list_run_files",
     responses={404: {"model": ErrorResponse, "description": "Run not found"}},
 )
-async def list_run_files(run_id: UUID) -> RunFileListing:
-    raise NotImplementedError("Run file listing is not implemented")
+async def list_run_files(run_id: UUID, request: Request) -> RunFileListing:
+    runtime = get_runtime(request)
+    async with runtime.db.session() as session:
+        version = await saved_version(session, run_id)
+    response = await runtime.tools_get(f"/tools/workspace-versions/{version}/files")
+    try:
+        listing = FileListing.model_validate_json(response.content)
+    except ValidationError as exc:
+        raise ControlError(
+            503, "invalid_tool_response", "Tool service returned an invalid listing", retryable=True
+        ) from exc
+    return RunFileListing(workspace_version_id=version, entries=listing.entries)
 
 
 @routes.get(
@@ -112,8 +127,21 @@ async def list_run_files(run_id: UUID) -> RunFileListing:
         404: {"model": ErrorResponse, "description": "Run, accepted version, or file not found"},
     },
 )
-async def download_run_file(run_id: UUID, version_id: UUID, path: str) -> Response:
-    raise NotImplementedError("Run file downloads are not implemented")
+async def download_run_file(
+    run_id: UUID, version_id: UUID, path: str, request: Request
+) -> Response:
+    runtime = get_runtime(request)
+    async with runtime.db.session() as session:
+        version = await saved_version(session, run_id, version_id)
+    response = await runtime.tools_get(
+        f"/tools/workspace-versions/{version}/file", params={"path": path}
+    )
+    filename = quote(PurePosixPath(path).name, safe="")
+    return Response(
+        content=response.content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
 
 
 @routes.post("/internal/claims", response_model=Assignment | None, operation_id="claim_work")
