@@ -27,12 +27,36 @@ class Worker:
         *,
         heartbeat_interval: float = 5,
         report_retry_interval: float = 1,
+        poll_interval: float = 1,
     ):
         self.services = services
         self.models = models
         self.worker_id = worker_id
         self.heartbeat_interval = heartbeat_interval
         self.report_retry_interval = report_retry_interval
+        self.poll_interval = poll_interval
+
+    async def run(self) -> None:
+        loop = asyncio.get_running_loop()
+        while True:
+            claimed_at = loop.time()
+            try:
+                assignment = await self.services.claim(self.worker_id)
+            except ServiceError as exc:
+                if not exc.error.retryable:
+                    raise
+                logger.warning("Claim failed: %s", exc)
+                await asyncio.sleep(max(self.poll_interval, exc.error.retry_after_seconds or 0))
+                continue
+            if assignment is None:
+                await asyncio.sleep(self.poll_interval)
+                continue
+            try:
+                await self.run_assignment(assignment, claimed_at=claimed_at)
+            except LeaseLost as exc:
+                logger.warning("Abandoned attempt %s: %s", assignment.attempt_id, exc)
+            else:
+                logger.info("Reported attempt %s", assignment.attempt_id)
 
     async def run_assignment(self, assignment: Assignment, *, claimed_at: float) -> None:
         lease = Lease(
