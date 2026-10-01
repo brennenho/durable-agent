@@ -21,4 +21,5 @@ def create_database_engine(database_url: str) -> AsyncEngine:
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    """Return a per-task session context; callers explicitly await commit for writes."""
     return async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
