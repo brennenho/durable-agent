@@ -6,8 +6,8 @@ and owns its branches. The human reviews and merges PRs.
 
 Read `AGENTS.md`, `DESIGN.md`, and `docs/API.md` before starting. Repository docs are
 the current specification; earlier conversation decisions may be outdated.
-The repo has shared contract types and API/harness stubs. Database setup and component
-behavior are still unimplemented. Component work starts after both foundation PRs merge.
+The repo has shared contracts, API/harness stubs, models, and an initial migration.
+Component behavior is still unimplemented. Start after both foundation PRs merge.
 
 ## 1. Land the foundation first
 
@@ -53,6 +53,8 @@ Source package paths (`control/`, `harness/`, `tools/`, `worker/`, `db/`, and
 Runtime owns both control and harness to keep their state transitions under one
 owner. They remain separate modules. After the foundation handoff, Runtime and
 Tools own their route implementations; wire contract changes go through Integration.
+Backend owners use `db/models.py` and `db/session.py`; see `db/README.md` for transaction
+rules. The shared `postgres_engine` test fixture provides a migrated, isolated schema.
 
 ## 3. Build components concurrently
 
