@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from durable_agent.db.models import Attempt, Operation, Run, ToolRequest, WorkspaceVersion
-from durable_agent.db.session import create_database_engine, create_session_factory
+from durable_agent.db.session import Database
 from sqlalchemy import delete, func, insert, inspect, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -277,10 +277,9 @@ def test_session_transaction_publishes_checkpoint_and_result_together(postgres_e
     operation_key, output_id = uuid4(), uuid4()
 
     async def exercise():
-        engine = create_database_engine(postgres_engine.url.render_as_string(hide_password=False))
-        sessions = create_session_factory(engine)
+        db = Database(postgres_engine.url.render_as_string(hide_password=False))
         try:
-            async with sessions.begin() as session:
+            async with db.session() as session, session.begin():
                 session.add(
                     ToolRequest(
                         operation_key=operation_key,
@@ -290,7 +289,7 @@ def test_session_transaction_publishes_checkpoint_and_result_together(postgres_e
                     )
                 )
             with pytest.raises(RuntimeError, match="interrupted"):
-                async with sessions.begin() as session:
+                async with db.session() as session, session.begin():
                     session.add(WorkspaceVersion(id=output_id, archive=b"updated archive"))
                     await session.flush()
                     request = await session.get(ToolRequest, operation_key)
@@ -299,7 +298,7 @@ def test_session_transaction_publishes_checkpoint_and_result_together(postgres_e
                     request.completed_at = NOW
                     await session.flush()
                     raise RuntimeError("interrupted before commit")
-            async with sessions() as session:
+            async with db.session() as session:
                 assert await session.get(WorkspaceVersion, output_id) is None
                 assert (
                     await session.scalar(
@@ -309,20 +308,20 @@ def test_session_transaction_publishes_checkpoint_and_result_together(postgres_e
                     )
                     == 1
                 )
-            async with sessions.begin() as session:
+            async with db.session() as session, session.begin():
                 session.add(WorkspaceVersion(id=output_id, archive=b"updated archive"))
                 await session.flush()
                 request = await session.get(ToolRequest, operation_key)
                 request.result = {"status": "ok", "value": {"bytes_written": 7}}
                 request.output_version_id = output_id
                 request.completed_at = NOW
-            async with sessions() as session:
+            async with db.session() as session:
                 saved = await session.get(ToolRequest, operation_key)
                 assert saved.output_version_id == output_id
                 assert (
                     await session.get(WorkspaceVersion, output_id)
                 ).archive == b"updated archive"
         finally:
-            await engine.dispose()
+            await db.close()
 
     asyncio.run(exercise())
