@@ -2,6 +2,15 @@
 set -eu
 cd "$(dirname "$0")/.."
 
+if ! command -v docker >/dev/null 2>&1; then
+    if [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
+        export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+    else
+        echo "Docker CLI not found. Install Docker or add its bin directory to PATH." >&2
+        exit 1
+    fi
+fi
+
 docker compose config --quiet
 
 docker build -f docker/Dockerfile.sandbox -t durable-agent-sandbox:dev .
