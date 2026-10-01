@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { run, runDetail } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/runs/*/files", (route) =>
     route.fulfill({
       json: {
@@ -118,7 +119,9 @@ test("stops polling when navigating away", async ({ page }) => {
 });
 
 test("opens the saved run from the submission confirmation", async ({ page }) => {
-  await page.route("**/api/runs", (route) => route.fulfill({ json: run }));
+  await page.route("**/api/runs", (route) =>
+    route.fulfill({ json: route.request().method() === "GET" ? [] : run }),
+  );
   await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
   await page.goto("/");
   await page.getByRole("textbox").fill(run.prompt);

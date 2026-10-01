@@ -9,6 +9,7 @@ test("submits a prompt once and displays the saved run", async ({ page }) => {
   });
   const bodies: SubmitRunRequest[] = [];
   await page.route("**/api/runs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] });
     bodies.push(route.request().postDataJSON());
     await ready;
     await route.fulfill({ json: run });
@@ -31,6 +32,7 @@ test("submits a prompt once and displays the saved run", async ({ page }) => {
 test("retries a lost response with the same key; a new run gets a new key", async ({ page }) => {
   const bodies: SubmitRunRequest[] = [];
   await page.route("**/api/runs", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [] });
     bodies.push(route.request().postDataJSON());
     if (bodies.length === 1) await route.abort();
     else await route.fulfill({ json: run });
@@ -52,16 +54,18 @@ test("retries a lost response with the same key; a new run gets a new key", asyn
 
 test("shows the unfinished API's error without claiming success", async ({ page }) => {
   await page.route("**/api/runs", (route) =>
-    route.fulfill({
-      status: 501,
-      json: {
-        error: {
-          code: "not_implemented",
-          message: "Run submission is not implemented.",
-          retryable: false,
-        },
-      },
-    }),
+    route.request().method() === "GET"
+      ? route.fulfill({ json: [] })
+      : route.fulfill({
+          status: 501,
+          json: {
+            error: {
+              code: "not_implemented",
+              message: "Run submission is not implemented.",
+              retryable: false,
+            },
+          },
+        }),
   );
   await page.goto("/");
   await page.getByRole("textbox").fill(run.prompt);
