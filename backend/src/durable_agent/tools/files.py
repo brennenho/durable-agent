@@ -55,37 +55,10 @@ def execute_file_tool(
         return ToolError(status="error", code="invalid_path", message=str(exc)), None
     try:
         if name == "list_files":
-            entries = list_workspace(archive, max_bytes).entries
-            if path != PurePosixPath("."):
-                selected = next((entry for entry in entries if entry.path == str(path)), None)
-                if selected is None:
-                    raise FileNotFoundError(str(path))
-                if selected.kind != "directory":
-                    raise NotADirectoryError(str(path))
-            children = [
-                entry.model_dump(mode="json", exclude_none=True)
-                for entry in entries
-                if PurePosixPath(entry.path).parent == path
-            ]
-            return ToolSuccess(status="ok", value={"entries": children}), None
+            return _list_files(archive, path, max_bytes), None
         if name == "read_file":
-            content = read_workspace_file(archive, str(path), max_bytes)
-            if len(content) > TEXT_LIMIT:
-                return ToolError(
-                    status="error", code="too_large", message="Text reads are limited to 64 KiB"
-                ), None
-            return ToolSuccess(status="ok", value={"content": content.decode("utf-8")}), None
-        content = args.content.encode("utf-8")
-        if len(content) > max_bytes:
-            raise InvalidWorkspace("Workspace exceeds its file-size limit")
-        with TemporaryDirectory() as directory:
-            root = Path(directory) / "workspace"
-            restore_workspace(archive, root, max_bytes)
-            target = root / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(content)
-            updated = capture_workspace(root, max_bytes, allow_permission_changes=True)
-        return ToolSuccess(status="ok", value={"bytes_written": len(content)}), updated
+            return _read_file(archive, path, max_bytes), None
+        return _write_file(archive, path, args.content, max_bytes)
     except FileNotFoundError:
         return ToolError(
             status="error", code="not_found", message=f"File or directory not found: {path}"
@@ -102,3 +75,44 @@ def execute_file_tool(
         return ToolError(
             status="error", code="invalid_encoding", message="File content must be UTF-8"
         ), None
+
+
+def _list_files(archive: bytes, path: PurePosixPath, max_bytes: int) -> ToolSuccess:
+    entries = list_workspace(archive, max_bytes).entries
+    if path != PurePosixPath("."):
+        selected = next((entry for entry in entries if entry.path == str(path)), None)
+        if selected is None:
+            raise FileNotFoundError(str(path))
+        if selected.kind != "directory":
+            raise NotADirectoryError(str(path))
+    children = [
+        entry.model_dump(mode="json", exclude_none=True)
+        for entry in entries
+        if PurePosixPath(entry.path).parent == path
+    ]
+    return ToolSuccess(status="ok", value={"entries": children})
+
+
+def _read_file(archive: bytes, path: PurePosixPath, max_bytes: int) -> ToolOutput:
+    content = read_workspace_file(archive, str(path), max_bytes)
+    if len(content) > TEXT_LIMIT:
+        return ToolError(
+            status="error", code="too_large", message="Text reads are limited to 64 KiB"
+        )
+    return ToolSuccess(status="ok", value={"content": content.decode("utf-8")})
+
+
+def _write_file(
+    archive: bytes, path: PurePosixPath, content: str, max_bytes: int
+) -> tuple[ToolSuccess, bytes]:
+    data = content.encode("utf-8")
+    if len(data) > max_bytes:
+        raise InvalidWorkspace("Workspace exceeds its file-size limit")
+    with TemporaryDirectory() as directory:
+        root = Path(directory) / "workspace"
+        restore_workspace(archive, root, max_bytes)
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        updated = capture_workspace(root, max_bytes, allow_permission_changes=True)
+    return ToolSuccess(status="ok", value={"bytes_written": len(data)}), updated
