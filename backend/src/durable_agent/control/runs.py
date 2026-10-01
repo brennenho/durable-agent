@@ -14,8 +14,8 @@ from durable_agent.harness import start
 
 async def find_submission(session: AsyncSession, body: SubmitRunRequest) -> Run | None:
     run = await session.scalar(select(Run).where(Run.submission_key == body.submission_key))
-    if run is not None and run.prompt != body.prompt:
-        raise ControlError(409, "submission_conflict", "Submission key has a different prompt")
+    if run is not None and (run.prompt != body.prompt or run.turn_index != 0):
+        raise ControlError(409, "submission_conflict", "Submission key has different inputs")
     return run
 
 
