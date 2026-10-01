@@ -102,7 +102,7 @@ export function RunDetailView({ runId }: { runId: string }) {
                 <section aria-labelledby="output-heading" className="min-w-0 min-h-64">
                   <h2 id="output-heading">Final output</h2>
                   {run.final_answer !== null ? (
-                    <pre className="mt-5">
+                    <pre className="mt-5 text-sm leading-7">
                       {run.final_answer || "The agent returned an empty answer."}
                     </pre>
                   ) : (
