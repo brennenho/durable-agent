@@ -10,6 +10,7 @@ from durable_agent.contracts import (
     ModelRequest,
     ModelResult,
     OperationResult,
+    PreviousTurn,
     ReadFileArguments,
     RunCommandArguments,
     WriteFileArguments,
@@ -37,10 +38,15 @@ def fail(code: str, message: str) -> FailedTransition:
     )
 
 
-def model_step(prompt: str, history: list[OperationResult]) -> ContinueTransition:
+def model_step(
+    prompt: str, history: list[OperationResult], previous_turns: list[PreviousTurn]
+) -> ContinueTransition:
     return ContinueTransition(
         status="continue",
-        next=ModelOperation(kind="model", request=ModelRequest(prompt=prompt, history=history)),
+        next=ModelOperation(
+            kind="model",
+            request=ModelRequest(prompt=prompt, history=history, previous_turns=previous_turns),
+        ),
     )
 
 
@@ -53,10 +59,12 @@ def validate_config(config: AgentConfig) -> FailedTransition | None:
     return None
 
 
-def start(config: AgentConfig, prompt: str) -> Transition:
+def start(
+    config: AgentConfig, prompt: str, *, previous_turns: list[PreviousTurn] | None = None
+) -> Transition:
     if error := validate_config(config):
         return error
-    return model_step(prompt, [])
+    return model_step(prompt, [], previous_turns or [])
 
 
 def advance(state: AgentState, result: OperationResult) -> Transition:
@@ -74,9 +82,11 @@ def advance(state: AgentState, result: OperationResult) -> Transition:
         if not calls:
             return FinishedTransition(status="finished", final_answer=result.output.text)
         enabled = {schema.get("name") for schema in state.config.tool_schemas}
+        histories = [turn.history for turn in state.previous_turns] + [state.history]
         seen = {
             call.call_id
-            for previous in state.history
+            for history in histories
+            for previous in history
             if isinstance(previous, ModelResult)
             for call in previous.output.tool_calls
         }
@@ -105,4 +115,4 @@ def advance(state: AgentState, result: OperationResult) -> Transition:
         )
     if state.turn_count >= state.config.max_turns:
         return fail("turn_limit", "Model turn limit reached")
-    return model_step(state.prompt, [*state.history, result])
+    return model_step(state.prompt, [*state.history, result], state.previous_turns)

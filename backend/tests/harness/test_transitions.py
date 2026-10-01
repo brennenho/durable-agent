@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import pytest
-from durable_agent.contracts import AgentConfig, ModelResult, ToolCall, ToolResult
+from durable_agent.contracts import AgentConfig, ModelResult, PreviousTurn, ToolCall, ToolResult
 from durable_agent.harness import advance, start
 from durable_agent.harness.contracts import AgentState
 
@@ -67,6 +67,45 @@ def test_start_and_final_answer_are_pure(state):
     assert first.next.request.history == []
     assert advance(state, model()).final_answer == "Done"
     assert state.model_dump() == before
+
+
+def test_prior_turns_reach_every_model_call_without_using_the_current_turn_budget(state):
+    previous = PreviousTurn(
+        prompt="Earlier request",
+        history=[model(call("unfinished"))],
+        terminal_error={"code": "timeout", "message": "Interrupted", "retryable": True},
+    )
+    original = previous.model_dump()
+    state.previous_turns = [previous]
+    first = start(state.config, state.prompt, previous_turns=state.previous_turns)
+    assert first.next.request.previous_turns == [previous]
+    assert first.next.request.history == []
+    planned = model(call())
+    assert advance(state, planned).next.call == call()
+    state.history, state.pending_tool_calls, state.turn_count = [planned], [call()], 1
+    next_step = advance(state, tool())
+    assert next_step.next.request.previous_turns == [previous]
+    assert next_step.next.request.history == [planned, tool()]
+    assert previous.model_dump() == original
+
+
+def test_existing_states_and_requests_default_to_no_prior_turns(state):
+    payload = state.model_dump()
+    payload.pop("previous_turns")
+    assert AgentState.model_validate(payload).previous_turns == []
+    assert start(state.config, state.prompt).next.request.previous_turns == []
+
+
+def test_reused_call_id_from_an_earlier_turn_rejects_the_entire_new_plan(state):
+    state.previous_turns = [
+        PreviousTurn(
+            prompt="Earlier request",
+            history=[model(call()), tool(), model()],
+        )
+    ]
+    transition = advance(state, model(call("fresh"), call()))
+    assert transition.status == "failed"
+    assert transition.error.code == "invalid_tool_call"
 
 
 def test_two_tools_execute_in_order_then_return_full_context_to_model(state):

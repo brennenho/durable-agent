@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from durable_agent.contracts import (
     AgentConfig,
     AttemptView,
+    ModelRequest,
     ModelResult,
     OperationResult,
     OperationView,
@@ -43,6 +44,9 @@ def restore_state(run: Run, operations: list[Operation]) -> AgentState:
         config=AgentConfig.model_validate(run.config),
         prompt=run.prompt,
         history=history,
+        previous_turns=ModelRequest.model_validate(operations[0].request).previous_turns
+        if operations
+        else [],
         pending_tool_calls=pending,
         turn_count=turns,
     )
