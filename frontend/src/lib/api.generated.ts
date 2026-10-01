@@ -452,6 +452,8 @@ export interface components {
         ModelRequest: {
             /** History */
             history: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"])[];
+            /** Previous Turns */
+            previous_turns?: components["schemas"]["PreviousTurn"][];
             /** Prompt */
             prompt: string;
         };
@@ -493,6 +495,14 @@ export interface components {
             position: number;
             /** Result */
             result: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"]) | null;
+        };
+        /** PreviousTurn */
+        PreviousTurn: {
+            /** History */
+            history: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"])[];
+            /** Prompt */
+            prompt: string;
+            terminal_error?: components["schemas"]["ExecutionError"] | null;
         };
         /** ReportRequest */
         ReportRequest: {

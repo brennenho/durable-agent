@@ -91,9 +91,16 @@ class ToolResult(Contract):
 OperationResult = Annotated[ModelResult | ToolResult, Field(discriminator="kind")]
 
 
+class PreviousTurn(Contract):
+    prompt: str
+    history: list[OperationResult]
+    terminal_error: ExecutionError | None = None
+
+
 class ModelRequest(Contract):
     prompt: str
     history: list[OperationResult]
+    previous_turns: list[PreviousTurn] = Field(default_factory=list)
 
 
 class ToolRequest(Contract):
@@ -117,6 +124,10 @@ Operation = Annotated[ModelOperation | ToolOperation, Field(discriminator="kind"
 class SubmitRunRequest(Contract):
     submission_key: UUID
     prompt: str
+
+
+class SubmitFollowUpRequest(SubmitRunRequest):
+    after_run_id: UUID
 
 
 RunStatus = Literal["queued", "running", "retrying", "succeeded", "failed"]
