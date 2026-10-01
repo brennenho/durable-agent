@@ -25,6 +25,9 @@ returns the existing completion; publication never replaces it.
 writes return a complete new checkpoint. Business errors return model-facing output,
 while invalid call schemas and invalid checkpoints raise execution failures.
 
-Filesystem/archive functions are synchronous; service handlers must offload them
-from the event loop, outside database transactions. HTTP handlers, orchestration,
-and the sandbox runner are pending.
+The HTTP service imports `WORKSPACE_INPUT_DIR` once at startup (unset means empty),
+using `DATABASE_URL` and an optional `WORKSPACE_MAX_BYTES` limit (default 20 MiB).
+It serves saved versions and executes file tools outside database transactions.
+Archive/file work runs off-loop; a deadline discards late thread results. Completed
+responses survive service restarts. Readiness stays false until the sandbox runner
+is available; `run_command` currently returns an explicit not-implemented error.
