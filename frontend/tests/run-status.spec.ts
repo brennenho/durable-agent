@@ -143,3 +143,34 @@ test("expands activity with the keyboard without hiding the answer", async ({ pa
   await expect(page.getByRole("region", { name: "Execution history" })).toBeHidden();
   await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
 });
+
+test("renders Markdown without executing HTML or loading remote images", async ({ page }) => {
+  const remoteRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith("https://example.com")) remoteRequests.push(request.url());
+  });
+  await page.route(endpoint, (route) =>
+    route.fulfill({
+      json: {
+        ...runDetail,
+        status: "succeeded",
+        next_attempt_at: null,
+        finished_at: "2026-10-01T12:01:00Z",
+        final_answer:
+          '## Result\n\n- Added **tests**\n\n```python\nprint("ok")\n```\n\n[Docs](https://example.com/docs)\n\n<script>window.injected = true</script>\n\n![A diagram](https://example.com/image.png)\n\n[Unsafe](javascript:alert(1))',
+      },
+    }),
+  );
+  await page.goto(url);
+  const answer = page.getByRole("region", { name: "Final output" });
+  await expect(answer.getByRole("heading", { name: "Result" })).toBeVisible();
+  await expect(answer.getByRole("listitem")).toHaveText("Added tests");
+  await expect(answer.locator("pre")).toHaveText('print("ok")');
+  await expect(answer.getByRole("link", { name: "Docs" })).toHaveAttribute(
+    "href",
+    "https://example.com/docs",
+  );
+  await expect(answer).toContainText("<script>window.injected = true</script>");
+  await expect(answer.locator("script, img, [href^='javascript:']")).toHaveCount(0);
+  expect(remoteRequests).toEqual([]);
+});
