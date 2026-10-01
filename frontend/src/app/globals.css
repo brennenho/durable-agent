@@ -88,3 +88,28 @@ pre,
 pre {
   line-height: 1.6;
 }
+
+.operation-list,
+.attempt-list {
+  list-style: none;
+  padding: 0;
+}
+.operation-list > li + li {
+  border-top: 1px solid #dce3df;
+  margin-top: 24px;
+  padding-top: 12px;
+}
+.attempt-list > li {
+  border-left: 2px solid #dce3df;
+  padding-left: 16px;
+  margin: 16px 0;
+}
+h3 {
+  font-size: 1rem;
+}
+.attempt-error {
+  color: #a12828;
+}
+summary {
+  cursor: pointer;
+}
