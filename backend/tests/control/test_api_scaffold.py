@@ -1,4 +1,4 @@
-"""Unconfigured and unfinished handlers must not return successful fake responses."""
+"""Application handlers must remain unavailable before service startup."""
 
 import pytest
 from durable_agent.control.app import app
@@ -38,11 +38,10 @@ def client():
         ),
     ],
 )
-def test_routes_report_unimplemented_instead_of_success(method, path, body, client):
+def test_routes_are_unavailable_before_startup(method, path, body, client):
     response = client.request(method, path, json=body)
-    implemented = path.startswith("/api/")
-    assert response.status_code == (503 if implemented else 501)
-    assert response.json()["error"]["code"] == ("not_ready" if implemented else "not_implemented")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "not_ready"
 
 
 def test_submission_rejects_client_configuration_and_invalid_ids(client):
