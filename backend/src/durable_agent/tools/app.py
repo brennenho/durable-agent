@@ -53,17 +53,12 @@ async def lifespan(app: FastAPI):
             Path(source) if source is not None else None,
             app.state.max_bytes,
         )
-        async with db.session() as session:
-            app.state.initial_version = await save_workspace(session, archive)
-            await session.commit()
-        app.state.database = db
-        app.state.slots = asyncio.Semaphore(4)
         root = os.environ.get("SANDBOX_WORKSPACE_ROOT")
         image = os.environ.get("SANDBOX_IMAGE_DIGEST")
         if root is not None or image is not None:
-            if not root or not image or not Path(root).is_absolute():
+            if not root or not image or not Path(root).is_absolute() or "," in root:
                 raise SandboxConfiguration(
-                    "Set SANDBOX_IMAGE_DIGEST and an absolute SANDBOX_WORKSPACE_ROOT"
+                    "Set SANDBOX_IMAGE_DIGEST and an absolute SANDBOX_WORKSPACE_ROOT without commas"
                 )
             owner = os.environ.get("SANDBOX_OWNER", "durable-agent-tools")
             if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", owner):
@@ -75,6 +70,11 @@ async def lifespan(app: FastAPI):
             await filesystem(prepare_workspace_root, app.state.workspace_root)
             app.state.runner = runner
             app.state.image = image
+        async with db.session() as session:
+            app.state.initial_version = await save_workspace(session, archive)
+            await session.commit()
+        app.state.database = db
+        app.state.slots = asyncio.Semaphore(4)
         yield
     finally:
         app.state.runner = None

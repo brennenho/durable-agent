@@ -7,7 +7,7 @@ import pytest
 from durable_agent.db.models import ToolRequest, WorkspaceVersion
 from durable_agent.tools import execution
 from durable_agent.tools.app import app
-from durable_agent.tools.runner import SandboxFailure
+from durable_agent.tools.runner import SandboxConfiguration, SandboxFailure
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -154,6 +154,20 @@ def configured_sandbox(configured, docker_runner, tmp_path, monkeypatch):
     monkeypatch.setenv("SANDBOX_OWNER", runner.owner)
     monkeypatch.setenv("DOCKER_BIN", runner.docker)
     return config.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("root", [None, "relative", "/root/with,comma"])
+def test_bad_sandbox_configuration_does_not_publish_seed(
+    configured, postgres_engine, monkeypatch, root
+):
+    monkeypatch.setenv("SANDBOX_IMAGE_DIGEST", "sha256:test")
+    if root is not None:
+        monkeypatch.setenv("SANDBOX_WORKSPACE_ROOT", root)
+    with pytest.raises(SandboxConfiguration), TestClient(app):
+        pass
+    with Session(postgres_engine) as session:
+        assert session.scalar(select(func.count()).select_from(WorkspaceVersion)) == 0
+    assert app.state.database is None
 
 
 def test_command_completion_replays_and_startup_cleans_only_private_files(
