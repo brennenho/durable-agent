@@ -113,3 +113,19 @@ h3 {
 summary {
   cursor: pointer;
 }
+
+.file-list {
+  list-style: none;
+  padding: 0;
+}
+.file-list li {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.file-download {
+  text-align: left;
+  background: white;
+  color: #234e3a;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

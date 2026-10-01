@@ -1,6 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { run, runDetail } from "./fixtures";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/runs/*/files", (route) =>
+    route.fulfill({
+      json: {
+        workspace_version_id: runDetail.workspace_version_id,
+        entries: [],
+      },
+    }),
+  );
+});
+
 const url = `/runs/${runDetail.id}`;
 const endpoint = `**/api/runs/${runDetail.id}`;
 

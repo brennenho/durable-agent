@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 import type { RunDetail } from "../src/lib/api";
 import { runDetail } from "./fixtures";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/runs/*/files", (route) =>
+    route.fulfill({
+      json: {
+        workspace_version_id: runDetail.workspace_version_id,
+        entries: [],
+      },
+    }),
+  );
+});
+
 const started = "2026-10-01T12:00:00Z";
 const finished = "2026-10-01T12:01:00Z";
 const detail: RunDetail = {

@@ -1,5 +1,6 @@
 import type { components } from "./api.generated";
 
+export type RunFileListing = components["schemas"]["RunFileListing"];
 export type RunDetail = components["schemas"]["RunDetail"];
 export type RunSummary = components["schemas"]["RunSummary"];
 export type SubmitRunRequest = components["schemas"]["SubmitRunRequest"];
@@ -13,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
     cache: "no-store",
     ...init,
@@ -30,5 +31,9 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
       response.status,
     );
   }
-  return response.json();
+  return response;
+}
+
+export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await request(path, init)).json();
 }
