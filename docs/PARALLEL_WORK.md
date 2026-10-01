@@ -2,7 +2,8 @@
 
 Use one agent per component and one integration owner. Only folders, dependencies,
 and basic service entry points are scaffolded. The deliverables below are future work.
-Agree on shared contracts before implementing components in parallel.
+Use the agreed payloads in `docs/API.md`. Integration implements the shared types and
+route signatures first, then component owners build against the generated contracts.
 
 | Owner | Files | Deliverable |
 | --- | --- | --- |
@@ -33,7 +34,7 @@ Agree on shared contracts before implementing components in parallel.
 
 ## Harness
 
-- Define and implement the harness interface with the integration owner; keep I/O and clocks out.
+- Implement the harness interface specified in `docs/API.md`; keep I/O and clocks out.
 - Validate tool calls, preserve their ordered plan in the model result, and return only
   the next operation. Create later tool operations after earlier results are accepted.
 - Treat native model context as opaque. Cover final responses, multiple tools, malformed
@@ -68,12 +69,15 @@ Agree on shared contracts before implementing components in parallel.
 ## Integration
 
 - Define shared models and migration setup when database implementation begins.
+- Implement the agreed payloads in `contracts.py` and generate OpenAPI/TypeScript
+  before component owners depend on them. Error categories are fixed in `docs/API.md`.
 - Keep queries in the owning component, with explicit transaction boundaries.
 - Keep one migration chain. Component owners supply schema needs; this owner writes revisions.
 - Maintain `contracts.py`, API route signatures, and shared harness signatures in coordination
   with their component owners. Regenerate OpenAPI and TypeScript together.
 - Manage dependency/lockfile changes and Compose readiness/startup wiring.
-- Create a seed workspace version before accepting runs; configure control with its ID.
+- Wire the read-only startup workspace import and the initial-version endpoint. Control
+  freezes that version per run. Use the fixed Python/pytest sandbox image from the API spec.
 - Wire the trusted sandbox launcher without exposing its Docker socket, credentials,
   or host directories to sandbox code. The current Compose file does not do this yet.
 - Run the DD failure-injection suite against PostgreSQL and actual service processes.
@@ -81,7 +85,7 @@ Agree on shared contracts before implementing components in parallel.
 
 ## Integration order
 
-1. Agree on contracts, then implement the schema while components develop against fixtures.
+1. Implement the agreed contracts and schema while components develop against fixtures.
 2. Connect control to the harness; connect the worker to control and tools.
 3. Complete one model → tool → model run and display it in the UI.
 4. Run concurrent work and failure-injection tests; fix recovery before adding features.

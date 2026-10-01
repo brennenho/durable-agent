@@ -71,7 +71,11 @@ A model response lost before it is saved may require another OpenAI request.
 
 #### Scope
 
-Use Docker Compose for local development. Start with workspace tools and OpenAI. External writes such as sending email or updating Google Docs are deferred; restoring files cannot undo them.
+Use Docker Compose and OpenAI. For the first version:
+
+- Copy a configured local folder once; start empty if none is configured.
+- Run Python 3.12 and pytest offline. Support code, plain text, and Markdown.
+- Defer uploads, Git cloning, and external writes such as email or Google Docs updates.
 
 ## Implementation Reference
 
@@ -170,13 +174,14 @@ Five tables in one PostgreSQL database. Control owns `runs`, `operations`, and `
 - The tool runner registers each attempt's generation and checks it before committing. Once a newer attempt registers, the older attempt cannot save changes.
 - OpenAI uses the Responses API without streaming or SDK retries. Preserve response items and tool-call IDs. Control owns retry delays; exhausted retries or permanent errors fail the run.
 - Database outages stop new assignments and progress commits. Restart unfinished runs with the same application build.
+- Missing files and normal command failures return to the model. Infrastructure failures retry; invalid calls/configuration and exhausted retries fail the run. Shared payloads are specified in `docs/API.md`.
 
 ### Workspace storage
 
-- Begin with an empty or imported workspace saved before the run starts.
+- Import `WORKSPACE_INPUT_DIR` once at tool-service startup; unset means empty. Invalid configured paths fail startup. Keep the source folder read-only. Restart tools and control to import changed files; existing runs keep their saved version.
 - Store complete compressed copies of `/workspace` in PostgreSQL. Capture files, directories, additions, deletions, and executable permissions. Keep saved versions and tool results indefinitely for now.
 - Stop child processes before capturing files. Read-only calls reuse the input version.
-- Use a fixed container image for dependencies. Each attempt gets a private workspace and temporary storage.
+- Use a fixed image with Python 3.12, pytest 9.1.1, and `/bin/sh`. Install dependencies when building the image and freeze its digest per run. Each attempt gets a private workspace and temporary storage.
 - Run containers as non-root with resource limits. Keep the network, service credentials, host directories, and Docker socket inaccessible to tool code.
 - Reject invalid archive paths, links, special files, and oversized checkpoints. The runner enforces command timeouts and removes abandoned containers.
 
