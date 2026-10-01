@@ -1,17 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, Check, LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowUp, LoaderCircle } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError, requestJson, type RunSummary, type SubmitRunRequest } from "../lib/api";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
 export function RunSubmission() {
+  const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [run, setRun] = useState<RunSummary | null>(null);
   const pending = useRef<SubmitRunRequest | null>(null);
   const submitting = useRef(false);
 
@@ -34,7 +34,7 @@ export function RunSubmission() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pending.current),
       });
-      setRun(saved);
+      router.push(`/runs/${encodeURIComponent(saved.id)}`);
     } catch (cause) {
       setError(
         cause instanceof ApiError
@@ -47,64 +47,51 @@ export function RunSubmission() {
     }
   }
 
-  if (run) {
-    return (
-      <section aria-labelledby="submitted-heading" className="submission-panel">
-        <Check aria-hidden="true" className="mb-4 size-5 text-primary" />
-        <h2 id="submitted-heading">Run submitted</h2>
-        <p role="status">Status: {run.status}</p>
-        <p className="run-id">Run ID: {run.id}</p>
-        <div className="mt-6 flex items-center gap-3">
-          <Button asChild>
-            <Link href={`/runs/${encodeURIComponent(run.id)}`}>View run</Link>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              pending.current = null;
-              setRun(null);
-              setPrompt("");
-            }}
-          >
-            New run
-          </Button>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section aria-label="Start a run" className="submission-panel">
-      <form onSubmit={submit} aria-busy={busy}>
-        <label htmlFor="prompt">What should the agent do?</label>
-        <Textarea
-          className="mt-3 min-h-48 resize-y border-0 bg-transparent p-0 text-base shadow-none md:text-base"
-          id="prompt"
-          name="prompt"
-          rows={6}
-          required
-          disabled={busy}
-          value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
-          aria-describedby={error ? "submission-error" : "prompt-help"}
-          placeholder="Describe a coding or document task…"
-        />
-        {error && (
-          <p id="submission-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t pt-5">
-          <p id="prompt-help" className="m-0 text-xs text-muted-foreground">
-            Files are saved as the agent works.
-          </p>
-          <Button type="submit" disabled={busy}>
-            {busy && <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />}
-            {busy ? "Submitting…" : error ? "Try again" : "Start run"}
-            {!busy && <ArrowRight aria-hidden="true" />}
-          </Button>
-        </div>
-      </form>
-    </section>
+    <form onSubmit={submit} aria-busy={busy} aria-label="New chat" className="chat-composer">
+      <label htmlFor="prompt" className="sr-only">
+        Message
+      </label>
+      <Textarea
+        className="min-h-24 max-h-64 resize-y border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 md:text-sm"
+        id="prompt"
+        name="prompt"
+        rows={3}
+        required
+        disabled={busy}
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        aria-describedby={error ? "submission-error" : "prompt-help"}
+        placeholder="Ask the agent to write, edit, or build something…"
+      />
+      {error && (
+        <p id="submission-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <p id="prompt-help" className="m-0 text-xs text-muted-foreground">
+          Enter to send · Shift + Enter for a new line
+        </p>
+        <Button
+          type="submit"
+          size="icon-sm"
+          disabled={busy || !prompt.trim()}
+          aria-label={busy ? "Sending…" : error ? "Try again" : "Send message"}
+        >
+          {busy ? (
+            <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
+          ) : (
+            <ArrowUp aria-hidden="true" />
+          )}
+        </Button>
+      </div>
+    </form>
   );
 }

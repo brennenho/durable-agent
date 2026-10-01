@@ -74,10 +74,10 @@
 
 @layer components {
   .new-run-page {
-    @apply max-w-3xl pt-12 sm:pt-20;
+    @apply w-full max-w-3xl pt-[18dvh] md:pt-[25dvh];
   }
-  .submission-panel {
-    @apply mt-8 p-5 sm:p-7;
+  .chat-composer {
+    @apply rounded-xl border bg-background p-4 shadow-xs focus-within:ring-2 focus-within:ring-ring/40;
   }
   .run-id {
     @apply font-mono text-xs text-muted-foreground wrap-anywhere;
