@@ -72,12 +72,34 @@ Local commands read environment variables from your shell; Compose reads `.env`.
 
 ## Checks and API generation
 
+Run all local code checks from the repository root:
+
 ```bash
-uv run --project backend ruff check backend/src scripts
-uv run --project backend ruff format --check backend/src scripts
-pnpm --dir frontend check
-docker compose config --quiet
+make check
 ```
+
+This runs Ruff linting/format checks across Python source, tests, migrations, and
+scripts, followed by ESLint, Prettier, and TypeScript checks for the frontend.
+Use `make check-python` or `make check-frontend` to check one side.
+No services, database, or API keys are needed. Checks do not rewrite source files.
+
+| Task | Command |
+| --- | --- |
+| Fix frontend lint | `pnpm --dir frontend lint:fix` |
+| Format frontend | `pnpm --dir frontend format` |
+| Check frontend types only | `pnpm --dir frontend typecheck` |
+| Fix Python lint | `uv run --project backend ruff check --config backend/pyproject.toml --fix <paths>` |
+| Format Python | `uv run --project backend ruff format --config backend/pyproject.toml <paths>` |
+
+Pass only your owned files when fixing Python. For a frontend file, use
+`pnpm --dir frontend exec prettier --write src/path/to/file.tsx` or
+`pnpm --dir frontend exec eslint --fix src/path/to/file.tsx`.
+Generated API types, Next.js generated files, and lockfiles are excluded from frontend
+linting/formatting. `frontend/pnpm-workspace.yaml` allows the lint import resolver's
+native install step; the frontend remains a standalone project.
+
+Validate Compose changes with `docker compose config --quiet`. These checks are local;
+CI and Git hooks are not configured.
 
 No tests have been implemented. After routes and payloads are added, regenerate types:
 

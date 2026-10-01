@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+.env*
+*.tsbuildinfo
+pnpm-lock.yaml
+next-env.d.ts
+src/lib/api.generated.ts
