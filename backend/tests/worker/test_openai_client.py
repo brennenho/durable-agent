@@ -43,12 +43,13 @@ def test_rebuilds_request_from_saved_context_and_tool_outputs(config, response_p
         output=ToolSuccess(status="ok", value={"content": "Saved"}),
         workspace_version_id=uuid4(),
     )
-    request = ModelRequest(prompt="Edit a file", history=[previous, tool])
+    listing = tool.model_copy(update={"call_id": "call_list"})
+    request = ModelRequest(prompt="Edit a file", history=[previous, listing, tool])
 
     def handler(http_request):
         body = json.loads(http_request.content)
         assert body["input"][0] == {"role": "user", "content": "Edit a file"}
-        assert body["input"][1:-1] == response_payload["output"]
+        assert body["input"][1:-2] == response_payload["output"]
         assert body["input"][-1] == {
             "type": "function_call_output",
             "call_id": "call_read",
@@ -64,6 +65,17 @@ def test_rebuilds_request_from_saved_context_and_tool_outputs(config, response_p
     assert isinstance(outcome, SuccessfulOutcome)
     assert outcome.provider_request_id == "req_http"
     assert outcome.usage == response_payload["usage"]
+
+
+def test_invalid_history_fails_before_sending_a_request(config, response_payload):
+    model = map_response(Response.model_validate(response_payload)).result
+
+    def handler(request):
+        pytest.fail("Invalid history must not reach the provider")
+
+    outcome = run_client(config, handler, ModelRequest(prompt="Continue", history=[model]))
+    assert outcome.error.code == "invalid_model_input"
+    assert not outcome.error.retryable
 
 
 @pytest.mark.parametrize("status,retryable", [(401, False), (422, False), (429, True), (503, True)])

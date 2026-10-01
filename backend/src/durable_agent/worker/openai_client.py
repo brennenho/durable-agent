@@ -16,23 +16,8 @@ from durable_agent.contracts import (
     FailedOutcome,
     ModelRequest,
 )
+from durable_agent.worker.context import InvalidModelInput, response_input
 from durable_agent.worker.responses import map_response
-
-
-def response_input(request: ModelRequest) -> list[dict]:
-    items = [{"role": "user", "content": request.prompt}]
-    for result in request.history:
-        if result.kind == "model":
-            items.extend(result.native_context)
-        else:
-            items.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": result.call_id,
-                    "output": result.output.model_dump_json(),
-                }
-            )
-    return items
 
 
 def retry_after_seconds(value: str | None) -> float | None:
@@ -109,6 +94,8 @@ class OpenAIClient:
             code, message, retryable = "openai_connection_error", str(exc), True
         except (APIError, JSONDecodeError) as exc:
             code, message, retryable = "invalid_model_response", str(exc), False
+        except InvalidModelInput as exc:
+            code, message, retryable = "invalid_model_input", str(exc), False
         except (TypeError, ValueError) as exc:
             code, message, retryable = "invalid_model_config", str(exc), False
         return FailedOutcome(
