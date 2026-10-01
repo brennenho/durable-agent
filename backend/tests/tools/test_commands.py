@@ -3,8 +3,12 @@ import asyncio
 import pytest
 from durable_agent.contracts import SandboxConfig
 from durable_agent.tools.archives import InvalidWorkspace, capture_workspace, unpack_workspace
-from durable_agent.tools.commands import InvalidCommand, execute_command_tool
-from durable_agent.tools.runner import DockerRunner, SandboxFailure
+from durable_agent.tools.commands import (
+    InvalidCommand,
+    execute_command_tool,
+    prepare_workspace_root,
+)
+from durable_agent.tools.runner import DockerRunner, SandboxConfiguration, SandboxFailure
 from durable_agent.tools.workspaces import read_workspace_file
 
 
@@ -96,3 +100,21 @@ def test_invalid_command_schema_fails_before_launch(saved_input, arguments):
     config = SandboxConfig(image_digest="sha256:test", workspace_max_bytes=1024, log_max_bytes=100)
     with pytest.raises(InvalidCommand):
         execute(saved_input, (runner, config), arguments)
+
+
+def test_startup_cleanup_does_not_follow_symlinks(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir(mode=0o750)
+    (outside / "keep").write_text("saved")
+    root = tmp_path / "pool"
+    root.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(SandboxConfiguration, match="symlink"):
+        prepare_workspace_root(root)
+    root.unlink()
+    root.mkdir()
+    (root / "link").symlink_to(outside, target_is_directory=True)
+    prepare_workspace_root(root)
+    assert list(root.iterdir()) == []
+    assert root.stat().st_mode & 0o777 == 0o700
+    assert (outside / "keep").read_text() == "saved"
+    assert outside.stat().st_mode & 0o777 == 0o750

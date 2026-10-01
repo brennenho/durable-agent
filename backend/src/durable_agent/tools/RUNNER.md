@@ -20,5 +20,5 @@ maximum file size. Total workspace size is validated when capturing the checkpoi
 Docker tests require `SANDBOX_TEST_IMAGE`; set `DOCKER_BIN` if Docker is outside PATH.
 `commands.py` restores each input into a new private directory, calls the runner,
 validates a complete checkpoint, and discards the directory on every exit path.
-Only normal command completion returns updated files. HTTP publication follows
-separately and must save those files and the result in one fenced transaction.
+Only normal command completion returns updated files. HTTP execution saves those
+files and the result in one fenced transaction; a retry reuses the saved completion.
