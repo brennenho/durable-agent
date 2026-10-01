@@ -18,3 +18,5 @@ dist/
 frontend/test-results/
 frontend/playwright-report/
 frontend/next-env.d.ts
+
+.sandbox-workspaces/

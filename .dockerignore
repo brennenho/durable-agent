@@ -8,3 +8,5 @@
 **/.pytest_cache
 **/.ruff_cache
 
+
+.sandbox-workspaces/

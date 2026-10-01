@@ -2,6 +2,7 @@ x-backend: &backend
   build:
     context: .
     dockerfile: docker/Dockerfile.backend
+    target: backend
   image: durable-agent-backend:dev
   restart: unless-stopped
   environment: &backend-environment
@@ -18,7 +19,7 @@ services:
       POSTGRES_PASSWORD: durable
       POSTGRES_DB: durable
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,40 +28,71 @@ services:
       timeout: 5s
       retries: 15
 
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
   control:
     <<: *backend
     command: ["uvicorn", "durable_agent.control.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${CONTROL_PORT:-8000}:8000"
     environment:
       <<: *backend-environment
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      TOOLS_URL: http://tools:8001
+      OPENAI_MODEL: ${OPENAI_MODEL:?Set OPENAI_MODEL in .env}
+      SANDBOX_IMAGE_DIGEST: ${SANDBOX_IMAGE_DIGEST:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      tools:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=2)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=2)"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 12
 
   tools:
     <<: *backend
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      target: tools
+    image: durable-agent-tools:dev
+    environment:
+      <<: *backend-environment
+      SANDBOX_IMAGE_DIGEST: ${SANDBOX_IMAGE_DIGEST:-}
+      SANDBOX_WORKSPACE_ROOT: ${SANDBOX_WORKSPACE_ROOT:-/tmp/durable-agent-workspaces}
+      SANDBOX_OWNER: ${COMPOSE_PROJECT_NAME:-durable-agent}
+    volumes:
+      - ./backend/src:/app/backend/src:ro
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      # Sibling sandboxes need the same absolute path on the host and in Tools.
+      - ${SANDBOX_WORKSPACE_ROOT:-/tmp/durable-agent-workspaces}:${SANDBOX_WORKSPACE_ROOT:-/tmp/durable-agent-workspaces}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     command: ["uvicorn", "durable_agent.tools.app:app", "--host", "0.0.0.0", "--port", "8001"]
     ports:
-      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:${TOOLS_PORT:-8001}:8001"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/live', timeout=2)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/ready', timeout=2)"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 12
 
   worker:
     <<: *backend
-    profiles: ["worker"]
-    restart: "no"
     command: ["python", "-m", "durable_agent.worker"]
     environment:
       CONTROL_URL: http://control:8000
       TOOLS_URL: http://tools:8001
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env}
     depends_on:
       control:
         condition: service_healthy
@@ -73,15 +105,21 @@ services:
       dockerfile: docker/Dockerfile.frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     environment:
       CONTROL_URL: http://control:8000
       NEXT_TELEMETRY_DISABLED: "1"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000', {signal: AbortSignal.timeout(3000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
     volumes:
       - ./frontend/src:/app/frontend/src
     depends_on:
       control:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:
