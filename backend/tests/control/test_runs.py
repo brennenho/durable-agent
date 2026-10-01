@@ -31,7 +31,11 @@ def test_submission_persists_first_operation_and_freezes_config(database, config
                 operation = await session.scalar(select(Operation))
                 assert operation.run_id == run_id
                 assert operation.kind == "model"
-                assert operation.request == {"prompt": body.prompt, "history": []}
+                assert operation.request == {
+                    "prompt": body.prompt,
+                    "history": [],
+                    "previous_turns": [],
+                }
                 assert operation.position == 0
                 assert duplicate.status == "queued"
                 changed = body.model_copy(update={"prompt": "Different"})

@@ -577,6 +577,13 @@
             "title": "History",
             "type": "array"
           },
+          "previous_turns": {
+            "items": {
+              "$ref": "#/components/schemas/PreviousTurn"
+            },
+            "title": "Previous Turns",
+            "type": "array"
+          },
           "prompt": {
             "title": "Prompt",
             "type": "string"
@@ -700,6 +707,52 @@
           "attempts"
         ],
         "title": "OperationView",
+        "type": "object"
+      },
+      "PreviousTurn": {
+        "additionalProperties": false,
+        "properties": {
+          "history": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "model": "#/components/schemas/ModelResult",
+                  "tool": "#/components/schemas/ToolResult"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ModelResult"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolResult"
+                }
+              ]
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "terminal_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "prompt",
+          "history"
+        ],
+        "title": "PreviousTurn",
         "type": "object"
       },
       "ReportRequest": {

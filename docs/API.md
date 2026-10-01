@@ -39,12 +39,18 @@ generations, and execution limits are positive; operation positions are nonnegat
 | `ModelResult` | `kind: model`, `output: ModelOutput`, `native_context: object[]` |
 | `ToolResult` | `kind: tool`, `call_id: string`, `output: ToolOutput`, `workspace_version_id: uuid` |
 | `OperationResult` | `ModelResult` or `ToolResult`, discriminated by `kind` |
-| `ModelRequest` | `prompt: string`, `history: OperationResult[]` |
+| `PreviousTurn` | `prompt: string`, `history: OperationResult[]`, `terminal_error?: ExecutionError` |
+| `ModelRequest` | `prompt: string`, `history: OperationResult[]`, `previous_turns: PreviousTurn[] = []` |
 | `ToolRequest` | `call: ToolCall`, `input_version_id: uuid` |
 | `Operation` | `{kind: model, request: ModelRequest}` or `{kind: tool, request: ToolRequest}` |
 
 `native_context` contains the provider's response output items. The OpenAI adapter
 uses them to reconstruct subsequent requests; the harness treats them as opaque.
+`previous_turns` contains ordered accepted history from prior user turns, separate
+from the current prompt/history. Old saved requests omit it and default to an empty
+list. Runtime will freeze this context in each new turn's first model operation;
+Worker will replay it without modifying saved results. Follow-up submission uses
+`SubmitFollowUpRequest`: submission key, prompt, and `after_run_id`.
 Send only tool output to the model, not runtime workspace IDs. Run configuration
 is immutable and travels with assignments; tool schemas come from the fixed registry.
 

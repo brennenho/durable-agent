@@ -10,6 +10,7 @@ from durable_agent.contracts import (
     Assignment,
     ClaimRequest,
     FailedOutcome,
+    ModelRequest,
     ModelResult,
     OperationResult,
     ReportRequest,
@@ -174,3 +175,23 @@ def test_harness_plans_a_tool_without_assigning_its_workspace():
     payload["next"]["input_version_id"] = VERSION
     with pytest.raises(ValidationError, match="extra_forbidden"):
         TypeAdapter(Transition).validate_python(payload)
+
+
+def test_previous_turns_preserve_context_and_old_model_requests_still_parse():
+    previous = {
+        "prompt": "First prompt",
+        "history": [MODEL_RESULT],
+        "terminal_error": {
+            "code": "call_timeout",
+            "message": "Tool interrupted",
+            "retryable": True,
+        },
+    }
+    request = ModelRequest(prompt="Continue", history=[], previous_turns=[previous])
+    restored = ModelRequest.model_validate_json(request.model_dump_json())
+    assert restored == request
+    assert restored.previous_turns[0].history[0].native_context == MODEL_RESULT["native_context"]
+    assert restored.previous_turns[0].terminal_error.code == "call_timeout"
+    assert (
+        ModelRequest.model_validate({"prompt": "Existing run", "history": []}).previous_turns == []
+    )
