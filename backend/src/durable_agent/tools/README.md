@@ -21,6 +21,10 @@ with a row lock and the latest registered generation. Callers commit registratio
 before executing, then commit the validated checkpoint and result together. A retry
 returns the existing completion; publication never replaces it.
 
+`files.py` implements the three file tools over saved inputs. Reads reuse the input;
+writes return a complete new checkpoint. Business errors return model-facing output,
+while invalid call schemas and invalid checkpoints raise execution failures.
+
 Filesystem/archive functions are synchronous; service handlers must offload them
-from the event loop, outside database transactions. HTTP handlers, tool execution,
+from the event loop, outside database transactions. HTTP handlers, orchestration,
 and the sandbox runner are pending.
