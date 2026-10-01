@@ -29,5 +29,12 @@ The HTTP service imports `WORKSPACE_INPUT_DIR` once at startup (unset means empt
 using `DATABASE_URL` and an optional `WORKSPACE_MAX_BYTES` limit (default 20 MiB).
 It serves saved versions and executes file tools outside database transactions.
 Archive/file work runs off-loop; a deadline discards late thread results. Completed
-responses survive service restarts. Readiness stays false until the sandbox runner
-is available; `run_command` currently returns an explicit not-implemented error.
+responses survive service restarts. `run_command` uses the same registration and
+atomic completion path, with sandbox failures leaving no completed result.
+
+Set `SANDBOX_IMAGE_DIGEST` and an absolute `SANDBOX_WORKSPACE_ROOT` to enable commands.
+Optional `DOCKER_BIN` selects the CLI; `SANDBOX_OWNER` identifies this service instance.
+Startup removes that owner's abandoned containers, then clears its private
+`tools-<owner>` directory under the configured root. Other directories are untouched.
+Readiness checks PostgreSQL and the installed image. With no sandbox configuration,
+file operations remain available but readiness returns 503. See `RUNNER.md` for wiring.

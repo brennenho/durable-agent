@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import shutil
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,7 +16,7 @@ from durable_agent.tools.archives import (
     restore_workspace,
     workspace_path,
 )
-from durable_agent.tools.runner import DockerRunner
+from durable_agent.tools.runner import DockerRunner, SandboxConfiguration
 
 
 class InvalidCommand(ValueError):
@@ -26,6 +27,21 @@ class CommandArgs(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     command: str
     cwd: str = "."
+
+
+def prepare_workspace_root(path: Path) -> None:
+    """Discard this service's abandoned files after all its containers have stopped."""
+    if path.is_symlink():
+        raise SandboxConfiguration("Managed workspace root cannot be a symlink")
+    if path.exists():
+        path.chmod(0o700)
+        for root, directories, _ in os.walk(path):
+            for name in directories:
+                directory = Path(root) / name
+                if not directory.is_symlink():
+                    directory.chmod(0o700)
+        shutil.rmtree(path)
+    path.mkdir(parents=True, mode=0o700)
 
 
 async def filesystem(function, *args, **kwargs):
