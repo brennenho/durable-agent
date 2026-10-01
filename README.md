@@ -13,10 +13,10 @@ backend/
     harness/                    State/transition types; agent loop pending
     worker/                     Placeholder entry point
     tools/                      Typed FastAPI routes; handlers pending
-    db/                         Empty package for database code
+    db/                         SQLAlchemy models and async session setup
     contracts.py                Shared API payloads and tool argument types
-  migrations/                   Empty; no schema or migration setup
-  tests/                        Contract tests; component/integration behavior pending
+  migrations/                   Alembic schema revisions
+  tests/                        Contract and PostgreSQL schema tests
 contracts/                      Generated OpenAPI
 scripts/                        API export
 docker/                         Dockerfiles
@@ -24,8 +24,8 @@ compose.yaml                    Local services
 ```
 
 `frontend/` owns its pnpm dependencies; `backend/` owns its uv dependencies.
-The manifests include the planned stack. Shared payloads and route signatures are
-implemented. Database models, queries, migrations, agent logic, and tools are pending.
+Shared payloads, route signatures, database models, and the initial migration are
+implemented. Service queries, agent logic, and tools are pending.
 
 The APIs expose liveness (`200`), readiness (`503`), and typed application stubs (`501`).
 Compose checks liveness so the scaffold can start; application readiness comes later.
@@ -43,13 +43,18 @@ docker compose up --build frontend control tools
 Open `http://localhost:3000`. API docs are at `http://localhost:8000/docs`
 and `http://localhost:8001/docs`. No model calls or database operations run.
 
-An optional PostgreSQL container is configured for later development:
+Start PostgreSQL and apply the schema from the repository root:
 
 ```bash
 docker compose up -d db
+export DATABASE_URL=postgresql://durable:durable@localhost:5432/durable
+uv run --project backend --locked alembic -c backend/alembic.ini upgrade head
 ```
 
 Its named volume survives `docker compose down`; `down -v` deletes it.
+Migration setup reads `DATABASE_URL` from the shell. Services do not run migrations
+automatically yet. The five tables belong to Control and Tools as described in
+[db/README.md](backend/src/durable_agent/db/README.md).
 
 ## Develop without containers
 
@@ -101,7 +106,18 @@ native install step; the frontend remains a standalone project.
 Validate Compose changes with `docker compose config --quiet`. These checks are local;
 CI and Git hooks are not configured.
 
-Run contract tests with `uv run --project backend pytest backend/tests`; no services or API keys are needed.
+Run tests with `uv run --project backend --locked pytest backend/tests`. Contract
+tests need no services or API keys. PostgreSQL tests run when `TEST_DATABASE_URL`
+is set; otherwise they are skipped. For the local database above:
+
+```bash
+TEST_DATABASE_URL="$DATABASE_URL" uv run --project backend --locked pytest backend/tests
+```
+
+Each database test migrates a unique schema and drops only that schema afterward.
+The test user must be able to create schemas. These tests cover schema constraints
+and transaction rollback; service recovery tests are still pending.
+
 After changing routes or payloads, regenerate types:
 
 ```bash
