@@ -2,8 +2,6 @@
 
 These interfaces are defined in `contracts.py`, typed FastAPI routes, and
 `harness/contracts.py`. OpenAPI and frontend TypeScript are generated from the routes.
-Application handlers currently return `501` with `error.code: not_implemented`;
-harness functions raise `NotImplementedError`. Service behavior is still pending.
 
 IDs are UUIDs. Timestamps are UTC. Fields marked `?` are nullable. Reject unexpected
 request fields. The browser sends only a submission key and prompt; control freezes
@@ -85,6 +83,23 @@ under the same key returns `409`. Reuse the original frozen configuration on a r
 Unknown runs/files return `404`. File downloads require the version returned by the
 listing; control validates that it is the seed or an accepted version for this run.
 Control proxies file reads to tools. Next.js proxies only public `/api/*` routes.
+
+## Conversations
+
+A conversation groups ordered runs. Each run is one user prompt and its execution.
+Existing run/file URLs remain valid; an initial run and its conversation share an ID.
+
+| Method | Path | Request → response |
+| --- | --- | --- |
+| POST | `/api/conversations` | `SubmitRunRequest` → `ConversationSummary` |
+| GET | `/api/conversations` | → `ConversationSummary[]`, newest updated first |
+| GET | `/api/conversations/{conversation_id}` | → `ConversationDetail` |
+
+`ConversationSummary`: `id`, `title`, `created_at`, `updated_at`, `status`, `latest_run_id`.
+The title is the first prompt normalized to one line and limited to 80 characters.
+Status and updated time come from the latest run's saved progress. `ConversationDetail`
+adds `runs: RunDetail[]`, oldest first. Creation submits the first prompt; matching
+submission keys reuse the original conversation. Follow-up submission is not yet exposed.
 
 ## Worker → control
 

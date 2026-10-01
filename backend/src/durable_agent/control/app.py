@@ -14,6 +14,8 @@ from sqlalchemy import text
 from durable_agent.contracts import (
     Assignment,
     ClaimRequest,
+    ConversationDetail,
+    ConversationSummary,
     ErrorResponse,
     ExecutionError,
     FileListing,
@@ -26,6 +28,7 @@ from durable_agent.contracts import (
     RunSummary,
     SubmitRunRequest,
 )
+from durable_agent.control.conversations import conversation_detail, list_conversations
 from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
 from durable_agent.control.leases import claim, heartbeat
@@ -73,6 +76,39 @@ async def submit_run(body: SubmitRunRequest, request: Request) -> RunSummary:
         run = await create_run(session, body, config)
         await session.commit()
         return await detail(session, run.id)
+
+
+@routes.post(
+    "/api/conversations",
+    response_model=ConversationSummary,
+    operation_id="create_conversation",
+    responses={409: {"model": ErrorResponse, "description": "Conflicting submission key"}},
+)
+async def create_conversation(body: SubmitRunRequest, request: Request) -> ConversationSummary:
+    run = await submit_run(body, request)
+    async with get_runtime(request).db.session() as session:
+        return await conversation_detail(session, run.id)
+
+
+@routes.get(
+    "/api/conversations",
+    response_model=list[ConversationSummary],
+    operation_id="list_conversations",
+)
+async def get_conversations(request: Request) -> list[ConversationSummary]:
+    async with get_runtime(request).db.session() as session:
+        return await list_conversations(session)
+
+
+@routes.get(
+    "/api/conversations/{conversation_id}",
+    response_model=ConversationDetail,
+    operation_id="get_conversation",
+    responses={404: {"model": ErrorResponse, "description": "Conversation not found"}},
+)
+async def get_conversation(conversation_id: UUID, request: Request) -> ConversationDetail:
+    async with get_runtime(request).db.session() as session:
+        return await conversation_detail(session, conversation_id)
 
 
 @routes.get("/api/runs", response_model=list[RunSummary], operation_id="list_runs")

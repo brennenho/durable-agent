@@ -161,6 +161,19 @@ class RunDetail(RunSummary):
     operations: list[OperationView]
 
 
+class ConversationSummary(Contract):
+    id: UUID
+    title: str
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+    status: RunStatus
+    latest_run_id: UUID
+
+
+class ConversationDetail(ConversationSummary):
+    runs: list[RunDetail]
+
+
 class FileEntry(Contract):
     path: str
     kind: Literal["file", "directory"]
