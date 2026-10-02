@@ -8,6 +8,7 @@ import { OperationInspection } from "./operation-inspection";
 import { operationName, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
 import { BranchDialog } from "./branch-dialog";
+import { TimelineStamp } from "./timeline-stamp";
 
 type Operation = RunDetail["operations"][number];
 
@@ -22,17 +23,11 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
         (typeof result.output.value.exit_code === "number" && result.output.value.exit_code !== 0)
     : operation.attempts.at(-1)?.status === "error";
   return (
-    <li aria-current={current ? "step" : undefined} className="relative py-1">
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute top-6 -left-[1.3rem] size-2 rounded-full border bg-background",
-          current && "border-foreground bg-foreground",
-        )}
-      />
+    <li aria-current={current ? "step" : undefined} className="grid grid-cols-subgrid col-span-3">
+      <TimelineStamp at={operation.created_at} label="Operation planned" active={current} />
       <details
         aria-label={`${operation.position + 1}. ${operationName(operation)}`}
-        className="group/step"
+        className="group/step min-w-0"
         onToggle={(event) => {
           if (event.target === event.currentTarget) setOpen(event.currentTarget.open);
         }}
@@ -54,18 +49,19 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
               operation={operation}
               status={run.status}
             />
-            <span className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 text-xs text-muted-foreground">
-              <span>
-                Planned{" "}
-                <time dateTime={operation.created_at}>
-                  {new Date(operation.created_at).toLocaleString()}
-                </time>
+            {operation.checkpoint && (
+              <span className="mt-1 flex justify-end">
+                <BranchDialog run={run} operation={operation} />
               </span>
-              {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
-            </span>
+            )}
           </span>
         </summary>
-        {open && <OperationInspection run={run} operation={operation} />}
+        {open && (
+          // Span the clock column, dot, and gaps on narrow screens (3.75 + .5 + 1 rem).
+          <div className="relative -ml-21 min-w-0 bg-background sm:ml-0">
+            <OperationInspection run={run} operation={operation} />
+          </div>
+        )}
       </details>
     </li>
   );
@@ -73,15 +69,9 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
 
 function RunMarker({ label, at }: { label: string; at: string }) {
   return (
-    <li className="relative flex flex-wrap justify-between gap-x-3 gap-y-1 py-3 text-xs">
-      <span
-        aria-hidden="true"
-        className="absolute top-4 -left-[1.3rem] size-2 rounded-full border bg-background"
-      />
-      <span className="font-medium">{label}</span>
-      <time dateTime={at} className="text-muted-foreground tabular-nums">
-        {new Date(at).toLocaleString()}
-      </time>
+    <li className="col-span-3 grid grid-cols-subgrid text-xs">
+      <TimelineStamp at={at} label={label} />
+      <span className="py-3.5 font-medium">{label}</span>
     </li>
   );
 }
@@ -90,10 +80,13 @@ export function ExecutionTimeline({ run }: { run: RunDetail }) {
   return (
     <section aria-label="Execution history" className="mt-3 border-0 p-0">
       <h2 className="sr-only">Execution history</h2>
-      <ol aria-label="Run timeline" className="m-0 ml-1 list-none border-l p-0 pl-4">
+      <ol
+        aria-label="Run timeline"
+        className="m-0 grid list-none grid-cols-[3.75rem_0.5rem_minmax(0,1fr)] gap-x-2 p-0 sm:gap-x-3"
+      >
         <RunMarker label="Run submitted" at={run.created_at} />
         {run.operations.length === 0 ? (
-          <li className="py-2 text-muted-foreground">No operations recorded yet.</li>
+          <li className="col-start-3 py-2 text-muted-foreground">No operations recorded yet.</li>
         ) : (
           run.operations.map((operation) => (
             <OperationRow key={operation.id} run={run} operation={operation} />

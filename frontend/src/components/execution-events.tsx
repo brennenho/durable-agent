@@ -1,32 +1,27 @@
 import type { ExecutionEvent } from "../lib/execution-events";
 import { cn } from "../lib/utils";
+import { TimelineStamp } from "./timeline-stamp";
 
 export function ExecutionEvents({ events }: { events: ExecutionEvent[] }) {
   return (
-    <ol aria-label="Execution milestones" className="ml-1 list-none border-l p-0 pl-4">
+    <ol
+      aria-label="Execution milestones"
+      className="grid list-none grid-cols-[3.75rem_0.5rem_minmax(0,1fr)] gap-x-2 p-0 sm:gap-x-3"
+    >
       {events.map((event) => (
-        <li key={event.id} className="relative py-2" data-event-id={event.id}>
-          <span
-            aria-hidden="true"
-            className={cn(
-              "absolute top-4 -left-[1.3rem] size-2 rounded-full border bg-background",
-              event.failed && "border-destructive bg-destructive",
-            )}
-          />
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs">
+        <li key={event.id} className="col-span-3 grid grid-cols-subgrid" data-event-id={event.id}>
+          <TimelineStamp at={event.at} label={event.label} failed={event.failed} />
+          <div className="min-w-0 py-3.5 text-xs">
             <span className={cn("font-medium", event.failed && "text-destructive")}>
               {event.label}
             </span>
-            <time dateTime={event.at} className="text-muted-foreground tabular-nums">
-              {new Date(event.at).toLocaleString()}
-            </time>
+            {event.detail && <p className="my-1 text-xs text-muted-foreground">{event.detail}</p>}
+            {event.workspaceVersionId && (
+              <p className="run-id my-1">
+                {event.workspaceLabel ?? "Accepted workspace"}: {event.workspaceVersionId}
+              </p>
+            )}
           </div>
-          {event.detail && <p className="my-1 text-xs text-muted-foreground">{event.detail}</p>}
-          {event.workspaceVersionId && (
-            <p className="run-id my-1">
-              {event.workspaceLabel ?? "Accepted workspace"}: {event.workspaceVersionId}
-            </p>
-          )}
         </li>
       ))}
     </ol>
