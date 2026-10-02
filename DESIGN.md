@@ -76,6 +76,10 @@ Saving an accepted result and scheduling the next operation happen in one transa
 
 A model response lost before it is saved may require another OpenAI request.
 
+Pause prevents new worker claims; the current call may finish and save normally.
+The pause request survives restarts. Resume clears it without changing the pending
+operation, retry timing, or attempt budget. A paused run still occupies its conversation.
+
 #### Scope
 
 Use Docker Compose and OpenAI. For the first version:
@@ -107,6 +111,7 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 | `prompt` | `text` | Initial prompt. |
 | `config` | `jsonb` | Frozen model/parameters, tool schemas, image digest, seed version ID, and limits. |
 | `status` | `text` | queued, running, retrying, succeeded, failed. |
+| `pause_requested` | `boolean` | Blocks new claims; defaults false and clears on completion/failure. |
 | `next_attempt_at` | `timestamptz?` | Next eligible claim time. |
 | `lease_owner` | `uuid?` | Worker process ID. |
 | `lease_generation` | `bigint` | Increments on each claim. |

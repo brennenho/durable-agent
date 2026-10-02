@@ -82,6 +82,7 @@ def summary(run: Run, last_progress: datetime | None) -> RunSummary:
         prompt=run.prompt,
         model=run.config["model"],
         status=run.status,
+        pause_requested=run.pause_requested,
         created_at=run.created_at,
         finished_at=run.finished_at,
         next_attempt_at=run.next_attempt_at,

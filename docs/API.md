@@ -113,6 +113,18 @@ Unknown runs/files return `404`. File downloads require the version returned by 
 listing; control validates that it is the seed or an accepted version for this run.
 Control proxies file reads to tools. Next.js proxies only public `/api/*` routes.
 
+## Pause and resume
+
+`POST /api/runs/{run_id}/pause` and `/resume` return `RunSummary`; unknown runs return
+`404`. Both set the persisted pause flag under the same run lock as claims and reports.
+Repeated requests create no work; terminal runs remain terminal with the flag cleared.
+
+Run and conversation summaries include `pause_requested` (default false). Status values
+stay unchanged: running plus the flag means pausing; queued/retrying plus the flag means
+paused. Existing calls may finish or expire normally, but no new attempt can be claimed
+while paused. Resume preserves operation IDs, inputs, retry times, and attempt budgets.
+Follow-ups remain blocked; saved files stay readable. Service restarts preserve the flag.
+
 ## Conversations
 
 A conversation groups ordered runs. Each run is one user prompt and its execution.

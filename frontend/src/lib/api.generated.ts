@@ -176,6 +176,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause Run */
+        post: operations["pause_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume Run */
+        post: operations["resume_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -393,6 +427,11 @@ export interface components {
              * Format: uuid
              */
             latest_run_id: string;
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
             /** Runs */
             runs: components["schemas"]["RunDetail"][];
             /**
@@ -425,6 +464,11 @@ export interface components {
              * Format: uuid
              */
             latest_run_id: string;
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
             /**
              * Status
              * @enum {string}
@@ -666,6 +710,11 @@ export interface components {
             next_attempt_at: string | null;
             /** Operations */
             operations: components["schemas"]["OperationView"][];
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
             /** Prompt */
             prompt: string;
             /**
@@ -712,6 +761,11 @@ export interface components {
             model: string;
             /** Next Attempt At */
             next_attempt_at: string | null;
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
             /** Prompt */
             prompt: string;
             /**
@@ -1548,6 +1602,122 @@ export interface operations {
                 };
             };
             /** @description Operation not found in this run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pause_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"];
+                };
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resume_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"];
+                };
+            };
+            /** @description Run not found */
             404: {
                 headers: {
                     [name: string]: unknown;

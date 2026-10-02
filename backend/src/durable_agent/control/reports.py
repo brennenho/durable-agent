@@ -53,6 +53,7 @@ def failed_attempt(run: Run, attempt: Attempt, error: ExecutionError, now: datet
         run.status, run.next_attempt_at = "retrying", retry_at
     else:
         run.status, run.next_attempt_at = "failed", None
+        run.pause_requested = False
         run.terminal_error, run.finished_at = attempt.error, now
 
 
@@ -124,6 +125,7 @@ async def accept_report(
         else:
             run.status = "succeeded" if transition.status == "finished" else "failed"
             run.finished_at, run.next_attempt_at = now, None
+            run.pause_requested = False
             run.terminal_error = (
                 transition.error.model_dump(mode="json") if transition.status == "failed" else None
             )

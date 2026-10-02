@@ -35,7 +35,9 @@ async def claim(session: AsyncSession, worker_id: UUID) -> Assignment | None:
     run = await session.scalar(
         select(Run)
         .where(
-            Run.status.in_(["queued", "retrying"]), Run.next_attempt_at <= func.clock_timestamp()
+            Run.status.in_(["queued", "retrying"]),
+            Run.pause_requested.is_(False),
+            Run.next_attempt_at <= func.clock_timestamp(),
         )
         .order_by(Run.next_attempt_at, Run.created_at, Run.id)
         .with_for_update(skip_locked=True)

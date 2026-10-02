@@ -143,6 +143,7 @@ class RunSummary(Contract):
     prompt: str
     model: str
     status: RunStatus
+    pause_requested: bool = False
     created_at: UtcDatetime
     finished_at: UtcDatetime | None
     next_attempt_at: UtcDatetime | None
@@ -197,6 +198,7 @@ class ConversationSummary(Contract):
     created_at: UtcDatetime
     updated_at: UtcDatetime
     status: RunStatus
+    pause_requested: bool = False
     latest_run_id: UUID
 
 
