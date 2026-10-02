@@ -73,7 +73,7 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 | GET | `/api/runs/{run_id}` | → `RunDetail` |
 | GET | `/api/runs/{run_id}/operations/{operation_id}` | → `OperationInspection` |
 | GET | `/api/runs/{run_id}/operations/{operation_id}/checkpoint` | → `ToolCheckpoint` or `null` |
-| GET | `/api/runs/{run_id}/files` | → `{workspace_version_id, entries: FileEntry[]}` |
+| GET | `/api/runs/{run_id}/files?version_id=…` | → `{workspace_version_id, entries: FileEntry[]}` |
 | GET | `/api/runs/{run_id}/file?version_id=…&path=…` | → stored bytes for that version/path |
 
 - `RunSummary`: `id`, `prompt`, `model`, `status`, `created_at`, `finished_at?`,
@@ -82,7 +82,10 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 - `RunDetail`: summary plus `final_answer?`, `workspace_version_id`, `operations[]`,
   and the frozen `max_attempts` limit.
 - Operation view: `id`, `position`, `kind`, `created_at`, `completed_at?`, `result?`,
-  `attempts[]`, `tool_name?`, and `tool_target?` (path or command, at most 160 characters).
+  `attempts[]`, `tool_name?`, `tool_target?` (path or command, at most 160 characters),
+  and `checkpoint?`. A checkpoint contains `workspace_version_id` and appears only
+  after a valid model response and all its requested tools have been accepted.
+  Incomplete responses and unfinished tool batches are not branch points.
   Attempt view: `id`, `attempt_no`, `status`, `started_at`, `finished_at?`, `error?`,
   `provider_request_id?`, and `usage?`. Null usage means unknown. Return both lists
   in execution order.
@@ -92,7 +95,9 @@ with its exit code and logs: the command ran, and the model can inspect the fail
   run details; accepted outputs remain in each operation's `result`. A missing
   operation or an operation belonging to another run returns `404`.
 - `FileEntry`: `path`, `kind` (file or directory), and `size_bytes?` for files.
-  File listings cover the saved workspace recursively, sorted by path.
+  File listings cover the saved workspace recursively, sorted by path. Omit
+  `version_id` for the latest accepted workspace; supply it for a specific accepted
+  version or the run’s starting workspace.
 
 `ToolCheckpoint` contains `completed_at` (Tools' saved publication timestamp) and
 `workspace_version_id`. It describes the result and complete workspace saved together,

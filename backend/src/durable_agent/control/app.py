@@ -196,10 +196,12 @@ async def inspect_tool_checkpoint(
     operation_id="list_run_files",
     responses={404: {"model": ErrorResponse, "description": "Run not found"}},
 )
-async def list_run_files(run_id: UUID, request: Request) -> RunFileListing:
+async def list_run_files(
+    run_id: UUID, request: Request, version_id: UUID | None = None
+) -> RunFileListing:
     runtime = get_runtime(request)
     async with runtime.db.session() as session:
-        version = await saved_version(session, run_id)
+        version = await saved_version(session, run_id, version_id)
     response = await runtime.tools_get(f"/tools/workspace-versions/{version}/files")
     try:
         listing = FileListing.model_validate_json(response.content)

@@ -342,6 +342,14 @@ export interface components {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
         };
+        /** BranchCheckpoint */
+        BranchCheckpoint: {
+            /**
+             * Workspace Version Id
+             * Format: uuid
+             */
+            workspace_version_id: string;
+        };
         /** ClaimRequest */
         ClaimRequest: {
             /**
@@ -537,6 +545,7 @@ export interface components {
         OperationView: {
             /** Attempts */
             attempts: components["schemas"]["AttemptView"][];
+            checkpoint?: components["schemas"]["BranchCheckpoint"] | null;
             /** Completed At */
             completed_at: string | null;
             /**
@@ -1276,7 +1285,9 @@ export interface operations {
     };
     list_run_files: {
         parameters: {
-            query?: never;
+            query?: {
+                version_id?: string | null;
+            };
             header?: never;
             path: {
                 run_id: string;
