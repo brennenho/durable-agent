@@ -3,6 +3,7 @@
 import asyncio
 import os
 import shutil
+from collections.abc import Awaitable, Callable
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -59,6 +60,8 @@ async def execute_command_tool(
     runner: DockerRunner,
     workspace_root: Path,
     deadline: float,
+    *,
+    on_started: Callable[[str], Awaitable[None]] | None = None,
 ) -> tuple[ToolOutput, bytes | None]:
     try:
         args = CommandArgs.model_validate(arguments)
@@ -89,7 +92,13 @@ async def execute_command_tool(
         async with asyncio.timeout_at(deadline):
             workspace = await filesystem(restore)
             output = await runner.run(
-                workspace, args.command, cwd, config, deadline, timeout_seconds=args.timeout_seconds
+                workspace,
+                args.command,
+                cwd,
+                config,
+                deadline,
+                timeout_seconds=args.timeout_seconds,
+                on_started=on_started,
             )
             if isinstance(output, ToolError):
                 return output, None

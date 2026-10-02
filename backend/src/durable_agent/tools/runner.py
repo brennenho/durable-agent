@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from pathlib import Path
 from uuid import uuid4
@@ -105,6 +106,7 @@ class DockerRunner:
         deadline: float,
         *,
         timeout_seconds: int = 120,
+        on_started: Callable[[str], Awaitable[None]] | None = None,
     ) -> ToolOutput:
         """Command time starts in the container; deadline bounds the whole attempt."""
         validate_image(config.image_digest)
@@ -147,9 +149,16 @@ class DockerRunner:
                     str(config.log_max_bytes),
                     str(timeout_seconds),
                 )
-                output = await self._checked(
-                    "start", "--attach", name, limit=config.log_max_bytes * 6 + 8192
-                )
+                if on_started:
+                    await self._checked("start", name)
+                    await on_started(name)
+                    output = await self._checked(
+                        "logs", "--follow", name, limit=config.log_max_bytes * 6 + 8192
+                    )
+                else:
+                    output = await self._checked(
+                        "start", "--attach", name, limit=config.log_max_bytes * 6 + 8192
+                    )
                 state = json.loads(
                     await self._checked("inspect", "--format", "{{json .State}}", name)
                 )
