@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, requestJson, type ConversationDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
+import { ChatWorkspace } from "./chat-workspace";
 import { FollowUp } from "./follow-up";
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
@@ -72,27 +73,31 @@ export function ConversationView({ conversationId }: { conversationId: string })
   }, [conversationId, revision]);
 
   return (
-    <div className="flex flex-1 flex-col gap-12">
-      {error && (
-        <p role="alert" aria-label="Chat update error">
-          {error}
-        </p>
-      )}
-      {!conversation && !error && <p role="status">Loading chat…</p>}
-      {conversation?.runs.map((run, index) => (
-        <div key={run.id} ref={index === conversation.runs.length - 1 ? latestTurn : undefined}>
-          <ChatTurn run={run} />
-        </div>
-      ))}
-      {conversation && (
-        <div className="sticky bottom-0 mt-auto bg-background pt-4 pb-4">
+    <ChatWorkspace
+      runs={conversation?.runs ?? []}
+      composer={
+        conversation && (
           <FollowUp
             conversation={conversation}
             blocked={awaitingRefresh || error !== null}
             refresh={requestRefresh}
           />
-        </div>
-      )}
-    </div>
+        )
+      }
+    >
+      <div className="space-y-12">
+        {error && (
+          <p role="alert" aria-label="Chat update error">
+            {error}
+          </p>
+        )}
+        {!conversation && !error && <p role="status">Loading chat…</p>}
+        {conversation?.runs.map((run, index) => (
+          <div key={run.id} ref={index === conversation.runs.length - 1 ? latestTurn : undefined}>
+            <ChatTurn run={run} />
+          </div>
+        ))}
+      </div>
+    </ChatWorkspace>
   );
 }
