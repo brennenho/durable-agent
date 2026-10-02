@@ -17,10 +17,12 @@ from durable_agent.contracts import (
     ErrorResponse,
     ExecutionError,
     FileListing,
+    ToolCheckpoint,
     ToolExecuteRequest,
     ToolExecuteResponse,
     WorkspaceVersion,
 )
+from durable_agent.db.models import ToolRequest
 from durable_agent.db.session import Database
 from durable_agent.tools.archives import InvalidWorkspace
 from durable_agent.tools.commands import InvalidCommand, filesystem, prepare_workspace_root
@@ -163,6 +165,26 @@ async def execute_tool(body: ToolExecuteRequest, request: Request) -> ToolExecut
 )
 async def get_initial_workspace(request: Request) -> WorkspaceVersion:
     return WorkspaceVersion(workspace_version_id=request.app.state.initial_version)
+
+
+@routes.get(
+    "/tools/operations/{operation_id}/checkpoint",
+    response_model=ToolCheckpoint | None,
+    operation_id="get_tool_checkpoint",
+)
+async def get_tool_checkpoint(operation_id: UUID, request: Request) -> ToolCheckpoint | None:
+    async with request.app.state.database.session() as session:
+        row = (
+            await session.execute(
+                select(ToolRequest.completed_at, ToolRequest.output_version_id).where(
+                    ToolRequest.operation_key == operation_id,
+                    ToolRequest.completed_at.is_not(None),
+                )
+            )
+        ).one_or_none()
+    if row is None:
+        return None
+    return ToolCheckpoint(completed_at=row.completed_at, workspace_version_id=row.output_version_id)
 
 
 async def saved_archive(request: Request, version_id: UUID) -> bytes:
