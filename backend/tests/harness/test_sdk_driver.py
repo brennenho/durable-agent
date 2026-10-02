@@ -117,7 +117,7 @@ def test_tool_ids_preserve_provider_identity_or_use_operation_id(config):
     operation_id = uuid4()
     for call_id in (None, "provider-call"):
         request = plan_step(
-            ToolCall(name="read_file", call_id=call_id),
+            ToolCall(name="read_file", call_id=call_id, arguments={"path": "a"}),
             config,
             operation_id,
             config.initial_workspace_version_id,
@@ -161,3 +161,12 @@ def test_step_limit_prevents_scheduling_but_callbacks_can_still_finish(config):
         )
     with pytest.raises(ValueError, match="not registered"):
         plan(ToolCall(name="missing"), config)
+
+
+@pytest.mark.parametrize(
+    "arguments", [{}, {"command": "true", "timeout_seconds": 0}, {"command": 1}]
+)
+def test_invalid_builtin_arguments_fail_before_persistence(config, arguments):
+    config.tool_schemas.append({"name": "run_command"})
+    with pytest.raises(ValueError):
+        plan(ToolCall(name="run_command", arguments=arguments), config)

@@ -14,6 +14,7 @@ from durable_agent.contracts import (
     ToolRequest,
 )
 from durable_agent.contracts import ToolCall as WireToolCall
+from durable_agent.harness import ARGUMENTS
 from durable_agent.sdk import AgentContext, ChildBatch, Decision, Fail, ModelCall, Step, StepResult
 
 DECISION = TypeAdapter(Decision)
@@ -76,6 +77,8 @@ def plan_step(
             raise ValueError("Only one child batch is allowed, and children cannot delegate")
     elif name not in schemas:
         raise ValueError(f"Tool is not registered: {name}")
+    if validator := ARGUMENTS.get(name):
+        validator.model_validate(arguments, strict=True)
     return ToolOperation(
         kind="tool",
         request=ToolRequest(
