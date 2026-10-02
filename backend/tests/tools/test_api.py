@@ -207,7 +207,7 @@ def test_command_completion_replays_and_startup_cleans_only_private_files(
         )
 
 
-def test_command_timeout_publishes_nothing_and_retry_uses_fixed_input(
+def test_outer_deadline_publishes_nothing_and_retry_uses_fixed_input(
     configured_sandbox, postgres_engine
 ):
     with TestClient(app) as client:
@@ -235,6 +235,56 @@ def test_command_timeout_publishes_nothing_and_retry_uses_fixed_input(
             assert row.result == retried.json()["output"]
         body["lease_generation"] = 1
         assert client.post("/tools/execute", json=body).status_code == 409
+
+
+def test_command_timeout_is_saved_with_input_and_replayed(
+    configured_sandbox, postgres_engine, monkeypatch
+):
+    with TestClient(app) as client:
+        seed = client.get("/tools/workspace/initial").json()["workspace_version_id"]
+        body = tool_request(
+            seed, "run_command", command="printf partial > seed.md; sleep 5", timeout_seconds=1
+        )
+        body["sandbox"] = configured_sandbox
+        first = client.post("/tools/execute", json=body)
+        assert first.status_code == 200
+        assert first.json()["output"]["code"] == "command_timeout"
+        assert first.json()["workspace_version_id"] == seed
+        assert list(app.state.workspace_root.iterdir()) == []
+        with Session(postgres_engine) as session:
+            assert session.scalar(select(func.count()).select_from(WorkspaceVersion)) == 1
+            assert session.get(ToolRequest, body["operation_id"]).result == first.json()["output"]
+
+        async def must_not_repeat(*args, **kwargs):
+            raise AssertionError("Saved timeout was executed again")
+
+        monkeypatch.setattr(app.state.runner, "run", must_not_repeat)
+        body["lease_generation"] = 2
+        assert client.post("/tools/execute", json=body).json() == first.json()
+        assert (
+            client.get(f"/tools/workspace-versions/{seed}/file", params={"path": "seed.md"}).content
+            == b"seed"
+        )
+
+
+def test_timeout_cleanup_failure_cannot_publish(configured_sandbox, postgres_engine, monkeypatch):
+    with TestClient(app) as client:
+        seed = client.get("/tools/workspace/initial").json()["workspace_version_id"]
+        remove = app.state.runner._remove
+
+        async def lost_cleanup_ack(name):
+            await remove(name)
+            raise SandboxFailure("Cleanup acknowledgment lost")
+
+        monkeypatch.setattr(app.state.runner, "_remove", lost_cleanup_ack)
+        body = tool_request(seed, "run_command", command="sleep 5", timeout_seconds=1)
+        body["sandbox"] = configured_sandbox
+        result = client.post("/tools/execute", json=body)
+        assert result.status_code == 503
+        assert result.json()["error"]["retryable"] is True
+        with Session(postgres_engine) as session:
+            assert session.get(ToolRequest, body["operation_id"]).result is None
+            assert session.scalar(select(func.count()).select_from(WorkspaceVersion)) == 1
 
 
 def test_invalid_checkpoint_is_permanent_and_dependency_failure_is_not_ready(

@@ -4,6 +4,7 @@ import pytest
 from durable_agent.contracts import SandboxConfig
 from durable_agent.tools.archives import InvalidWorkspace, capture_workspace, unpack_workspace
 from durable_agent.tools.commands import (
+    CommandArgs,
     InvalidCommand,
     execute_command_tool,
     prepare_workspace_root,
@@ -93,13 +94,50 @@ def test_timeout_discards_partial_edits_and_retry_restores_saved_input(saved_inp
 
 
 @pytest.mark.parametrize(
-    "arguments", [{}, {"command": 123}, {"command": "\0"}, {"command": "true", "extra": 1}]
+    "arguments",
+    [{}, {"command": 123}, {"command": "\0"}, {"command": "true", "extra": 1}]
+    + [{"command": "true", "timeout_seconds": value} for value in (0, 901, 1.5, True, "30")],
 )
 def test_invalid_command_schema_fails_before_launch(saved_input, arguments):
     runner = DockerRunner(docker="must-not-launch")
     config = SandboxConfig(image_digest="sha256:test", workspace_max_bytes=1024, log_max_bytes=100)
     with pytest.raises(InvalidCommand):
         execute(saved_input, (runner, config), arguments)
+
+
+@pytest.mark.parametrize(
+    "arguments,expected", [({}, 120), ({"timeout_seconds": 1}, 1), ({"timeout_seconds": 900}, 900)]
+)
+def test_command_budget_defaults_and_bounds(arguments, expected):
+    assert CommandArgs.model_validate({"command": "true", **arguments}).timeout_seconds == expected
+
+
+def test_command_budget_starts_after_setup(saved_input, docker_runner, monkeypatch):
+    runner, _ = docker_runner
+    check_image = runner.check_image
+
+    async def slow_setup(image):
+        await asyncio.sleep(1.2)
+        await check_image(image)
+
+    monkeypatch.setattr(runner, "check_image", slow_setup)
+    output, _ = execute(
+        saved_input, docker_runner, {"command": "sleep 0.2; cat keep", "timeout_seconds": 1}
+    )
+    assert output.value["stdout"] == "committed"
+
+
+def test_command_timeout_discards_partial_files(saved_input, docker_runner):
+    output, updated = execute(
+        saved_input,
+        docker_runner,
+        {"command": "printf partial > keep; sleep 5", "timeout_seconds": 1},
+    )
+    assert output.code == "command_timeout"
+    assert updated is None
+    assert "discarded" in output.message
+    output, _ = execute(saved_input, docker_runner, {"command": "cat keep"})
+    assert output.value["stdout"] == "committed"
 
 
 def test_startup_cleanup_does_not_follow_symlinks(tmp_path):

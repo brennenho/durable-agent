@@ -1,7 +1,13 @@
 # Sandbox runner
 
-`DockerRunner.run(workspace, command, cwd, config, deadline)` returns a tool output
-only after the container stops. `deadline` uses the caller's event-loop clock.
+`DockerRunner.run(workspace, command, cwd, config, deadline, *, timeout_seconds=120)`
+returns a tool output only after the container stops and removal succeeds.
+`deadline` uses the caller's event-loop clock and bounds the entire attempt.
+The requested command budget (1–900 seconds) starts after container setup; the
+supervisor also enforces the outer wall deadline if the service disappears.
+Only a confirmed command timeout returns `command_timeout`, discarding partial
+files and saving the input version with the result. Outer deadline expiry, crashes,
+and failed cleanup remain execution failures.
 The caller restores and owns the private directory, assigns it to `runner.uid/gid`,
 then captures or discards it. Command failure is a result; container failure raises
 `SandboxFailure`. Cleanup runs before returning, including cancellation.

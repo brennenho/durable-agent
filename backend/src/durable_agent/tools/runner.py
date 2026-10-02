@@ -97,9 +97,16 @@ class DockerRunner:
             raise SandboxFailure("Could not remove sandbox: " + stderr.decode(errors="replace"))
 
     async def run(
-        self, workspace: Path, command: str, cwd: str, config: SandboxConfig, deadline: float
+        self,
+        workspace: Path,
+        command: str,
+        cwd: str,
+        config: SandboxConfig,
+        deadline: float,
+        *,
+        timeout_seconds: int = 120,
     ) -> ToolOutput:
-        """Deadline uses this event loop's monotonic clock; workspace is quiescent on return."""
+        """Command time starts in the container; deadline bounds the whole attempt."""
         validate_image(config.image_digest)
         if not workspace.is_absolute() or "," in str(workspace):
             raise SandboxConfiguration("Workspace must be an absolute path without commas")
@@ -138,6 +145,7 @@ class DockerRunner:
                     cwd,
                     str(wall_deadline),
                     str(config.log_max_bytes),
+                    str(timeout_seconds),
                 )
                 output = await self._checked(
                     "start", "--attach", name, limit=config.log_max_bytes * 6 + 8192

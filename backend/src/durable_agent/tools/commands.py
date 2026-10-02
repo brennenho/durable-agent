@@ -7,7 +7,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from durable_agent.contracts import SandboxConfig, ToolError, ToolOutput
 from durable_agent.tools.archives import (
@@ -27,6 +27,7 @@ class CommandArgs(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     command: str
     cwd: str = "."
+    timeout_seconds: int = Field(default=120, ge=1, le=900)
 
 
 def prepare_workspace_root(path: Path) -> None:
@@ -90,7 +91,9 @@ async def execute_command_tool(
     try:
         async with asyncio.timeout_at(deadline):
             workspace = await filesystem(restore)
-            output = await runner.run(workspace, args.command, cwd, config, deadline)
+            output = await runner.run(
+                workspace, args.command, cwd, config, deadline, timeout_seconds=args.timeout_seconds
+            )
             if isinstance(output, ToolError):
                 return output, None
             updated = await filesystem(
