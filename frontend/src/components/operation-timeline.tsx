@@ -54,7 +54,12 @@ export function OperationTimeline({
   const { saved, checkedAt, error } = checkpoint;
   return (
     <>
-      {operation.kind === "tool" && (
+      {operation.tool_name === "delegate" && !operation.completed_at && (
+        <p className="text-xs text-muted-foreground">
+          Control waits for every subagent to finish. No worker is held while waiting.
+        </p>
+      )}
+      {operation.kind === "tool" && operation.tool_name !== "delegate" && (
         <div className="mb-3 text-xs text-muted-foreground" aria-live="polite">
           {error ? (
             <p role="alert" aria-label="Checkpoint update error">

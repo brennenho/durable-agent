@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { FailedAttemptsBadge } from "./failed-attempts-badge";
+import { groupIsPausing, subagentProgress } from "../lib/subagents";
 
 type Operation = RunDetail["operations"][number];
 
@@ -51,28 +52,33 @@ export function OperationSummary({
   operation,
   status,
   pauseRequested,
+  pausing,
   children,
 }: {
   operation: Operation;
   status: RunDetail["status"];
   pauseRequested?: boolean;
+  pausing?: boolean;
   children?: ReactNode;
 }) {
   const attempt = operation.attempts.at(-1);
   const running = !operation.completed_at && status !== "failed" && attempt?.status === "running";
-  const paused =
-    !operation.completed_at && pauseRequested && (status === "queued" || status === "retrying");
+  const paused = !operation.completed_at && pauseRequested && !pausing && status !== "running";
   const label = operation.completed_at
     ? "Completed"
     : status === "failed"
       ? "Stopped"
       : running
         ? "Running"
-        : paused
-          ? "Paused"
-          : status === "retrying"
-            ? "Retry pending"
-            : "Queued";
+        : pausing
+          ? "Pausing…"
+          : paused
+            ? "Paused"
+            : status === "waiting"
+              ? "Waiting for subagents"
+              : status === "retrying"
+                ? "Retry pending"
+                : "Queued";
   const failure = operation.attempts.findLast((item) => item.status === "unknown" || item.error);
   const note =
     failure?.status === "unknown"
@@ -134,12 +140,18 @@ export function OperationSummary({
 }
 
 export function operationName(operation: Operation) {
-  return operation.kind === "model" ? "Model call" : operation.tool_name || "Tool call";
+  return operation.kind === "model"
+    ? "Model call"
+    : operation.tool_name === "delegate"
+      ? "Subagents"
+      : operation.tool_name || "Tool call";
 }
 
 export function ActivityStatus({ run }: { run: RunDetail }) {
   const active = run.status !== "succeeded" && run.status !== "failed";
-  const now = useNow(active && (!run.pause_requested || run.status === "running"));
+  const now = useNow(
+    active && run.status !== "waiting" && (!run.pause_requested || run.status === "running"),
+  );
   const index = run.operations.findIndex((operation) => !operation.completed_at);
   const operation = run.operations[index];
   const attempt = operation?.attempts.at(-1);
@@ -168,14 +180,20 @@ export function ActivityStatus({ run }: { run: RunDetail }) {
         : "";
     label = `${phase}${elapsed}`;
   }
-  if (active && run.pause_requested) label = run.status === "running" ? "Pausing…" : "Paused";
+  if (run.status === "waiting") label = `Waiting for subagents · ${subagentProgress(run)}`;
+  if (active && run.pause_requested) {
+    label = groupIsPausing(run) ? "Pausing…" : "Paused";
+    if (run.status === "waiting") label += ` · ${subagentProgress(run)}`;
+  }
   return (
     <span
       role="status"
       aria-label="Execution status"
       title={
-        active && run.pause_requested && run.status === "running"
-          ? "Finishes the current call before pausing"
+        active && groupIsPausing(run)
+          ? run.status === "waiting"
+            ? "Finishes active subagent calls before pausing"
+            : "Finishes the current call before pausing"
           : undefined
       }
     >
