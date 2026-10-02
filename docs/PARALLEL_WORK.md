@@ -6,8 +6,10 @@ and owns its branches. The human reviews and merges PRs.
 
 Read `AGENTS.md`, `DESIGN.md`, and `docs/API.md` before starting. Repository docs are
 the current specification; earlier conversation decisions may be outdated.
-The repo has shared contracts, API/harness stubs, models, and an initial migration.
-Component behavior is still unimplemented. Start after both foundation PRs merge.
+The core components are implemented. The foundation and component-build steps below
+record the original implementation sequence; use the ownership and review rules for
+ongoing changes. Start new independent work from current trunk and stack dependent
+changes on their owning PR.
 
 ## 1. Land the foundation first
 

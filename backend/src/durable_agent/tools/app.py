@@ -90,7 +90,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Durable Agent Tools", version="0.1.0", lifespan=lifespan)
 routes = APIRouter(
     responses={
-        501: {"model": ErrorResponse, "description": "Handler not implemented"},
         503: {"model": ErrorResponse, "description": "Service unavailable"},
     }
 )

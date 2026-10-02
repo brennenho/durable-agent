@@ -452,16 +452,6 @@
             },
             "description": "Validation Error"
           },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Handler not implemented"
-          },
           "503": {
             "content": {
               "application/json": {
@@ -519,16 +509,6 @@
               }
             },
             "description": "Validation Error"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Handler not implemented"
           },
           "503": {
             "content": {
@@ -607,16 +587,6 @@
             },
             "description": "Validation Error"
           },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Handler not implemented"
-          },
           "503": {
             "content": {
               "application/json": {
@@ -677,16 +647,6 @@
             },
             "description": "Validation Error"
           },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Handler not implemented"
-          },
           "503": {
             "content": {
               "application/json": {
@@ -714,16 +674,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Handler not implemented"
           },
           "503": {
             "content": {
