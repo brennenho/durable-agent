@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 import httpx
+from durable_agent.crash_test import HookReply
 from fastapi import HTTPException
 
 from crash_test.contracts import ContainerAction
@@ -22,6 +23,20 @@ class ControlRoom:
         self.inventory_lock = asyncio.Lock()
         self.services, self.services_at, self.services_error = [], None, None
         self.journal = Journal(root / "controls.jsonl")
+        self.autoscaling_enabled = True
+        self.autoscaling_checked_at: str | None = None
+
+    async def set_autoscaling(self, enabled: bool):
+        async with self.mutation:
+            await self.journal.record(
+                "autoscaling", "Autoscaling allowed" if enabled else "Autoscaling paused"
+            )
+            self.autoscaling_enabled = enabled
+        return {"enabled": enabled}
+
+    def autoscaling_hook(self) -> HookReply:
+        self.autoscaling_checked_at = now()
+        return HookReply(action="continue" if self.autoscaling_enabled else "interrupt")
 
     def require_idle(self):
         if (self.task and not self.task.done()) or self.mutation.locked():
@@ -90,6 +105,8 @@ class ControlRoom:
                 for name, (hook, description) in SCENARIOS.items()
             ],
             "controls": self.journal.events,
+            "autoscaling_enabled": self.autoscaling_enabled,
+            "autoscaling_checked_at": self.autoscaling_checked_at,
         }
 
     async def close(self):

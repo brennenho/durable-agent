@@ -12,6 +12,9 @@ test("controller proxy rejects unknown paths and cross-origin mutations", async 
   ).toBe(403);
   expect((await request.post("/crash-api/scenarios", { data: {} })).status()).toBe(403);
   expect(
+    (await request.post("/crash-api/autoscaling", { data: { enabled: false } })).status(),
+  ).toBe(403);
+  expect(
     (
       await request.post("/crash-api/scenarios", {
         headers: { Host: "unrelated.test", Origin: "http://unrelated.test" },
@@ -41,6 +44,14 @@ test("same-origin loopback mutations reach the controller configuration check", 
     expect(await response.json()).toEqual({
       detail: "Start Crashboard with scripts/crash-test.sh.",
     });
+    expect(
+      (
+        await request.post("/crash-api/autoscaling", {
+          headers: { Host: origin.host, Origin: origin.origin },
+          data: { enabled: false },
+        })
+      ).status(),
+    ).toBe(503);
   }
   const otherOrigin = new URL(baseURL!);
   otherOrigin.hostname = "localhost";

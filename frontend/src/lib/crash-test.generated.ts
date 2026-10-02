@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/autoscaling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Autoscaling */
+        post: operations["autoscaling_autoscaling_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/containers/action": {
         parameters: {
             query?: never;
@@ -121,6 +138,11 @@ export interface components {
             usage?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+        };
+        /** AutoscalingSetting */
+        AutoscalingSetting: {
+            /** Enabled */
+            enabled: boolean;
         };
         /** BranchCheckpoint */
         BranchCheckpoint: {
@@ -328,6 +350,11 @@ export interface components {
             next_attempt_at: string | null;
             /** Operations */
             operations: components["schemas"]["OperationView"][];
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
             /** Prompt */
             prompt: string;
             /**
@@ -380,6 +407,10 @@ export interface components {
         };
         /** Snapshot */
         Snapshot: {
+            /** Autoscaling Checked At */
+            autoscaling_checked_at: string | null;
+            /** Autoscaling Enabled */
+            autoscaling_enabled: boolean;
             /** Controls */
             controls: components["schemas"]["Observation"][];
             current: components["schemas"]["Session"] | null;
@@ -488,6 +519,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    autoscaling_autoscaling_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoscalingSetting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoscalingSetting"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     action_containers_action_post: {
         parameters: {
             query?: never;

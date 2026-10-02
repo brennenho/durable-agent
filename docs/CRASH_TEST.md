@@ -5,6 +5,16 @@ Control emits `control.before_scale` before each worker-pool reconciliation. Ret
 The next pass checks the hook again. A resize already in progress may finish. As with
 other hooks, a missing controller leaves normal execution enabled.
 
+Use **Allow autoscaling** in Crashboard, or authenticated `POST /autoscaling` with
+`{"enabled": false}` / `{"enabled": true}`. It works before and during scenarios;
+arming or cancelling a scenario does not change the setting. `/snapshot` includes
+`autoscaling_enabled` and `autoscaling_checked_at`, the last received scaling hook.
+No hook timestamp means Control has not connected through this hook yet.
+
+The setting belongs to the running Crash Test service and resets to allowed when it
+restarts. It takes effect at the next hook, not in the middle of an in-flight resize.
+It cannot override `WORKER_AUTOSCALE=false`, which prevents Control's scaler starting.
+
 Crash Test is the name for the fault-injection dashboard and scenario controller.
 The optional hook client is independent of application persistence: no new database,
 no event table, and no hook code in the pure harness.
@@ -210,7 +220,8 @@ existing run ID. Watch status and recovery in the dashboard; use its Cancel butt
 to disarm the scenario and wait for any in-flight recovery. No terminal commands
 are needed to run, inspect, or cancel scenarios.
 
-Scenario kills automatically restart services; manual kills stay stopped until
+Scenario kills automatically restart services. Autoscaling may restart manually killed
+workers; pause it through Crashboard to prevent that. Other manual kills stay stopped until
 Start is clicked. Sandbox restart belongs to Tools. Manual controls are disabled
 during a scenario to keep its observations attributable to that scenario.
 

@@ -7,6 +7,7 @@ const routes = new Set([
   "POST scenarios",
   "POST scenarios/cancel",
   "POST containers/action",
+  "POST autoscaling",
 ]);
 
 async function proxy(request: NextRequest, context: Context) {

@@ -30,7 +30,8 @@ Control uses the local Docker socket to manage this Compose project's workers.
 Compose starts the baseline workers before Control and stops Control before workers;
 workers retry claims while Control starts. Restarting Control reuses existing containers.
 Use one Control replica. `WORKER_AUTOSCALE=false` disables scaling at startup.
-Crash Test hooks can interrupt a scaling pass without changing the current workers.
+Crashboard's **Allow autoscaling** switch controls scaling through Crash Test hooks,
+including during a scenario. It defaults to allowed and applies at the next check.
 Tools still executes at most four tool calls concurrently.
 
 Try: “Write a Python function that adds two numbers, create a pytest test, and run it.”

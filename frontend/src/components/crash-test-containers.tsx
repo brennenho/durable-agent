@@ -95,7 +95,7 @@ export function CrashTestContainers({
       <p className="m-0 border-t bg-muted/30 px-5 py-3 text-xs text-muted-foreground">
         {running
           ? "Manual controls are locked while a scenario runs."
-          : "Manual kills stay stopped until you restart them."}
+          : "Autoscaling may restart killed workers."}
       </p>
     </section>
   );

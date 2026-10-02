@@ -10,7 +10,13 @@ from durable_agent.crash_test import HookEvent, HookReply
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from crash_test.contracts import ContainerAction, Session, Snapshot, StartScenario
+from crash_test.contracts import (
+    AutoscalingSetting,
+    ContainerAction,
+    Session,
+    Snapshot,
+    StartScenario,
+)
 from crash_test.docker import Container, DockerControl, DockerError
 from crash_test.room import ControlRoom
 
@@ -67,10 +73,16 @@ def create_app(room: ControlRoom | None = None, *, token: str | None = None):
     async def action(body: ContainerAction, request: Request):
         return await request.app.state.room.action(body)
 
+    @app.post("/autoscaling", response_model=AutoscalingSetting)
+    async def autoscaling(body: AutoscalingSetting, request: Request):
+        return await request.app.state.room.set_autoscaling(body.enabled)
+
     @app.post("/hooks", response_model=HookReply)
     async def hook(body: HookEvent, request: Request):
         if body.observed_at.tzinfo is None:
             raise HTTPException(422, "Hook timestamp must include a timezone")
+        if body.name == "control.before_scale" and body.service == "control":
+            return request.app.state.room.autoscaling_hook()
         current = request.app.state.room.current
         if current and current.status == "running":
             return await current.observe_hook(body)
