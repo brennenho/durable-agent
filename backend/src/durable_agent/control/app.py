@@ -302,7 +302,7 @@ async def download_run_file(
 @routes.post("/internal/claims", response_model=Assignment | None, operation_id="claim_work")
 async def claim_work(body: ClaimRequest, request: Request) -> Assignment | None:
     async with get_runtime(request).db.session() as session:
-        assignment = await claim(session, body.worker_id)
+        assignment = await claim(session, body.worker_id, agents=get_runtime(request).agents)
         await session.commit()
         return assignment
 
@@ -332,7 +332,7 @@ async def report_attempt(attempt_id: UUID, body: ReportRequest, request: Request
     runtime = get_runtime(request)
     scope = None
     async with runtime.db.session() as session:
-        response = await accept_report(session, attempt_id, body)
+        response = await accept_report(session, attempt_id, body, agents=runtime.agents)
         if (
             runtime.hooks
             and runtime.hooks.client
