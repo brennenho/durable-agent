@@ -46,6 +46,12 @@ class Snapshot(Contract):
     current: Session | None
     scenarios: list[Scenario]
     controls: list[Observation]
+    autoscaling_enabled: bool
+    autoscaling_checked_at: str | None
+
+
+class AutoscalingSetting(Contract):
+    enabled: bool
 
 
 class StartScenario(Contract):

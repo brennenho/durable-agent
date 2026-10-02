@@ -8,6 +8,8 @@ export function crashSnapshot(): CrashSnapshot {
     services_at: "2026-10-01T12:00:00Z",
     services_error: null,
     controls: [],
+    autoscaling_enabled: true,
+    autoscaling_checked_at: null,
     current: null,
     scenarios: [
       {
@@ -48,6 +50,53 @@ test("the dashboard homepage omits app navigation", async ({ page }) => {
     process.env.CRASH_TEST_APP_URL ?? "http://localhost:3000",
   );
   await expect(page).toHaveTitle("Crashboard · Applied Agent");
+});
+
+test("autoscaling can change during a scenario and failed updates retain the setting", async ({
+  page,
+}) => {
+  const snapshot = crashSnapshot();
+  snapshot.current = {
+    id: "active",
+    scenario: "baseline",
+    status: "running",
+    run: null,
+    observed_at: null,
+    error: null,
+    checkpoints: {},
+    checks: {},
+    events: [],
+  };
+  let fail = false;
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/crash-api/**", async (route) => {
+    if (route.request().method() === "POST") {
+      expect(route.request().url()).toContain("/autoscaling");
+      if (fail) return route.fulfill({ status: 503, json: { detail: "Setting update failed" } });
+      snapshot.autoscaling_enabled = route.request().postDataJSON().enabled;
+    }
+    return route.fulfill({ json: snapshot });
+  });
+  await page.goto("/");
+  const toggle = page.getByRole("switch", { name: "Allow autoscaling" });
+  await expect(toggle).toBeChecked();
+  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
+  await expect(
+    page.getByText("Waiting for Control. Enable Crash Test hooks in the app."),
+  ).toBeVisible();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  snapshot.autoscaling_checked_at = "2026-10-02T12:00:00Z";
+  await expect(page.getByText(/Last check:/)).toBeVisible();
+  fail = true;
+  await toggle.click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Setting update failed");
+  await expect(toggle).not.toBeChecked();
+  fail = false;
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  expect(errors).toEqual([]);
 });
 
 test("scenario selection supports the keyboard and validates an existing run", async ({ page }) => {

@@ -45,8 +45,9 @@ scaling without interrupting the runtime. No additional tables are needed.
 
 Run one Control replica. Compose starts workers before Control and shuts Control down
 first. Workers retry claims during startup. Control emits `control.before_scale` before
-each scaling pass; the Crash Test service can interrupt that pass. Tools retains its
-four-call concurrency limit.
+each scaling pass. The Crash Test service's **Allow autoscaling** setting determines
+whether the pass continues; enabling Crash Test mode alone does not disable scaling.
+Tools retains its four-call concurrency limit.
 
 #### Agent Harness
 

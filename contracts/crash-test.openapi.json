@@ -88,6 +88,20 @@
         "title": "AttemptView",
         "type": "object"
       },
+      "AutoscalingSetting": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "AutoscalingSetting",
+        "type": "object"
+      },
       "BranchCheckpoint": {
         "additionalProperties": false,
         "properties": {
@@ -722,6 +736,11 @@
             "title": "Operations",
             "type": "array"
           },
+          "pause_requested": {
+            "default": false,
+            "title": "Pause Requested",
+            "type": "boolean"
+          },
           "prompt": {
             "title": "Prompt",
             "type": "string"
@@ -894,6 +913,21 @@
       "Snapshot": {
         "additionalProperties": false,
         "properties": {
+          "autoscaling_checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autoscaling Checked At"
+          },
+          "autoscaling_enabled": {
+            "title": "Autoscaling Enabled",
+            "type": "boolean"
+          },
           "controls": {
             "items": {
               "$ref": "#/components/schemas/Observation"
@@ -959,7 +993,9 @@
           "services_error",
           "current",
           "scenarios",
-          "controls"
+          "controls",
+          "autoscaling_enabled",
+          "autoscaling_checked_at"
         ],
         "title": "Snapshot",
         "type": "object"
@@ -1180,6 +1216,44 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/autoscaling": {
+      "post": {
+        "operationId": "autoscaling_autoscaling_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoscalingSetting"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoscalingSetting"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Autoscaling"
+      }
+    },
     "/containers/action": {
       "post": {
         "operationId": "action_containers_action_post",

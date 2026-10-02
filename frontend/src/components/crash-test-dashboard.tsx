@@ -113,6 +113,30 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
               })
             }
           />
+          <section className="space-y-2 border p-4" aria-label="Worker autoscaling">
+            <div className="flex items-center justify-between gap-3">
+              <h2>Worker autoscaling</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                role="switch"
+                aria-label="Allow autoscaling"
+                aria-checked={snapshot?.autoscaling_enabled ?? false}
+                disabled={!snapshot || pending || !!connectionError}
+                onClick={() => void act("autoscaling", { enabled: !snapshot?.autoscaling_enabled })}
+              >
+                {!snapshot ? "Loading…" : snapshot.autoscaling_enabled ? "Allowed" : "Paused"}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Applies at the next scaling check. Existing workers keep running.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {snapshot?.autoscaling_checked_at
+                ? `Last check: ${new Date(snapshot.autoscaling_checked_at).toLocaleTimeString()}`
+                : "Waiting for Control. Enable Crash Test hooks in the app."}
+            </p>
+          </section>
         </div>
         <div className="min-w-0 space-y-5 lg:col-start-1 lg:row-start-1">
           <CrashTestResult session={current} appUrl={appUrl} />
