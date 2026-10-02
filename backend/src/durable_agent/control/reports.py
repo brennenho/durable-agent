@@ -73,7 +73,7 @@ async def accept_report(
             raise ControlError(409, "report_conflict", "Attempt already has a different report")
         return ReportResponse(status="already_recorded")
     now = await session.scalar(select(func.clock_timestamp()))
-    check_lease(attempt, run, body, now)
+    check_lease(attempt, operation, run, body, now)
     attempt.provider_request_id = outcome.provider_request_id
     if outcome.status == "failed":
         failed_attempt(run, attempt, outcome.error, now)

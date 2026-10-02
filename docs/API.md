@@ -156,7 +156,10 @@ recorded reports return `already_recorded`; changed reports conflict. Only a suc
 operation result advances the harness. A recorded execution error invokes the retry policy.
 
 Workers use `server_time` and `deadline_at` to maintain a monotonic local time budget.
-PostgreSQL time remains authoritative. SDKs and tool functions do not add hidden retries.
+PostgreSQL time remains authoritative. For `run_command`, the fixed attempt budget is
+`timeout_seconds` (default 120) plus 30 seconds for setup, cleanup, and result delivery.
+Other calls use `config.call_timeout_seconds`. Workers honor the assigned deadline;
+heartbeats cannot extend it. SDKs and tool functions do not add hidden retries.
 
 ## Worker → tools
 
@@ -182,10 +185,15 @@ registered generation may commit, and a completed result cannot be replaced.
 | `list_files` | `{path: "."}`; path optional | `{entries: FileEntry[]}` for immediate children, sorted by path |
 | `read_file` | `{path}` | `{content: string}`; UTF-8, up to 64 KiB |
 | `write_file` | `{path, content}` | `{bytes_written: int}`; replace UTF-8 content, creating parent directories |
-| `run_command` | `{command, cwd: "."}`; cwd optional | `{exit_code: int, stdout: string, stderr: string, truncated: bool}` |
+| `run_command` | `{command, cwd: ".", timeout_seconds: 120}`; cwd and timeout optional | `{exit_code: int, stdout: string, stderr: string, truncated: bool}` |
 
 Paths are relative to `/workspace`. `run_command` uses `/bin/sh -c`; its working
-directory is explicit and does not persist between calls. Bound combined stdout/stderr
+directory is explicit and does not persist between calls. `timeout_seconds` is an integer
+from 1 to 900, fixed across retries. After a confirmed command timeout and cleanup,
+save `ToolError(code="command_timeout")` with the input workspace unchanged. The model
+can then issue a new call with a larger budget or smaller scope. A crash, failed cleanup,
+or expired outer deadline remains an infrastructure failure; publish no partial files.
+Bound combined stdout/stderr
 by the frozen log limit, marking truncation. Read-only calls return the input version.
 Text reads over the limit return a `too_large` tool error instead of incomplete content.
 The worker adds the saved model `call_id` when constructing `ToolResult`; it never uses

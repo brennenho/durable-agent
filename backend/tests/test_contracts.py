@@ -14,6 +14,7 @@ from durable_agent.contracts import (
     ModelResult,
     OperationResult,
     ReportRequest,
+    RunCommandArguments,
     SuccessfulOutcome,
     ToolError,
     ToolResult,
@@ -195,3 +196,16 @@ def test_previous_turns_preserve_context_and_old_model_requests_still_parse():
     assert (
         ModelRequest.model_validate({"prompt": "Existing run", "history": []}).previous_turns == []
     )
+
+
+def test_command_budget_defaults_and_explicit_limits():
+    assert RunCommandArguments(command="true").timeout_seconds == 120
+    for seconds in (1, 600, 900):
+        args = RunCommandArguments(command="true", timeout_seconds=seconds)
+        assert RunCommandArguments.model_validate_json(args.model_dump_json()) == args
+
+
+@pytest.mark.parametrize("seconds", [0, -1, 901, True, 1.5, "600", None])
+def test_command_budget_rejects_invalid_values(seconds):
+    with pytest.raises(ValidationError):
+        RunCommandArguments(command="true", timeout_seconds=seconds)
