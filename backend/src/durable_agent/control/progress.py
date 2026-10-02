@@ -5,6 +5,8 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from durable_agent.contracts import OperationResult, ToolRequest
+from durable_agent.control.agent_progress import advance_agent
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.errors import ControlError
 from durable_agent.control.history import load_operations, restore_state, workspace_version
 from durable_agent.db.models import Operation, Run
@@ -17,6 +19,8 @@ async def accept_result(
     operation: Operation,
     result: OperationResult,
     now: datetime,
+    *,
+    agents: AgentRuntime | None = None,
 ) -> None:
     """Caller holds the run lock and validates the execution's right to publish."""
     if operation.completed_at is not None:
@@ -25,6 +29,9 @@ async def accept_result(
         result.kind == "tool" and result.call_id != operation.request["call"]["call_id"]
     ):
         raise ControlError(409, "invalid_result", "Result does not match the assigned operation")
+    if run.config.get("agent") is not None:
+        await advance_agent(session, run, operation, result, now, agents)
+        return
     state = restore_state(run, await load_operations(session, run.id))
     transition = advance(state, result)
     operation.result, operation.completed_at = result.model_dump(mode="json"), now

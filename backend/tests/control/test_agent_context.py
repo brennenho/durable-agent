@@ -8,7 +8,7 @@ from durable_agent.control.errors import ControlError
 from durable_agent.db.models import Operation, Run
 from durable_agent.sdk import Done, StepResult
 from durable_agent.sdk.loading import AgentApp
-from durable_agent.sdk.registration import agent
+from durable_agent.sdk.registration import agent, tool
 
 
 @agent(name="count", version="1")
@@ -73,3 +73,47 @@ def test_context_uses_only_accepted_results_and_preserves_inherited_history(conf
     assert [item.operation_id for item in ctx.history] == [prior.operation_id, accepted.id]
     assert ctx.history[-1].value == {"text": "new"}
     assert ctx.limits.max_steps == config.max_steps
+
+
+@tool(name="summarize", version="1")
+async def summarize(text: str) -> dict:
+    return {"text": text}
+
+
+def test_builtin_accepts_a_frozen_custom_tool_definition(config):
+    from durable_agent.contracts import ModelResult
+    from durable_agent.harness.builtin import BuiltinAgent
+    from durable_agent.harness.sdk_driver import invoke
+    from durable_agent.harness.sdk_results import to_step_result
+    from durable_agent.sdk import AgentContext, Next
+
+    runtime = AgentRuntime(AgentApp(tools=[summarize]), "example:app", "build-1")
+    saved = runtime.freeze(config)
+    ctx = AgentContext(
+        run_id=uuid4(),
+        agent="builtin",
+        version="1",
+        input="Summarize",
+        workspace_version_id=config.initial_workspace_version_id,
+    )
+    builtin = BuiltinAgent(saved)
+    decision = invoke(builtin.start, ctx)
+    assert isinstance(decision, Next)
+    result = ModelResult(
+        kind="model",
+        output={
+            "status": "completed",
+            "text": "",
+            "tool_calls": [
+                {"call_id": "custom", "name": "summarize", "arguments": {"text": "hello"}}
+            ],
+        },
+        native_context=[],
+    )
+    following = invoke(
+        builtin.advance,
+        ctx.model_copy(update={"state": decision.state}),
+        to_step_result(uuid4(), result, ctx.workspace_version_id),
+    )
+    assert following.step.name == "summarize"
+    assert following.step.call_id == "custom"

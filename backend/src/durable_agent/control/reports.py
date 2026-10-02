@@ -14,6 +14,7 @@ from durable_agent.contracts import (
     ReportResponse,
     SuccessfulOutcome,
 )
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.errors import ControlError
 from durable_agent.control.leases import check_lease, lock_attempt
 from durable_agent.control.progress import accept_result
@@ -56,7 +57,11 @@ def failed_attempt(run: Run, attempt: Attempt, error: ExecutionError, now: datet
 
 
 async def accept_report(
-    session: AsyncSession, attempt_id: UUID, body: ReportRequest
+    session: AsyncSession,
+    attempt_id: UUID,
+    body: ReportRequest,
+    *,
+    agents: AgentRuntime | None = None,
 ) -> ReportResponse:
     attempt, operation, run = await lock_attempt(session, attempt_id)
     if attempt.worker_id != body.worker_id or attempt.lease_generation != body.lease_generation:
@@ -89,7 +94,7 @@ async def accept_report(
         failed_attempt(run, attempt, outcome.error, now)
         attempt.status = "error"
     else:
-        await accept_result(session, run, operation, outcome.result, now)
+        await accept_result(session, run, operation, outcome.result, now, agents=agents)
         attempt.status, attempt.finished_at, attempt.usage = "accepted", now, outcome.usage
     await session.flush()
     return ReportResponse(status="recorded")
