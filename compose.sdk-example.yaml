@@ -1,0 +1,40 @@
+# Use with compose.yaml after building the SDK sandbox and exporting its image ID.
+x-sdk-backend: &sdk-backend
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.sdk-example
+    target: backend
+    args:
+      AGENT_BUILD_ID: ${AGENT_BUILD_ID:?Set an immutable SDK build identifier}
+  image: durable-agent-sdk-backend:dev
+
+services:
+  migrate:
+    <<: *sdk-backend
+    volumes: !reset []
+
+  control:
+    <<: *sdk-backend
+    environment:
+      AGENT_APP: sdk_agent.app:app
+      SANDBOX_IMAGE_DIGEST: ${SANDBOX_IMAGE_DIGEST:?Build the SDK sandbox and export its image ID}
+    volumes: !override
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+
+  tools:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.sdk-example
+      target: tools
+      args:
+        AGENT_BUILD_ID: ${AGENT_BUILD_ID:?Set an immutable SDK build identifier}
+    image: durable-agent-sdk-tools:dev
+    environment:
+      SANDBOX_IMAGE_DIGEST: ${SANDBOX_IMAGE_DIGEST:?Build the SDK sandbox and export its image ID}
+    volumes: !override
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${SANDBOX_WORKSPACE_ROOT:-/tmp/durable-agent-workspaces}:${SANDBOX_WORKSPACE_ROOT:-/tmp/durable-agent-workspaces}
+
+  worker:
+    <<: *sdk-backend
+    volumes: !reset []
