@@ -174,3 +174,74 @@ def test_fault_waiting_for_manual_action_expires_with_the_hook_window(tmp_path):
         assert "expired while waiting" in controller.error
 
     asyncio.run(exercise())
+
+
+def test_child_hooks_are_scoped_to_authoritative_run_ids(tmp_path):
+    async def exercise():
+        docker, root, child, foreign, operation = Docker(), uuid4(), uuid4(), uuid4(), uuid4()
+        docker.release.set()
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), root, "tools.after_commit"
+        )
+        await controller.observe(event("worker.after_claim", operation, child))
+        await controller.observe(event("tools.after_commit", operation))
+        assert not controller.journal.events and docker.kills == 0
+
+        # The runner adds IDs only after reading the parent's saved child relationships.
+        controller.run_ids.add(child)
+        await controller.observe(event("worker.after_claim", uuid4(), foreign))
+        await controller.observe(event("worker.after_claim", operation, child, generation=2))
+        await controller.observe(event("tools.after_commit", operation, generation=1))
+        assert controller.trigger is None
+        await controller.observe(event("tools.after_commit", operation, generation=2))
+        assert controller.killed and docker.kills == docker.starts == 1
+        assert len(controller.operations) == 1
+        assert controller.journal.events[0]["hook"]["run_id"] == str(child)
+
+    asyncio.run(exercise())
+
+
+def test_coordinator_commit_kills_control_without_a_worker_attempt(tmp_path):
+    async def exercise(hook):
+        docker, run, operation = Docker(), uuid4(), uuid4()
+        docker.target = replace(docker.target, service="control")
+        docker.release.set()
+        controller = FaultController(docker, Journal(tmp_path / f"{hook}.jsonl"), run, hook)
+        committed = HookEvent(
+            name=hook,
+            service="control",
+            instance="host",
+            pid=1,
+            run_id=run,
+            operation_id=operation,
+        )
+        for invalid in [
+            committed.model_copy(update={"run_id": uuid4()}),
+            committed.model_copy(update={"service": "worker"}),
+            committed.model_copy(update={"attempt_id": uuid4()}),
+            committed.model_copy(update={"lease_generation": 1}),
+            committed.model_copy(update={"observed_at": datetime.now(UTC) - timedelta(seconds=20)}),
+        ]:
+            await controller.observe(invalid.model_copy(update={"event_id": uuid4()}))
+            assert docker.kills == 0
+        await controller.observe(committed)
+        await controller.observe(committed.model_copy(update={"event_id": uuid4()}))
+        await controller.close()
+        assert controller.killed and controller.error is None
+        assert docker.kills == docker.starts == 1
+        assert not controller.operations
+
+    for hook in ["control.after_children_commit", "control.after_join_commit"]:
+        asyncio.run(exercise(hook))
+
+
+def test_unclaimed_worker_hook_without_a_generation_cannot_trigger(tmp_path):
+    async def exercise():
+        docker, run = Docker(), uuid4()
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), run, "worker.before_report"
+        )
+        await controller.observe(event("worker.before_report", uuid4(), run, generation=None))
+        assert controller.trigger is None and docker.kills == 0
+
+    asyncio.run(exercise())

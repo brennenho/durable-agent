@@ -10,6 +10,8 @@ from durable_agent.crash_test import HookEvent, HookReply
 
 from crash_test.docker import DockerControl, DockerError
 
+COORDINATION_HOOKS = {"control.after_children_commit", "control.after_join_commit"}
+
 
 def now() -> str:
     return datetime.now(UTC).isoformat()
@@ -52,6 +54,7 @@ class FaultController:
         container_lock: asyncio.Lock | None = None,
     ):
         self.docker, self.journal, self.run_id, self.hook = docker, journal, run_id, hook
+        self.run_ids = {run_id}
         self.operations: dict[UUID, int] = {}
         self.seen: set[UUID] = set()
         self.trigger: HookEvent | None = None
@@ -67,11 +70,11 @@ class FaultController:
         age = (datetime.now(UTC) - event.observed_at).total_seconds()
         if not 0 <= age < 8 or event.operation_id is None:
             return HookReply(action="continue")
-        if event.run_id == self.run_id and event.name == "worker.after_claim":
+        if event.run_id in self.run_ids and event.name == "worker.after_claim":
             self.operations[event.operation_id] = max(
                 self.operations.get(event.operation_id, 0), event.lease_generation or 0
             )
-        if (event.run_id is not None and event.run_id != self.run_id) or (
+        if (event.run_id is not None and event.run_id not in self.run_ids) or (
             event.run_id is None and event.operation_id not in self.operations
         ):
             return HookReply(action="continue")
@@ -88,7 +91,7 @@ class FaultController:
             self.closed
             or event.name != self.hook
             or self.trigger is not None
-            or event.lease_generation != self.operations.get(event.operation_id)
+            or not self._current(event)
         ):
             return HookReply(action="continue")
         # Consume before the first await: duplicate/concurrent hooks cannot trigger twice.
@@ -96,6 +99,20 @@ class FaultController:
         self.task = asyncio.create_task(self._kill_and_restore(event))
         await asyncio.shield(self.task)
         return HookReply(action="continue")
+
+    def _current(self, event: HookEvent) -> bool:
+        if event.name in COORDINATION_HOOKS:
+            # Coordination commits have no worker lease or attempt to correlate.
+            return (
+                event.service == "control"
+                and event.run_id in self.run_ids
+                and event.attempt_id is None
+                and event.lease_generation is None
+            )
+        return (
+            event.operation_id in self.operations
+            and event.lease_generation == self.operations[event.operation_id]
+        )
 
     async def _kill_and_restore(self, event: HookEvent):
         remaining = max(0, 8 - (datetime.now(UTC) - event.observed_at).total_seconds())
@@ -138,7 +155,7 @@ class FaultController:
                 target=target.json(),
                 operation_id=str(event.operation_id),
             )
-            if self.closed or event.lease_generation != self.operations.get(event.operation_id):
+            if self.closed or not self._current(event):
                 raise DockerError("Hook was disarmed or superseded before injection")
             remaining = 8 - (datetime.now(UTC) - event.observed_at).total_seconds()
             if remaining <= 0:
