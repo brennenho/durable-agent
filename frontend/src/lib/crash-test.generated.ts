@@ -460,6 +460,8 @@ export interface components {
             checks: {
                 [key: string]: boolean;
             };
+            /** Child Runs */
+            child_runs?: components["schemas"]["RunDetail"][];
             /** Error */
             error: string | null;
             /** Events */

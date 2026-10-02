@@ -1041,6 +1041,13 @@
             "title": "Checks",
             "type": "object"
           },
+          "child_runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunDetail"
+            },
+            "title": "Child Runs",
+            "type": "array"
+          },
           "error": {
             "anyOf": [
               {
