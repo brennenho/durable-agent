@@ -40,6 +40,7 @@ const input: Inspection = {
     initial_workspace_version_id: runDetail.workspace_version_id,
     max_attempts: 5,
     max_turns: 20,
+    max_steps: 100,
     call_timeout_seconds: 120,
     sandbox: { image_digest: "sha256:test", workspace_max_bytes: 1000, log_max_bytes: 1000 },
   },

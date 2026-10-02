@@ -163,6 +163,52 @@
         "title": "ToolCheckpoint",
         "type": "object"
       },
+      "ToolDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "entrypoint": {
+            "minLength": 1,
+            "title": "Entrypoint",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "takes_context": {
+            "default": false,
+            "title": "Takes Context",
+            "type": "boolean"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "entrypoint",
+          "parameters"
+        ],
+        "title": "ToolDefinition",
+        "type": "object"
+      },
       "ToolError": {
         "additionalProperties": false,
         "properties": {
@@ -198,10 +244,32 @@
             "title": "Arguments",
             "type": "object"
           },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
           "deadline_at": {
             "format": "date-time",
             "title": "Deadline At",
             "type": "string"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "input_version_id": {
             "format": "uuid",
@@ -221,6 +289,18 @@
             "format": "uuid",
             "title": "Operation Id",
             "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           },
           "sandbox": {
             "$ref": "#/components/schemas/SandboxConfig"

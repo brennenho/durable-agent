@@ -301,6 +301,9 @@ export interface components {
     schemas: {
         /** AgentConfig */
         AgentConfig: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
+            /** Agent History */
+            agent_history?: components["schemas"]["StepResult"][];
             /** Call Timeout Seconds */
             call_timeout_seconds: number;
             /**
@@ -310,6 +313,11 @@ export interface components {
             initial_workspace_version_id: string;
             /** Max Attempts */
             max_attempts: number;
+            /**
+             * Max Steps
+             * @default 100
+             */
+            max_steps: number;
             /** Max Turns */
             max_turns: number;
             /** Model */
@@ -319,10 +327,25 @@ export interface components {
                 [key: string]: components["schemas"]["JsonValue"];
             };
             sandbox: components["schemas"]["SandboxConfig"];
+            /** Tool Definitions */
+            tool_definitions?: {
+                [key: string]: components["schemas"]["ToolDefinition"];
+            };
             /** Tool Schemas */
             tool_schemas: {
                 [key: string]: components["schemas"]["JsonValue"];
             }[];
+        };
+        /** AgentIdentity */
+        AgentIdentity: {
+            /** App Ref */
+            app_ref: string;
+            /** Build Id */
+            build_id: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
         };
         /** Assignment */
         Assignment: {
@@ -403,8 +426,11 @@ export interface components {
         };
         /** ChildRunSummary */
         ChildRunSummary: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
             /** Child Index */
             child_index: number;
+            /** Conversation Id */
+            conversation_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -642,12 +668,28 @@ export interface components {
         };
         /** ModelRequest */
         ModelRequest: {
+            /** Explicit Input */
+            explicit_input?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[] | null;
             /** History */
             history: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"])[];
+            /** Model */
+            model?: string | null;
+            /** Model Params */
+            model_params?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
             /** Previous Turns */
             previous_turns?: components["schemas"]["PreviousTurn"][];
             /** Prompt */
             prompt: string;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /** Tool Schemas */
+            tool_schemas?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[] | null;
         };
         /** ModelResult */
         ModelResult: {
@@ -729,8 +771,11 @@ export interface components {
         };
         /** RunDetail */
         RunDetail: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
             /** Children */
             children?: components["schemas"]["ChildRunSummary"][];
+            /** Conversation Id */
+            conversation_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -757,6 +802,7 @@ export interface components {
             next_attempt_at: string | null;
             /** Operations */
             operations: components["schemas"]["OperationView"][];
+            output?: components["schemas"]["JsonValue"];
             parent?: components["schemas"]["RunParent"] | null;
             /**
              * Pause Requested
@@ -809,6 +855,9 @@ export interface components {
         };
         /** RunSummary */
         RunSummary: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
+            /** Conversation Id */
+            conversation_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -852,6 +901,30 @@ export interface components {
             /** Workspace Max Bytes */
             workspace_max_bytes: number;
         };
+        /** StepError */
+        StepError: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** StepResult */
+        StepResult: {
+            error?: components["schemas"]["StepError"] | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model" | "tool" | "children";
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            value?: components["schemas"]["JsonValue"];
+            /** Workspace Version Id */
+            workspace_version_id?: string | null;
+        };
         /** SubmitFollowUpRequest */
         SubmitFollowUpRequest: {
             /**
@@ -859,7 +932,13 @@ export interface components {
              * Format: uuid
              */
             after_run_id: string;
-            /** Prompt */
+            /** Agent */
+            agent?: string | null;
+            input?: components["schemas"]["JsonValue"];
+            /**
+             * Prompt
+             * @default
+             */
             prompt: string;
             /**
              * Submission Key
@@ -874,7 +953,13 @@ export interface components {
              * Format: uuid
              */
             after_operation_id: string;
-            /** Prompt */
+            /** Agent */
+            agent?: string | null;
+            input?: components["schemas"]["JsonValue"];
+            /**
+             * Prompt
+             * @default
+             */
             prompt: string;
             /**
              * Submission Key
@@ -884,7 +969,13 @@ export interface components {
         };
         /** SubmitRunRequest */
         SubmitRunRequest: {
-            /** Prompt */
+            /** Agent */
+            agent?: string | null;
+            input?: components["schemas"]["JsonValue"];
+            /**
+             * Prompt
+             * @default
+             */
             prompt: string;
             /**
              * Submission Key
@@ -932,6 +1023,29 @@ export interface components {
              */
             workspace_version_id: string;
         };
+        /** ToolDefinition */
+        ToolDefinition: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Entrypoint */
+            entrypoint: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /**
+             * Takes Context
+             * @default false
+             */
+            takes_context: boolean;
+            /** Version */
+            version: string;
+        };
         /** ToolError */
         ToolError: {
             /** Code */
@@ -961,6 +1075,8 @@ export interface components {
              * Format: uuid
              */
             input_version_id: string;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
         };
         /** ToolResult */
         ToolResult: {
