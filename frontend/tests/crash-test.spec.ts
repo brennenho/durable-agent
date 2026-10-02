@@ -83,8 +83,10 @@ test("manual controls preserve target identity and expose failed actions", async
   });
   await page.goto("/crash-test");
   await expect(page.getByRole("heading", { name: "Crashboard", exact: true })).toBeVisible();
+  await expect(page.getByText("1 of 1 running", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Kill Tools", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start Tools", exact: true })).toBeEnabled();
+  await expect(page.getByText("0 of 1 running", { exact: true })).toBeVisible();
   fail = true;
   await page.getByRole("button", { name: "Start Tools", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Container restarted");
@@ -134,8 +136,33 @@ test("scenarios lock manual controls, cancel, and retain observations offline on
   offline = true;
   await expect(page.getByRole("alert").filter({ hasText: "Controller offline" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tools", exact: true })).toBeVisible();
+  await expect(page.getByText("Last known state", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("stopped sandboxes cannot be restarted and empty inventory stays explicit", async ({
+  page,
+}) => {
+  const snapshot = crashSnapshot();
+  snapshot.services = [
+    {
+      ...snapshot.services[0],
+      id: "sandbox",
+      name: "sandbox-1",
+      service: "sandbox",
+      running: false,
+    },
+  ];
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/crash-test");
+  await expect(page.getByRole("button", { name: "Start Sandbox", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Sandbox", exact: true })).toHaveAttribute(
+    "title",
+    "Tools manages sandbox recovery",
+  );
+  snapshot.services = [];
+  await expect(page.getByText("No containers found.", { exact: true })).toBeVisible();
 });
 
 test("timeline combines saved state and observed crashes, filters and downloads evidence", async ({
