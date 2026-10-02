@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { cn } from "../lib/utils";
 import { OperationInput } from "./operation-input";
-import { AttemptMetadata, OperationOutput } from "./operation-output";
+import { AttemptMetadata, OperationOutput, OutputTechnical } from "./operation-output";
 import { operationName, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
 
@@ -41,10 +41,11 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
         </summary>
         {open && (
           <div className="px-3 pb-4 sm:pl-8">
-            <OperationOutput operation={operation} />
+            <OperationOutput result={operation.result} />
             <OperationInput runId={run.id} operationId={operation.id} kind={operation.kind} />
             <InspectionDisclosure title="Technical details">
               <p className="run-id">Operation ID: {operation.id}</p>
+              <OutputTechnical operation={operation} />
               <ol className="attempt-list">
                 {operation.attempts.map((attempt) => (
                   <li key={attempt.id}>

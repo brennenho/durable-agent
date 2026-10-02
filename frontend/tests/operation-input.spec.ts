@@ -13,14 +13,21 @@ const input: Inspection = {
       history: [
         {
           kind: "model",
-          output: { status: "completed", text: "", tool_calls: [] },
+          output: { status: "completed", text: "Checking the calculator.", tool_calls: [] },
           native_context: [{ type: "reasoning", encrypted_content: "opaque-blob" }],
         },
       ],
       previous_turns: [
         {
           prompt: "Create a calculator.",
-          history: [],
+          history: [
+            {
+              kind: "tool",
+              call_id: "read_earlier",
+              workspace_version_id: runDetail.workspace_version_id,
+              output: { status: "ok", value: { content: "Earlier file contents" } },
+            },
+          ],
           terminal_error: { code: "interrupted", message: "Interrupted", retryable: false },
         },
       ],
@@ -47,6 +54,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         ...runDetail,
+        prompt: "Fix the failing test.",
         operations: [
           {
             id: operationId,
@@ -63,7 +71,9 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("loads saved model input only on expansion and keeps context collapsed", async ({ page }) => {
+test("loads context lazily without repeating the current prompt or exposing provider data", async ({
+  page,
+}) => {
   await page.clock.install();
   let calls = 0;
   await page.route(endpoint, (route) => {
@@ -77,12 +87,14 @@ test("loads saved model input only on expansion and keeps context collapsed", as
   await page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary").click();
   await page.getByText("Saved model input", { exact: true }).click();
   await expect(page.getByText("Fix the failing test.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Requested model: test-model")).toBeVisible();
-  await expect(page.getByText("Create a calculator.", { exact: true })).toBeHidden();
-  await page.getByText("Previous turns (1)", { exact: true }).click();
+  await expect(page.getByText("Fix the failing test.", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Earlier file contents", { exact: true })).toBeVisible();
   await expect(page.getByText("Create a calculator.", { exact: true })).toBeVisible();
-  await expect(page.getByText(/The worker adds interruption records/)).toBeVisible();
-  await page.getByText("Current turn history (1 results)", { exact: true }).click();
+  await expect(page.getByText("This turn failed: Interrupted")).toBeVisible();
+  await expect(page.getByText(/Encrypted context present/)).toBeHidden();
+  await page.getByText("Input technical details", { exact: true }).click();
+  await page.getByText("Raw saved context", { exact: true }).click();
   await expect(page.getByText(/Encrypted context present/)).toBeVisible();
   await expect(page.getByText("opaque-blob", { exact: false })).toHaveCount(0);
   await page.clock.fastForward(4000);
@@ -119,7 +131,7 @@ for (const failure of ["malformed", "unavailable"]) {
     );
     await trigger.click();
     await trigger.click();
-    await expect(page.getByText("Fix the failing test.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
     expect(calls).toBe(2);
   });
 }
@@ -129,6 +141,7 @@ test("shows full tool arguments without executing their contents", async ({ page
     route.fulfill({
       json: {
         ...runDetail,
+        prompt: "Fix the failing test.",
         operations: [
           {
             id: operationId,
@@ -156,7 +169,7 @@ test("shows full tool arguments without executing their contents", async ({ page
               name: "write_file",
               arguments: {
                 path: "report.md",
-                content: "<script>not executable</script>",
+                content: "<script>not executable</script>\nSecond line",
               },
             },
             input_version_id: runDetail.workspace_version_id,
@@ -172,5 +185,13 @@ test("shows full tool arguments without executing their contents", async ({ page
   await expect(page.getByRole("region", { name: "Execution history" })).toContainText(
     "<script>not executable</script>",
   );
-  await expect(page.getByText(`Input workspace: ${runDetail.workspace_version_id}`)).toBeVisible();
+  await expect(
+    page.getByLabel("1. write_file").locator("pre").filter({ hasText: "Second line" }),
+  ).toHaveText("<script>not executable</script>\nSecond line");
+  const workspace = page.getByText(`Input workspace: ${runDetail.workspace_version_id}`, {
+    exact: false,
+  });
+  await expect(workspace).toBeHidden();
+  await page.getByText("Input technical details", { exact: true }).click();
+  await expect(workspace).toBeVisible();
 });

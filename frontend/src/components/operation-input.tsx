@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { components } from "../lib/api.generated";
+import { OperationOutput } from "./operation-output";
 import { requestJson } from "../lib/api";
-import { InspectionDisclosure, InspectionJson } from "./inspection-json";
+import { InspectionDisclosure, InspectionJson, ToolArguments } from "./inspection-json";
 
 type Inspection = components["schemas"]["OperationInspection"];
 
@@ -39,69 +40,83 @@ function checkedInput(data: Inspection, kind: "model" | "tool") {
   return data;
 }
 
+function ResultHistory({ history }: { history: components["schemas"]["ModelRequest"]["history"] }) {
+  const toolNames = new Map(
+    history.flatMap((result) =>
+      result.kind === "model"
+        ? result.output.tool_calls.map((call) => [call.call_id, call.name] as const)
+        : [],
+    ),
+  );
+  return history.length === 0 ? (
+    <p className="text-xs text-muted-foreground">No earlier results.</p>
+  ) : (
+    <ol className="list-none space-y-5 p-0">
+      {history.map((result, index) => (
+        <li key={index}>
+          <h4 className="my-2 text-xs font-medium">
+            {result.kind === "model"
+              ? "Model response"
+              : toolNames.get(result.call_id) || "Tool result"}
+          </h4>
+          <OperationOutput result={result} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function InputContent({ data }: { data: Inspection }) {
-  const { operation, config } = data;
-  if (operation.kind === "tool")
-    return (
-      <>
-        <p className="text-xs">
-          {operation.request.call.name} · Call ID: {operation.request.call.call_id}
-        </p>
-        <h4 className="text-xs font-medium">Arguments</h4>
-        <InspectionJson value={operation.request.call.arguments} />
-        <p className="text-xs text-muted-foreground">
-          Input workspace: {operation.request.input_version_id}
-        </p>
-      </>
-    );
+  const { operation } = data;
+  if (operation.kind === "tool") return <ToolArguments value={operation.request.call.arguments} />;
   const previous = operation.request.previous_turns ?? [];
   return (
     <>
-      <p className="text-xs text-muted-foreground">
-        Saved logical input. The worker assembles the provider request from this context.
-      </p>
-      <p className="text-xs">Requested model: {config.model}</p>
-      <h4 className="text-xs font-medium">Prompt</h4>
-      <pre className="my-2">{operation.request.prompt}</pre>
-      <InspectionDisclosure title={`Previous turns (${previous.length})`}>
-        {previous.length === 0 ? (
-          <p className="text-xs">No previous turns.</p>
-        ) : (
-          previous.map((turn, index) => (
-            <div key={index} className="my-3 border-l-2 pl-3">
-              <h4 className="text-xs font-medium">Turn {index + 1}</h4>
-              <pre>{turn.prompt}</pre>
-              {turn.terminal_error && (
-                <p className="text-xs">
-                  This turn failed: {turn.terminal_error.message}. The worker adds interruption
-                  records or formats an invalid final response for replay; those adjustments are not
-                  in this saved history.
-                </p>
-              )}
-              <InspectionDisclosure title="Accepted history">
-                <InspectionJson value={turn.history} hideEncrypted />
-              </InspectionDisclosure>
-            </div>
-          ))
-        )}
-      </InspectionDisclosure>
-      <InspectionDisclosure
-        title={`Current turn history (${operation.request.history.length} results)`}
-      >
-        <InspectionJson value={operation.request.history} hideEncrypted />
-      </InspectionDisclosure>
-      <InspectionDisclosure title={`Available tools (${config.tool_schemas.length})`}>
-        <InspectionJson value={config.tool_schemas} />
-      </InspectionDisclosure>
-      <InspectionDisclosure title="Model settings and limits">
-        <InspectionJson
-          value={{
-            model_params: config.model_params,
-            max_attempts: config.max_attempts,
-            max_turns: config.max_turns,
-            call_timeout_seconds: config.call_timeout_seconds,
-          }}
-        />
+      {previous.map((turn, index) => (
+        <div key={index} className="my-5">
+          <h4 className="text-xs font-medium">Previous turn {index + 1}</h4>
+          <p className="whitespace-pre-wrap">{turn.prompt}</p>
+          {turn.terminal_error && (
+            <p className="text-xs text-destructive">
+              This turn failed: {turn.terminal_error.message}
+            </p>
+          )}
+          <ResultHistory history={turn.history} />
+        </div>
+      ))}
+      <h4 className="mt-5 text-xs font-medium">Earlier results in this turn</h4>
+      <ResultHistory history={operation.request.history} />
+    </>
+  );
+}
+
+function InputTechnical({ data }: { data: Inspection }) {
+  const { operation, config } = data;
+  return (
+    <>
+      {operation.kind === "tool" ? (
+        <p className="run-id">
+          Call ID: {operation.request.call.call_id}
+          <br />
+          Input workspace: {operation.request.input_version_id}
+        </p>
+      ) : (
+        <InspectionDisclosure title="Raw saved context">
+          <p className="text-xs text-muted-foreground">
+            Provider input is assembled from these saved results. Interrupted turns receive replay
+            adjustments.
+          </p>
+          <InspectionJson
+            value={{
+              previous_turns: operation.request.previous_turns ?? [],
+              history: operation.request.history,
+            }}
+            hideEncrypted
+          />
+        </InspectionDisclosure>
+      )}
+      <InspectionDisclosure title="Configuration, tool schemas, and limits">
+        <InspectionJson value={config} />
       </InspectionDisclosure>
     </>
   );
@@ -155,7 +170,12 @@ export function OperationInput({
             {error} Close and reopen to retry.
           </p>
         ) : data ? (
-          <InputContent data={data} />
+          <>
+            <InputContent data={data} />
+            <InspectionDisclosure title="Input technical details">
+              <InputTechnical data={data} />
+            </InspectionDisclosure>
+          </>
         ) : (
           <p aria-live="polite">Loading saved input…</p>
         ))}
