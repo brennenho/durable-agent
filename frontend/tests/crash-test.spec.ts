@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import type { CrashSnapshot } from "../src/lib/crash-test";
 
 export function crashSnapshot(): CrashSnapshot {
@@ -103,4 +104,68 @@ test("scenarios lock manual controls, cancel, and retain observations offline on
   await expect(page.getByRole("heading", { name: "Tools", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("timeline combines saved state and observed crashes, filters and downloads evidence", async ({
+  page,
+}) => {
+  const snapshot = crashSnapshot();
+  const { runDetail } = await import("./fixtures");
+  snapshot.current = {
+    id: "scenario",
+    scenario: "saved-response-lost",
+    status: "inconclusive",
+    observed_at: "2026-10-01T12:00:03Z",
+    error: "Control unavailable",
+    checks: {},
+    run: {
+      ...runDetail,
+      operations: [
+        {
+          id: "op",
+          position: 0,
+          kind: "tool",
+          tool_name: "write_file",
+          tool_target: "result.txt",
+          created_at: "2026-10-01T12:00:00Z",
+          completed_at: null,
+          result: null,
+          attempts: [],
+        },
+      ],
+    },
+    checkpoints: {
+      op: { completed_at: "2026-10-01T12:00:01Z", workspace_version_id: "saved-workspace" },
+    },
+    events: [
+      {
+        id: "kill",
+        kind: "kill_observed",
+        label: "Process stopped: tools",
+        at: "2026-10-01T12:00:02Z",
+        operation_id: "op",
+      },
+    ],
+  };
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/crash-test");
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  await expect(timeline.getByRole("listitem")).toHaveCount(3);
+  await expect(timeline.getByRole("listitem").nth(1)).toContainText(
+    "Result and workspace saved by Tools",
+  );
+  await expect(timeline.getByRole("listitem").nth(2)).toContainText("Process stopped: tools");
+  await expect(timeline).not.toContainText("Result accepted by Control");
+  await timeline.getByRole("button", { name: "Saved state", exact: true }).click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(2);
+  await expect(timeline).toContainText("saved-workspace");
+  await timeline.getByRole("button", { name: "Crash observations", exact: true }).click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  const download = page.waitForEvent("download");
+  await timeline.getByRole("button", { name: "Download observations" }).click();
+  const evidence = await download;
+  expect(evidence.suggestedFilename()).toBe("crash-test-scenario.json");
+  const contents = JSON.parse(await readFile((await evidence.path())!, "utf8"));
+  expect(contents.current.checkpoints.op.workspace_version_id).toBe("saved-workspace");
+  expect(contents.current.events[0].kind).toBe("kill_observed");
 });

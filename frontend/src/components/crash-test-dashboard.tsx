@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Activity, ArrowUpRight, Circle, RotateCcw, Square } from "lucide-react";
 import { crashRequest, serviceName, type CrashSnapshot } from "../lib/crash-test";
 import { Button } from "./ui/button";
+import { CrashTestTimeline } from "./crash-test-timeline";
 
 export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const [snapshot, setSnapshot] = useState<CrashSnapshot | null>(null);
@@ -253,6 +254,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
           </ul>
         </section>
       )}
+      {snapshot && <CrashTestTimeline snapshot={snapshot} appUrl={appUrl} />}
     </main>
   );
 }
