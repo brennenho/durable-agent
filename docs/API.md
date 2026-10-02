@@ -78,9 +78,13 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 
 - `RunSummary`: `id`, `prompt`, `model`, `status`, `created_at`, `finished_at?`,
   `next_attempt_at?`, `last_heartbeat_at?`, `last_progress_at?`, `terminal_error?`.
-  Status is queued, running, retrying, succeeded, or failed.
+  Status is queued, running, retrying, waiting, succeeded, or failed.
 - `RunDetail`: summary plus `final_answer?`, `workspace_version_id`, `operations[]`,
-  and the frozen `max_attempts` limit.
+  the frozen `max_attempts` limit, `parent?`, and ordered `children[]`.
+  A parent reference contains `run_id`, `conversation_id`, `operation_id`, and task `name`.
+  Each child summary adds `name`, `parent_operation_id`, and zero-based `child_index`.
+  Children remain available through their run/conversation URLs but are excluded from
+  top-level run and conversation lists. Each detail shows only that run's saved files.
 - Operation view: `id`, `position`, `kind`, `created_at`, `completed_at?`, `result?`,
   `attempts[]`, `tool_name?`, `tool_target?` (path or command, at most 160 characters),
   and `checkpoint?`. A checkpoint contains `workspace_version_id` and appears only

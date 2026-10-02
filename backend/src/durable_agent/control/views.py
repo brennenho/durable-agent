@@ -11,12 +11,15 @@ from durable_agent.contracts import (
     AgentConfig,
     AttemptView,
     BranchCheckpoint,
+    ChildRunSummary,
+    DelegateArguments,
     ModelRequest,
     ModelResult,
     OperationInspection,
     OperationResult,
     OperationView,
     RunDetail,
+    RunParent,
     RunSummary,
     ToolRequest,
 )
@@ -96,6 +99,7 @@ async def list_summaries(session: AsyncSession) -> list[RunSummary]:
     rows = await session.execute(
         select(Run, func.max(Operation.completed_at))
         .outerjoin(Operation, Run.id == Operation.run_id)
+        .where(Run.parent_operation_id.is_(None))
         .group_by(Run.id)
         .order_by(Run.created_at.desc(), Run.id.desc())
         .execution_options(populate_existing=True)
@@ -148,6 +152,56 @@ def tool_summary(operation: Operation) -> dict[str, str | None]:
     }
 
 
+def child_name(request: dict, index: int) -> str:
+    tool = ToolRequest.model_validate(request)
+    return DelegateArguments.model_validate(tool.call.arguments).tasks[index].name
+
+
+async def child_summaries(
+    session: AsyncSession, operations: list[Operation]
+) -> list[ChildRunSummary]:
+    requests = {op.id: op.request for op in operations}
+    if not requests:
+        return []
+    rows = await session.execute(
+        select(Run, func.max(Operation.completed_at))
+        .outerjoin(Operation, Operation.run_id == Run.id)
+        .where(Run.parent_operation_id.in_(requests))
+        .group_by(Run.id)
+        .order_by(Run.child_index)
+        .execution_options(populate_existing=True)
+    )
+    return [
+        ChildRunSummary(
+            **summary(child, progress).model_dump(),
+            name=child_name(requests[child.parent_operation_id], child.child_index),
+            parent_operation_id=child.parent_operation_id,
+            child_index=child.child_index,
+        )
+        for child, progress in rows
+    ]
+
+
+async def parent_reference(session: AsyncSession, run: Run) -> RunParent | None:
+    if run.parent_operation_id is None:
+        return None
+    # Read immutable identity without locking the parent after its child: group
+    # pause takes the opposite order (parent, then children).
+    row = (
+        await session.execute(
+            select(Operation.run_id, Run.conversation_id, Operation.request)
+            .join(Run, Run.id == Operation.run_id)
+            .where(Operation.id == run.parent_operation_id)
+        )
+    ).one()
+    return RunParent(
+        run_id=row.run_id,
+        conversation_id=row.conversation_id,
+        operation_id=run.parent_operation_id,
+        name=child_name(row.request, run.child_index),
+    )
+
+
 async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
     # All progress writers lock this row. SHARE keeps this multi-query view consistent.
     run = await session.scalar(
@@ -177,6 +231,8 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
     progress = max((op.completed_at for op in operations if op.completed_at), default=None)
     return RunDetail(
         **summary(run, progress).model_dump(),
+        parent=await parent_reference(session, run),
+        children=await child_summaries(session, operations),
         final_answer=final.output.text
         if run.status == "succeeded" and isinstance(final, ModelResult)
         else None,

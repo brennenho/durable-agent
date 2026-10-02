@@ -45,6 +45,7 @@ async def list_conversations(session: AsyncSession) -> list[ConversationSummary]
         .join(latest, latest.conversation_id == Conversation.id)
         .join(first, (first.conversation_id == Conversation.id) & (first.turn_index == 0))
         .outerjoin(progress, progress.c.run_id == latest.id)
+        .where(latest.parent_operation_id.is_(None))
         .order_by(updated.desc(), Conversation.id.desc())
     )
     return [
