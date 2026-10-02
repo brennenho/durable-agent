@@ -117,6 +117,135 @@
         "title": "BranchCheckpoint",
         "type": "object"
       },
+      "ChildRunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "child_index": {
+            "minimum": 0.0,
+            "title": "Child Index",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Progress At"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "parent_operation_id": {
+            "format": "uuid",
+            "title": "Parent Operation Id",
+            "type": "string"
+          },
+          "pause_requested": {
+            "default": false,
+            "title": "Pause Requested",
+            "type": "boolean"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "retrying",
+              "waiting",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "terminal_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "prompt",
+          "model",
+          "status",
+          "created_at",
+          "finished_at",
+          "next_attempt_at",
+          "last_heartbeat_at",
+          "last_progress_at",
+          "terminal_error",
+          "name",
+          "parent_operation_id",
+          "child_index"
+        ],
+        "title": "ChildRunSummary",
+        "type": "object"
+      },
       "Container": {
         "properties": {
           "exit_code": {
@@ -668,6 +797,13 @@
       "RunDetail": {
         "additionalProperties": false,
         "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/ChildRunSummary"
+            },
+            "title": "Children",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -760,6 +896,16 @@
             "title": "Operations",
             "type": "array"
           },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunParent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "pause_requested": {
             "default": false,
             "title": "Pause Requested",
@@ -774,6 +920,7 @@
               "queued",
               "running",
               "retrying",
+              "waiting",
               "succeeded",
               "failed"
             ],
@@ -812,6 +959,38 @@
           "operations"
         ],
         "title": "RunDetail",
+        "type": "object"
+      },
+      "RunParent": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "conversation_id",
+          "operation_id",
+          "name"
+        ],
+        "title": "RunParent",
         "type": "object"
       },
       "Scenario": {
