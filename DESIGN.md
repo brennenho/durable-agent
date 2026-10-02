@@ -99,6 +99,17 @@ Pause prevents new worker claims; the current call may finish and save normally.
 The pause request survives restarts. Resume clears it without changing the pending
 operation, retry timing, or attempt budget. A paused run still occupies its conversation.
 
+#### Subagents
+
+`delegate` starts one batch of up to three named tasks. Each child is an ordinary
+run with the task prompt, the parent's saved files, and its own workspace. Children
+cannot delegate. Their reports and errors return to the parent; file edits stay private.
+
+Control creates children atomically and marks the parent `waiting`, without a worker
+lease. It scans saved state after restarts and accepts the combined result once all
+children finish. Unique child identities prevent duplicate creation. Pause/resume on
+the parent applies to the group; child pages are read-only.
+
 #### Scope
 
 Use Docker Compose and OpenAI. For the first version:
@@ -125,11 +136,13 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 | --- | --- | --- |
 | `id` | `uuid` | Primary key. |
 | `conversation_id` | `uuid` | FK to conversations. |
+| `parent_operation_id` | `uuid?` | Delegation operation that created this child. |
+| `child_index` | `integer?` | Task order within the delegation, 0–2. |
 | `turn_index` | `integer` | Zero-based order within the conversation. |
 | `submission_key` | `uuid` | Unique browser submission key. |
 | `prompt` | `text` | Initial prompt. |
 | `config` | `jsonb` | Frozen model/parameters, tool schemas, image digest, seed version ID, and limits. |
-| `status` | `text` | queued, running, retrying, succeeded, failed. |
+| `status` | `text` | queued, running, retrying, waiting, succeeded, failed. |
 | `pause_requested` | `boolean` | Blocks new claims; defaults false and clears on completion/failure. |
 | `next_attempt_at` | `timestamptz?` | Next eligible claim time. |
 | `lease_owner` | `uuid?` | Worker process ID. |
@@ -193,7 +206,8 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 **Constraints**
 
 - Unique submission key, `(conversation_id, turn_index)`, `(run_id, position)`, and `(operation_id, attempt_no)`.
-- At most one queued, running, or retrying run per conversation.
+- At most one queued, running, retrying, or waiting run per conversation.
+- Unique `(parent_operation_id, child_index)` for children; both fields are null for root runs.
 - At most one running or accepted attempt per operation, enforced by a partial unique index.
 - Operation result/completion fields are both set or both null. Tool result/output-version/completion fields are all set or all null. Accepted results and workspace archives are immutable.
 - Lock the run for claims, acceptance, and expiry recovery. Only running runs have a lease; only queued/retrying runs have a claim time; only terminal runs have a finished_at. Check status/kind values.
@@ -291,6 +305,8 @@ Test with PostgreSQL and real service processes; inject failures at commit bound
 | Database outage or worker exit | Resume saved state and recover expired leases within budget. |
 | Call stalls while heartbeating | Fixed deadline ends the attempt. |
 | Sandbox replaced between calls | Restore exact saved files, including additions, deletions, and permissions. |
+| Control crashes after child creation or joining | Reuse child IDs and saved reports; continue the parent once. |
+| Child loses a tool report | Recover that child using the normal saved-tool path; siblings retain progress. |
 | Model response lost before persistence | Inference may repeat; only the accepted tool plan executes. |
 
 </details>

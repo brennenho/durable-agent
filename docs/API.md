@@ -106,7 +106,7 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 `ToolCheckpoint` contains `completed_at` (Tools' saved publication timestamp) and
 `workspace_version_id`. It describes the result and complete workspace saved together,
 independently of Control acceptance. `null` means no saved completion was observed
-(also returned for model operations); unavailable Tools returns an error, never `null`.
+(also returned for model operations and Control-managed `delegate` operations); unavailable Tools returns an error, never `null`.
 Control validates that the operation belongs to the run before querying Tools, outside
 the database transaction. This read does not advance the run or authorize file downloads.
 The timestamp is recorded within the publication transaction, not the exact commit instant.
@@ -128,6 +128,9 @@ stay unchanged: running plus the flag means pausing; queued/retrying plus the fl
 paused. Existing calls may finish or expire normally, but no new attempt can be claimed
 while paused. Resume preserves operation IDs, inputs, retry times, and attempt budgets.
 Follow-ups remain blocked; saved files stay readable. Service restarts preserve the flag.
+For a waiting parent, pause also blocks its children and the final join. Existing child
+calls may finish. Child pause/resume, follow-up, and fork requests return `409 child_run_read_only`;
+use the parent to control the group.
 
 ## Conversations
 
@@ -299,3 +302,16 @@ transport failures never enter `advance`.
 Run an edit that commits, crash the sandbox during the next call, and verify that a
 replacement sandbox restores the edit and repeats only the interrupted operation.
 Use recorded model outputs for this test. The DD lists the remaining failure cases.
+
+## Delegation
+
+`delegate({tasks: [{name, prompt}, ...]})` accepts 1–3 tasks, once per run. Names are
+1–80 characters; prompts are 1–8,000 characters. Children inherit frozen configuration
+and the operation's input workspace, with delegation disabled and no parent message history.
+
+Control owns this tool; workers never receive it. The parent waits without a lease
+until every child is terminal, then receives a normal `ToolResult` with its original
+input workspace and `output.value.children` in task order. Each entry contains
+`run_id`, `name`, `status`, `report`, `error`, and `truncated`. Reports are capped at
+16,384 characters; full output and files remain on the child run. A child failure
+returns an error entry so the parent can continue. There is no automatic file merge.
