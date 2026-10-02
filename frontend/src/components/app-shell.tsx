@@ -2,11 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeft, SquarePen, X } from "lucide-react";
+import { LoaderCircle, PanelLeft, Pause, SquarePen, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { requestJson, type ConversationSummary } from "../lib/api";
 import { Button } from "./ui/button";
+
+function ChatStateIcon({ conversation }: { conversation: ConversationSummary }) {
+  if (conversation.status === "succeeded" || conversation.status === "failed") return null;
+  const paused = conversation.pause_requested && conversation.status !== "running";
+  const label = paused ? "Paused" : conversation.pause_requested ? "Pausing" : "Active";
+  return (
+    <span role="img" aria-label={label} title={label} className="shrink-0">
+      {paused ? (
+        <Pause aria-hidden="true" className="size-3.5 text-muted-foreground" />
+      ) : (
+        <LoaderCircle
+          aria-hidden="true"
+          className="size-3.5 text-primary motion-safe:animate-spin"
+        />
+      )}
+    </span>
+  );
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -17,17 +35,35 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    requestJson<ConversationSummary[]>("/api/conversations", { signal: controller.signal })
-      .then((saved) => {
+    let timer: ReturnType<typeof setTimeout>;
+    let refreshing = false;
+    async function refresh() {
+      if (refreshing || controller.signal.aborted) return;
+      clearTimeout(timer);
+      refreshing = true;
+      try {
+        const saved = await requestJson<ConversationSummary[]>("/api/conversations", {
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
         setConversations(saved);
         setError(null);
-      })
-      .catch((cause) => {
+        // A follow-up can start without changing the current URL.
+        timer = setTimeout(refresh, 2_000);
+      } catch (cause) {
         if (!controller.signal.aborted)
           setError(cause instanceof Error ? cause.message : "Could not load previous chats.");
-      });
-    return () => controller.abort();
+      } finally {
+        refreshing = false;
+      }
+    }
+    void refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+      window.removeEventListener("focus", refresh);
+    };
   }, [pathname, retry]);
 
   const navigation = (
@@ -74,9 +110,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setOpen(false)}
                   title={conversation.title}
                   aria-current={pathname === href ? "page" : undefined}
-                  className="block truncate border-l-2 border-transparent px-3 py-2.5 hover:bg-accent aria-[current=page]:border-l-primary aria-[current=page]:bg-primary/8"
+                  className="flex items-center gap-2 border-l-2 border-transparent px-3 py-2.5 hover:bg-accent aria-[current=page]:border-l-primary aria-[current=page]:bg-primary/8"
                 >
-                  {conversation.title}
+                  <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
+                  <ChatStateIcon conversation={conversation} />
                 </Link>
               </li>
             );
