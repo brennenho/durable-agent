@@ -224,6 +224,7 @@ def test_coordinator_commit_kills_control_without_a_worker_attempt(tmp_path):
         ]:
             await controller.observe(invalid.model_copy(update={"event_id": uuid4()}))
             assert docker.kills == 0
+        controller.children_by_operation[operation] = (uuid4(),)
         await controller.observe(committed)
         await controller.observe(committed.model_copy(update={"event_id": uuid4()}))
         await controller.close()
