@@ -105,3 +105,31 @@ test("Enter sends while Shift+Enter adds a line break", async ({ page }) => {
   await expect(page).toHaveURL(`/chats/${conversation.id}`);
   expect(submitted?.prompt).toBe("Write a parser.\nAdd tests.");
 });
+
+test("leaving new chat cancels its pending submission", async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/conversations", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: [conversation] });
+    await pending;
+    await route.fulfill({
+      json: { ...conversation, id: "00000000-0000-4000-8000-000000000099" },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("textbox").fill("Start another task.");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByRole("button", { name: "Sending…" })).toBeDisabled();
+  const cancelled = page.waitForEvent("requestfailed", {
+    predicate: (request) =>
+      request.method() === "POST" && request.url().endsWith("/api/conversations"),
+    timeout: 3_000,
+  });
+  await page.getByRole("link", { name: conversation.title }).click();
+  await cancelled;
+  release();
+  await expect(page).toHaveURL(`/chats/${conversation.id}`);
+  await expect(page.getByRole("article", { name: "Chat turn" })).toContainText(run.prompt);
+});
