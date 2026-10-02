@@ -69,7 +69,10 @@ function ResultHistory({ history }: { history: components["schemas"]["ModelReque
 
 function InputContent({ data }: { data: Inspection }) {
   const { operation } = data;
-  if (operation.kind === "tool") return <ToolArguments value={operation.request.call.arguments} />;
+  if (operation.kind === "tool")
+    return (
+      <ToolArguments tool={operation.request.call.name} value={operation.request.call.arguments} />
+    );
   const previous = operation.request.previous_turns ?? [];
   return (
     <>

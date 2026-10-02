@@ -1,4 +1,5 @@
 import type { RunDetail } from "../lib/api";
+import { InfoHint } from "./info-hint";
 import { InspectionDisclosure, InspectionJson, ToolArguments } from "./inspection-json";
 
 type Operation = RunDetail["operations"][number];
@@ -64,17 +65,17 @@ export function OperationOutput({ result }: { result: Operation["result"] }) {
       )}
       {result.output.tool_calls.length > 0 ? (
         <>
-          <h4 className="mt-4 text-xs font-medium">
+          <h4 className="mt-4 flex items-center gap-1 text-xs font-medium">
             Requested tools ({result.output.tool_calls.length})
+            <InfoHint label="About requested tools">
+              Tools requested by the model. Execution appears as separate steps.
+            </InfoHint>
           </h4>
-          <p className="text-xs text-muted-foreground">
-            Requests only; execution appears as separate steps.
-          </p>
           <ol className="list-none space-y-4 p-0">
             {result.output.tool_calls.map((call, index) => (
               <li key={index}>
                 <p className="my-1 font-mono text-xs">{call.name}</p>
-                <ToolArguments value={call.arguments} />
+                <ToolArguments tool={call.name} value={call.arguments} />
               </li>
             ))}
           </ol>

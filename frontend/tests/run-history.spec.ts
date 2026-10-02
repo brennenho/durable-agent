@@ -169,3 +169,58 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
   });
 }
+
+test("tints failed results and attempts without treating unknown or recovered outcomes as failures", async ({
+  page,
+}) => {
+  const completed = detail.operations[0];
+  const toolError: RunDetail["operations"][number] = {
+    ...completed,
+    result: {
+      kind: "tool",
+      call_id: "call_missing",
+      workspace_version_id: detail.workspace_version_id,
+      output: { status: "error", code: "not_found", message: "File does not exist." },
+    },
+  };
+  const failedAttempt = {
+    ...completed,
+    result: null,
+    completed_at: null,
+    attempts: [completed.attempts[0]],
+  };
+  const unknown = { ...failedAttempt, attempts: [completed.attempts[1]] };
+  const recovered: RunDetail["operations"][number] = {
+    ...completed,
+    result: {
+      kind: "tool",
+      call_id: "call_recovered",
+      workspace_version_id: detail.workspace_version_id,
+      output: { status: "ok", value: { content: "Saved" } },
+    },
+  };
+  for (const [operation, tinted, status] of [
+    [completed, true, "Completed"],
+    [toolError, true, "Completed"],
+    [failedAttempt, true, "Retry pending"],
+    [unknown, false, "Retry pending"],
+    [recovered, false, "Completed"],
+  ] as const) {
+    await page.route(`**/api/runs/${detail.id}`, (route) =>
+      route.fulfill({ json: { ...detail, status: "retrying", operations: [operation] } }),
+    );
+    await page.goto(`/runs/${detail.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    const row = page.getByLabel("1. Tool call", { exact: true }).locator(":scope > summary");
+    await expect(row.getByText(status, { exact: true })).toBeVisible();
+    // Resolve the rendered tint, including transparency, instead of testing a class name.
+    const redTint = await row.evaluate((element) => {
+      const swatch = document.createElement("canvas").getContext("2d")!;
+      swatch.fillStyle = getComputedStyle(element).backgroundColor;
+      swatch.fillRect(0, 0, 1, 1);
+      const [red, green, blue, alpha] = swatch.getImageData(0, 0, 1, 1).data;
+      return red > green && red > blue && alpha > 0 && alpha < 40;
+    });
+    expect(redTint).toBe(tinted);
+  }
+});
