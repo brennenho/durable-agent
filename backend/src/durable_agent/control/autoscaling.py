@@ -42,6 +42,10 @@ async def scale_workers(
             # Missing observations are not evidence of idle capacity.
             policy.underused_since = None
             logger.warning("Worker scaling unavailable; retrying", exc_info=True)
+        except Exception:
+            # A failed scaling pass must not cancel Control's claims or recovery tasks.
+            policy.underused_since = None
+            logger.exception("Unexpected worker scaling failure; retrying")
         await asyncio.sleep(interval)
 
 

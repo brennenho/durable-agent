@@ -65,9 +65,21 @@ class DockerWorkers:
         workers = await self.inventory()
         slots = {}
         for worker in workers:
-            slot = int(worker["Labels"][NUMBER])
+            number = worker["Labels"].get(NUMBER)
+            try:
+                if not isinstance(number, str):
+                    raise ValueError
+                slot = int(number)
+                if slot < 1:
+                    raise ValueError
+            except ValueError:
+                raise WorkerPoolError(
+                    f"Worker container {worker['Id']} has an invalid {NUMBER} label"
+                ) from None
             if slot in slots:
-                raise WorkerPoolError("Multiple containers occupy the same worker slot")
+                raise WorkerPoolError(
+                    f"Worker container {worker['Id']} duplicates worker slot {slot}"
+                )
             slots[slot] = worker
         # Compose creates the two baseline workers after Control becomes ready.
         if not {1, 2}.issubset(slots):
