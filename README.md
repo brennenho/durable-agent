@@ -44,6 +44,18 @@ For another checkout, set a distinct `COMPOSE_PROJECT_NAME` and unused
 [Crash Test hooks](docs/CRASH_TEST.md) expose precise execution boundaries to a separate
 fault controller. They are disabled by default; `compose.crash-test.yaml` opts services in.
 
+To start the app with hooks, then run Crashboard in the background:
+
+```bash
+CRASH_TEST=1 ./scripts/dev-up.sh
+CRASH_TEST_MODE=docker ./scripts/crash-test.sh
+```
+
+Open [Crashboard](http://127.0.0.1:3020/crash-test) to choose scenarios and control the
+existing app containers. The controller and dashboard run in their own Compose
+project, sharing the app's database through its APIs. For live frontend development,
+omit `CRASH_TEST_MODE=docker` to run them in the terminal instead.
+
 ## Structure
 
 ```text

@@ -22,7 +22,7 @@ test("controller proxy rejects unknown paths and cross-origin mutations", async 
   const response = await request.get("/crash-api/snapshot");
   expect(response.status()).toBe(503);
   expect(await response.json()).toEqual({
-    detail: "Start the host dashboard with scripts/crash-test.sh.",
+    detail: "Start Crashboard with scripts/crash-test.sh.",
   });
 });
 
@@ -39,7 +39,7 @@ test("same-origin loopback mutations reach the controller configuration check", 
     });
     expect(response.status()).toBe(503);
     expect(await response.json()).toEqual({
-      detail: "Start the host dashboard with scripts/crash-test.sh.",
+      detail: "Start Crashboard with scripts/crash-test.sh.",
     });
   }
   const otherOrigin = new URL(baseURL!);
@@ -51,5 +51,18 @@ test("same-origin loopback mutations reach the controller configuration check", 
         data: { scenario: "baseline" },
       })
     ).status(),
+  ).toBe(403);
+});
+
+test("published Docker ports preserve same-origin checks", async ({ request }) => {
+  const post = (host: string, origin: string) =>
+    request.post("/crash-api/scenarios", {
+      headers: { Host: host, Origin: origin },
+      data: { scenario: "baseline" },
+    });
+  expect((await post("127.0.0.1:3020", "http://127.0.0.1:3020")).status()).toBe(503);
+  expect((await post("127.0.0.1:3020", "http://127.0.0.1:3021")).status()).toBe(403);
+  expect(
+    (await post("localhost.attacker.test:3020", "http://localhost.attacker.test:3020")).status(),
   ).toBe(403);
 });

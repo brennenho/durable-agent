@@ -129,7 +129,7 @@ kills are inconclusive. A passed scenario requires successful completion and one
 accepted attempt per operation. Saved-response recovery additionally requires the
 original workspace, observed cache reuse, and no observed execution after saving.
 
-## Host controller setup
+## Startup
 
 Crash Test lives in `backend/src/crash_test`, beside the application package. Only
 the small hook client remains in `durable_agent`. It shares the Python environment,
@@ -149,6 +149,25 @@ it never creates containers. `./scripts/crash-test.sh` starts the controller and
 dashboard together, waits for authenticated readiness, and stops both on Ctrl-C.
 Scenario selection, status, and cancellation are handled through the dashboard.
 
+To run Crashboard in the background with Docker instead of leaving a terminal open:
+
+```sh
+CRASH_TEST_MODE=docker ./scripts/crash-test.sh
+```
+
+This builds and starts two services in a separate `<app-project>-crash-test` Compose
+project: the controller and dashboard. It attaches to the existing application's
+containers and database. It does not create another app stack or database. The
+controller has the Docker socket; the dashboard only reads the shared token.
+Neither service appears among the containers you can kill in Crashboard.
+
+Open `http://127.0.0.1:3020/crash-test`. The launcher returns after both services are
+healthy. Stop the crash-test project from Docker Desktop; the application stays up.
+Reports remain in `.crash-test/reports`. Rerun the command after pulling changes to
+rebuild the controller and dashboard. Docker uses a production frontend build; live
+scenario selection resets when the controller restarts.
+Use `CRASH_TEST_MODE=host` (the default) for frontend development with live reload.
+
 For another checkout or project, set `CRASH_TEST_COMPOSE_DIRECTORY` and
 `CRASH_TEST_PROJECT` on the launcher. For a nondefault Control port, set `CONTROL_URL`.
 
@@ -164,9 +183,8 @@ saved run structure, not semantic correctness of an arbitrary task's output.
 
 ## Dashboard
 
-After enabling hooks with `CRASH_TEST=1 ./scripts/dev-up.sh`, run
-`./scripts/crash-test.sh` and open `http://127.0.0.1:3020/crash-test`. This starts
-only the host controller and Crashboard. The app frontend can be killed independently.
+After enabling hooks with `CRASH_TEST=1 ./scripts/dev-up.sh`, start either mode above
+and open `http://127.0.0.1:3020/crash-test`. The app frontend can be killed independently.
 Use `CRASH_TEST_DASHBOARD_PORT`, `CRASH_TEST_PORT`, and `CRASH_TEST_APP_URL` for
 nondefault ports/links; the hook URL must use the controller's chosen port.
 

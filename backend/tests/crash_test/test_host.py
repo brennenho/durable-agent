@@ -70,3 +70,13 @@ def test_foreign_repository_is_rejected_before_docker_discovery(tmp_path, monkey
     )
     with pytest.raises(ValueError, match="must belong to this Git repository"):
         serve()
+
+
+def test_missing_app_explains_startup_without_creating_a_token(tmp_path, monkeypatch):
+    monkeypatch.setenv("CRASH_TEST_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CRASH_TEST_COMPOSE_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr("crash_test.host.repository", lambda directory: tmp_path)
+    monkeypatch.setattr("crash_test.host.installed_projects", lambda directory: set())
+    with pytest.raises(ValueError, match="CRASH_TEST=1 ./scripts/dev-up.sh"):
+        serve()
+    assert not (tmp_path / "state").exists()

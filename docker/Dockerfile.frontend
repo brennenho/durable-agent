@@ -1,8 +1,16 @@
-FROM node:24-slim
+FROM node:24-slim AS dependencies
 RUN npm install --global pnpm@11.25.0
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
+
+FROM dependencies AS crash-dashboard
+COPY frontend ./
+RUN pnpm build
+EXPOSE 3000
+CMD ["pnpm", "start", "--hostname", "0.0.0.0"]
+
+FROM dependencies AS development
 COPY frontend ./
 EXPOSE 3000
 CMD ["pnpm", "dev", "--hostname", "0.0.0.0"]

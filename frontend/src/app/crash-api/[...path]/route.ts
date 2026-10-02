@@ -12,10 +12,10 @@ const routes = new Set([
 async function proxy(request: NextRequest, context: Context) {
   const path = (await context.params).path.join("/");
   if (!routes.has(`${request.method} ${path}`)) return new NextResponse(null, { status: 404 });
-  // NextURL normalizes 127.0.0.1 to localhost; browsers keep the actual origin.
+  // Docker can publish a different port than Next listens on. Compare the browser's
+  // origin to the actual Host, restricted to loopback, rather than Next's internal URL.
   const host = request.headers.get("host") ?? "";
-  const port = request.nextUrl.port ? `:${request.nextUrl.port}` : "";
-  const localHost = [`127.0.0.1${port}`, `localhost${port}`].includes(host);
+  const localHost = /^(127\.0\.0\.1|localhost)(:\d{1,5})?$/.test(host);
   if (
     request.method === "POST" &&
     (!localHost || request.headers.get("origin") !== `${request.nextUrl.protocol}//${host}`)
@@ -26,7 +26,7 @@ async function proxy(request: NextRequest, context: Context) {
   const tokenFile = process.env.CRASH_TEST_TOKEN_FILE;
   if (!url || !tokenFile) {
     return NextResponse.json(
-      { detail: "Start the host dashboard with scripts/crash-test.sh." },
+      { detail: "Start Crashboard with scripts/crash-test.sh." },
       { status: 503 },
     );
   }
