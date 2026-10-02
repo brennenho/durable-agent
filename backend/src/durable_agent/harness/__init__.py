@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from durable_agent.contracts import (
     AgentConfig,
+    DelegateArguments,
     ExecutionError,
     ListFilesArguments,
     ModelOperation,
@@ -25,6 +26,7 @@ from durable_agent.harness.contracts import (
 )
 
 ARGUMENTS = {
+    "delegate": DelegateArguments,
     "list_files": ListFilesArguments,
     "read_file": ReadFileArguments,
     "write_file": WriteFileArguments,
@@ -90,6 +92,14 @@ def advance(state: AgentState, result: OperationResult) -> Transition:
             if isinstance(previous, ModelResult)
             for call in previous.output.tool_calls
         }
+        delegations = sum(
+            call.name == "delegate"
+            for previous in [*state.history, result]
+            if isinstance(previous, ModelResult)
+            for call in previous.output.tool_calls
+        )
+        if delegations > 1:
+            return fail("delegation_limit", "Only one delegation batch is allowed per run")
         # Validate the entire plan before executing any of its effects.
         for call in calls:
             if not call.call_id or call.call_id in seen:
