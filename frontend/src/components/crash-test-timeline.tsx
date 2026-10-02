@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Eraser } from "lucide-react";
 import { scenarioName, type CrashSnapshot } from "../lib/crash-test";
 import { operationEvents, type ExecutionEvent } from "../lib/execution-events";
 import { ExecutionEvents } from "./execution-events";
@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { StatusDot } from "./ui/status-dot";
+import { useTimelineHistory } from "../lib/use-timeline-history";
 
 type Source = "all" | "app" | "controller";
 type Scope = "scenario" | "activity";
@@ -29,6 +30,10 @@ function Timeline({ snapshot, appUrl, live }: Props) {
   const [scope, setScope] = useState<Scope>(session ? "scenario" : "activity");
   const [source, setSource] = useState<Source>("all");
   const [selectedRun, setSelectedRun] = useState("all");
+  const { hiddenIds, storageError, clear, restore } = useTimelineHistory(
+    snapshot.project,
+    session?.id ?? null,
+  );
   const runs = session?.run ? [session.run, ...(session.child_runs ?? [])] : [];
   const runFilter = runs.some((run) => run.id === selectedRun) ? selectedRun : "all";
   const runNames = new Map(runs.map((run) => [run.id, run.parent?.name ?? "Parent agent"]));
@@ -82,7 +87,7 @@ function Timeline({ snapshot, appUrl, live }: Props) {
             ? "Sandbox started"
             : event.label;
       return {
-        id: `observed:${event.id}`,
+        id: `observed:${typeof event.hook?.event_id === "string" ? event.hook.event_id : event.id}`,
         operationId: event.operation_id ?? "",
         runId: event.operation_id ? operationRuns.get(event.operation_id) : undefined,
         runName:
@@ -100,6 +105,8 @@ function Timeline({ snapshot, appUrl, live }: Props) {
     .filter((event) => source === "all" || event.source === source)
     .filter((event) => runFilter === "all" || event.runId === runFilter)
     .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const visibleEvents = events.filter((event) => !hiddenIds.has(event.id));
+  const hiddenCount = events.length - visibleEvents.length;
 
   function download() {
     const url = URL.createObjectURL(
@@ -116,11 +123,39 @@ function Timeline({ snapshot, appUrl, live }: Props) {
     <section aria-labelledby="crash-timeline-heading" className="mt-0 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="crash-timeline-heading">Execution timeline</h2>
-        <Button variant="ghost" size="sm" onClick={download}>
-          <Download aria-hidden="true" />
-          Export JSON
-        </Button>
+        <div className="flex flex-wrap items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => clear(visibleEvents.map((event) => event.id))}
+            disabled={!visibleEvents.length}
+            title="Hide displayed entries in this tab. Saved reports stay available."
+          >
+            <Eraser aria-hidden="true" />
+            Clear view
+          </Button>
+          <Button variant="ghost" size="sm" onClick={download}>
+            <Download aria-hidden="true" />
+            Export JSON
+          </Button>
+        </div>
       </div>
+      {storageError && (
+        <p role="alert" className="text-xs">
+          {storageError}
+        </p>
+      )}
+      {hiddenCount > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>
+            {hiddenCount} earlier {hiddenCount === 1 ? "entry" : "entries"} hidden.
+          </span>
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={restore}>
+            Show earlier
+          </Button>
+          <span>Exports keep the full history for this view.</span>
+        </div>
+      )}
       <div className="my-4 flex flex-wrap items-center gap-3">
         <Select value={scope} onValueChange={(value) => setScope(value as Scope)}>
           <SelectTrigger aria-label="Timeline view" className="w-40">
@@ -184,15 +219,17 @@ function Timeline({ snapshot, appUrl, live }: Props) {
           )}
         </div>
         <TabsContent value={source}>
-          {events.length ? (
-            <ExecutionEvents events={events} appUrl={appUrl} />
+          {visibleEvents.length ? (
+            <ExecutionEvents events={visibleEvents} appUrl={appUrl} />
           ) : (
             <p className="my-10 text-center text-sm text-muted-foreground">
-              {source === "all"
-                ? scope === "scenario"
-                  ? "This scenario’s events will appear here."
-                  : "Worker, sandbox, and crash observations will appear here."
-                : "No events from this source."}
+              {hiddenCount > 0
+                ? "Timeline cleared. New events will appear here."
+                : source === "all"
+                  ? scope === "scenario"
+                    ? "This scenario’s events will appear here."
+                    : "Worker, sandbox, and crash observations will appear here."
+                  : "No events from this source."}
             </p>
           )}
         </TabsContent>

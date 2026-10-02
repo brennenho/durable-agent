@@ -706,3 +706,107 @@ test("timeline combines saved state and observed crashes, filters and downloads 
   expect(contents.current.checkpoints.op.workspace_version_id).toBe("saved-workspace");
   expect(contents.current.events[0].kind).toBe("kill_observed");
 });
+
+test("clearing the timeline survives polling and reloads while preserving evidence", async ({
+  page,
+}, testInfo) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 320, height: 800 });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const snapshot = crashSnapshot();
+  snapshot.current = {
+    id: "first",
+    scenario: "saved-response-lost",
+    status: "running",
+    manual_intervention: false,
+    run: null,
+    observed_at: null,
+    error: null,
+    checkpoints: {},
+    checks: {},
+    events: [
+      {
+        id: "scenario-hook",
+        kind: "hook",
+        label: "sandbox.started",
+        at: "2026-10-01T12:00:00Z",
+        hook: { event_id: "sandbox-hook", service: "tools" },
+      },
+    ],
+  };
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/");
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  const clear = timeline.getByRole("button", { name: "Clear view", exact: true });
+  const restore = timeline.getByRole("button", { name: "Show earlier", exact: true });
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  await clear.click();
+  await expect(timeline).toContainText("Timeline cleared. New events will appear here.");
+  await expect(clear).toBeDisabled();
+  // The same hook can later arrive in the controller-wide lifecycle journal.
+  snapshot.controls = [
+    {
+      ...snapshot.current.events[0],
+      id: "controller-hook",
+      kind: "lifecycle",
+      label: "Sandbox started",
+    },
+  ];
+  await page.clock.fastForward(1500);
+  await expect(timeline.getByRole("listitem")).toHaveCount(0);
+  // A delayed observation remains new even when its timestamp precedes the cleared entry.
+  snapshot.current.events.push({
+    id: "delayed",
+    kind: "armed",
+    label: "Scenario armed",
+    at: "2026-10-01T11:59:59Z",
+  });
+  await page.clock.fastForward(1500);
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  await expect(timeline.getByRole("listitem")).toContainText("Scenario armed");
+  await page.reload();
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  await expect(timeline).toContainText("1 earlier entry hidden.");
+  const download = page.waitForEvent("download");
+  await timeline.getByRole("button", { name: "Export JSON" }).click();
+  const contents = JSON.parse(await readFile((await (await download).path())!, "utf8"));
+  expect(contents.controls[0].hook.event_id).toBe("sandbox-hook");
+  expect(contents.current.events).toHaveLength(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await timeline.screenshot({ path: testInfo.outputPath("cleared-timeline.png") });
+  await restore.click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(2);
+  await expect(restore).toHaveCount(0);
+  await clear.click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(0);
+  snapshot.current.id = "second";
+  await page.clock.fastForward(1500);
+  await expect(timeline.getByRole("listitem")).toHaveCount(2);
+  await expect(restore).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("clearing still works when tab storage is unavailable and reports the limitation", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = () => {
+      throw new Error("Storage unavailable");
+    };
+  });
+  const snapshot = crashSnapshot();
+  snapshot.controls = [
+    { id: "manual", kind: "manual_action", label: "Manual kill", at: "2026-10-01T12:00:00Z" },
+  ];
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/");
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  await timeline.getByRole("button", { name: "Clear view", exact: true }).click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(0);
+  await expect(timeline.getByRole("alert")).toHaveText(
+    "This timeline view could not be saved for reloads.",
+  );
+  await timeline.getByRole("button", { name: "Show earlier", exact: true }).click();
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+});

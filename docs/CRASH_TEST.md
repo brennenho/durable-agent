@@ -254,6 +254,11 @@ exports follow the selected view. Background history retains the latest 2,000
 controller observations until the controller restarts; starting a scenario does not
 erase it. A finished scenario remains selected until another is armed.
 
+**Clear view** hides the displayed entries in the current browser tab; new events
+continue to appear. **Show earlier** restores them. The cleared view survives a tab
+reload and resets when a new scenario is armed. Clearing does not change scenario
+results, controller journals, application data, or the full history in JSON exports.
+
 ## Verify with real workers and OpenAI
 
 Use the existing application workers and configured OpenAI model for a live check.
