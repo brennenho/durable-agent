@@ -1,5 +1,6 @@
 """Load scenario presets and verify recovery from observed and saved state."""
 
+import json
 import tomllib
 from datetime import datetime
 from importlib.resources import files
@@ -49,6 +50,14 @@ SCENARIOS = parse_scenarios(
 
 
 def _child_report_matches(result: dict, child: RunDetail) -> bool:
+    if child.agent is not None and child.status == "succeeded":
+        return (
+            "output" in result
+            and result.get("error") is None
+            # JSON comparison distinguishes booleans from numbers, including nested values.
+            and json.dumps(result["output"], sort_keys=True)
+            == json.dumps(child.output, sort_keys=True)
+        )
     if child.status == "succeeded" and child.final_answer is not None:
         return (
             result.get("report") == child.final_answer[:16_384]
@@ -62,9 +71,12 @@ def _child_report_matches(result: dict, child: RunDetail) -> bool:
     return (
         child.status == "failed"
         and child.terminal_error is not None
-        and result.get("report") is None
         and error == child.terminal_error
-        and result.get("truncated") is False
+        and (
+            "output" in result and result["output"] is None
+            if child.agent is not None
+            else result.get("report") is None and result.get("truncated") is False
+        )
     )
 
 
@@ -101,8 +113,10 @@ def evaluate(
     delegated = [op for op in operations if op.tool_name == "delegate"]
     checks = {
         "Run completed successfully": run.status == "succeeded",
-        "Worker operations were accepted exactly once": all(
-            saved_run.operations for saved_run in [run, *children.values()]
+        "Worker operations were accepted exactly once": bool(run.operations)
+        and all(
+            child.operations or (child.agent is not None and child.status == "succeeded")
+            for child in children.values()
         )
         and all(
             sum(a.status == "accepted" for a in op.attempts) == 1
