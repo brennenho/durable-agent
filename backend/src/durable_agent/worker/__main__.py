@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import httpx
 
+from durable_agent.crash_test import open_hooks
 from durable_agent.worker.openai_client import OpenAIClient
 from durable_agent.worker.runner import Worker
 from durable_agent.worker.services import ServiceClient
@@ -33,7 +34,8 @@ async def main() -> None:
         cleanup.push_async_callback(services.close)
         models = OpenAIClient(api_key)
         cleanup.push_async_callback(models.close)
-        worker = Worker(services, models, uuid4())
+        hooks = await cleanup.enter_async_context(open_hooks("worker"))
+        worker = Worker(services, models, uuid4(), hooks=hooks)
         loop = asyncio.get_running_loop()
         task = asyncio.current_task()
         loop.add_signal_handler(signal.SIGTERM, task.cancel)

@@ -20,6 +20,7 @@ def exercise(
     stall_model=False,
     stall_tool=False,
     tool_status=200,
+    hooks=None,
 ):
     requests = {"model": [], "tool": [], "tool_timeouts": [], "heartbeat": [], "report": []}
     cancelled = []
@@ -85,7 +86,12 @@ def exercise(
             "test-key", http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
         )
         worker = Worker(
-            services, models, uuid4(), heartbeat_interval=0.005, report_retry_interval=0.005
+            services,
+            models,
+            uuid4(),
+            heartbeat_interval=0.005,
+            report_retry_interval=0.005,
+            hooks=hooks,
         )
         try:
             async with asyncio.timeout(2):

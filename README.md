@@ -41,6 +41,9 @@ workspaces live in the ignored `.sandbox-workspaces/` directory. Runs start empt
 For another checkout, set a distinct `COMPOSE_PROJECT_NAME` and unused
 `FRONTEND_PORT`, `CONTROL_PORT`, `TOOLS_PORT`, and `POSTGRES_PORT` in the shell.
 
+[Crash Test hooks](docs/CRASH_TEST.md) expose precise execution boundaries to a separate
+fault controller. They are disabled by default; `compose.crash-test.yaml` opts services in.
+
 ## Structure
 
 ```text
