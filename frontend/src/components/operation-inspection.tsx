@@ -15,7 +15,7 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
   const checkpoint = useToolCheckpoint(
     run.id,
     operation.id,
-    tab === "timeline" && operation.kind === "tool",
+    tab === "timeline" && operation.kind === "tool" && operation.tool_name !== "delegate",
   );
   return (
     <Tabs

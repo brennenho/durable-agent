@@ -55,7 +55,13 @@ export function RunControls({
         variant="ghost"
         disabled={busy}
         onClick={submit}
-        title={action === "pause" ? "Pause after the current call" : undefined}
+        title={
+          action === "pause"
+            ? run.children?.length
+              ? "Pause parent and subagents after active calls"
+              : "Pause after the current call"
+            : undefined
+        }
       >
         {busy ? (
           <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />

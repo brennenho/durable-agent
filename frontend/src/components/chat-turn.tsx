@@ -9,6 +9,7 @@ import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
 import { RunControls } from "./run-controls";
 import { FailedAttemptsBadge } from "./failed-attempts-badge";
+import { SubagentList } from "./subagent-list";
 
 export function ChatTurn({
   run,
@@ -69,6 +70,15 @@ export function ChatTurn({
           </summary>
           {activityOpen && <ExecutionTimeline run={run} live={live && !finished} />}
         </details>
+        {run.status === "waiting" && run.children?.length ? (
+          <section aria-label="Subagent progress" className="m-0 space-y-3 border-0 p-0">
+            <h3 className="text-xs font-medium">Subagents</h3>
+            <SubagentList runs={run.children} />
+            <p className="text-xs text-muted-foreground">
+              Reports return here. Each subagent keeps its own files.
+            </p>
+          </section>
+        ) : null}
         {run.terminal_error && (
           <p
             role="alert"

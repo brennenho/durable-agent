@@ -10,8 +10,18 @@ import { Button } from "./ui/button";
 
 function ChatStateIcon({ conversation }: { conversation: ConversationSummary }) {
   if (conversation.status === "succeeded" || conversation.status === "failed") return null;
-  const paused = conversation.pause_requested && conversation.status !== "running";
-  const label = paused ? "Paused" : conversation.pause_requested ? "Pausing" : "Active";
+  const waiting = conversation.status === "waiting";
+  const paused = conversation.pause_requested && conversation.status !== "running" && !waiting;
+  const label =
+    waiting && conversation.pause_requested
+      ? "Pause requested"
+      : paused
+        ? "Paused"
+        : conversation.pause_requested
+          ? "Pausing"
+          : waiting
+            ? "Waiting for subagents"
+            : "Active";
   return (
     <span role="img" aria-label={label} title={label} className="shrink-0">
       {paused ? (

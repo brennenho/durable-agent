@@ -14,7 +14,21 @@ export function SubagentList({ runs }: { runs: NonNullable<RunDetail["children"]
             >
               {child.name}
             </Link>
-            <span className="shrink-0 text-muted-foreground">{child.status}</span>
+            <span className="shrink-0 text-muted-foreground">
+              {child.status === "succeeded"
+                ? "Completed"
+                : child.status === "failed"
+                  ? "Failed"
+                  : child.pause_requested
+                    ? child.status === "running"
+                      ? "Pausing…"
+                      : "Paused"
+                    : child.status === "retrying"
+                      ? "Retrying"
+                      : child.status === "running"
+                        ? "Running"
+                        : "Queued"}
+            </span>
           </div>
           {child.terminal_error && (
             <p className="mb-0 mt-1 text-destructive wrap-anywhere">

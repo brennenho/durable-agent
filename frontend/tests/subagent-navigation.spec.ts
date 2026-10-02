@@ -49,6 +49,7 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole("button", { name: "Preview report.md" })).toBeEnabled();
     await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
     await expect(page.getByRole("button", { name: "Branch", exact: true })).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath("subagent-detail.png"), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { RunDetail } from "../lib/api";
 import { cn } from "../lib/utils";
+import { groupIsPausing } from "../lib/subagents";
 import { OperationInspection } from "./operation-inspection";
 import { operationName, OperationDuration, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
@@ -41,11 +42,13 @@ function OperationRow({
         active={current}
         live={live && current}
         duration={
-          <OperationDuration
-            key={operation.attempts.at(-1)?.id}
-            operation={operation}
-            status={run.status}
-          />
+          operation.tool_name !== "delegate" && (
+            <OperationDuration
+              key={operation.attempts.at(-1)?.id}
+              operation={operation}
+              status={run.status}
+            />
+          )
         }
       />
       <details
@@ -67,6 +70,7 @@ function OperationRow({
             operation={operation}
             status={run.status}
             pauseRequested={run.pause_requested}
+            pausing={groupIsPausing(run)}
           >
             {operation.checkpoint && !run.parent && (
               <BranchDialog run={run} operation={operation} />
@@ -80,7 +84,7 @@ function OperationRow({
           </div>
         )}
       </details>
-      {children.length > 0 && (
+      {children.length > 0 && run.status !== "waiting" && (
         <div className="col-start-3 min-w-0 pb-4">
           <SubagentList runs={children} />
         </div>
