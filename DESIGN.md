@@ -5,6 +5,8 @@
 Run agents that write code and edit documents. Each run has a workspace: the files the agent is working on.
 A conversation contains ordered runs, one per user prompt. Follow-ups reuse accepted
 history and saved files; only one run can be active in a conversation.
+Branch from a completed model/tool round to try a new instruction with its saved
+history and files. The original conversation continues independently.
 
 After each tool call, save its result and workspace together. If the sandbox crashes, restore the last saved workspace and retry the interrupted call. Completed calls are reused.
 
@@ -90,7 +92,8 @@ Use Docker Compose and OpenAI. For the first version:
 Six tables in one PostgreSQL database. Control owns `conversations`, `runs`, `operations`, and `attempts`; tools own `tool_requests` and `workspace_versions`. Use SQLAlchemy ORM with the psycopg 3 driver and Alembic migrations. Shared models live in `db/models.py`; each service owns its queries and explicit transactions. `?` means nullable.
 
 **`conversations`** — Groups ordered runs. `id: uuid` is the primary key;
-`created_at: timestamptz` records creation. Derive the title from the first prompt
+`created_at: timestamptz` records creation. `forked_from_operation_id: uuid?` links
+a branch to its source operation. Derive the title from the first prompt
 and status from the latest run. Existing runs keep their IDs and become one-turn conversations.
 
 **`runs`** — One user prompt, its execution, and current lease.

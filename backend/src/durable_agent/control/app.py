@@ -28,6 +28,7 @@ from durable_agent.contracts import (
     RunFileListing,
     RunSummary,
     SubmitFollowUpRequest,
+    SubmitForkRequest,
     SubmitRunRequest,
     ToolCheckpoint,
 )
@@ -35,6 +36,7 @@ from durable_agent.control.continuations import create_continuation
 from durable_agent.control.conversations import conversation_detail, list_conversations
 from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
+from durable_agent.control.forks import create_fork
 from durable_agent.control.leases import claim, heartbeat
 from durable_agent.control.reports import accept_report
 from durable_agent.control.runs import create_run, find_submission
@@ -134,6 +136,25 @@ async def submit_follow_up(
         run = await create_continuation(session, conversation_id, body)
         await session.commit()
         return await detail(session, run.id)
+
+
+@routes.post(
+    "/api/runs/{run_id}/forks",
+    response_model=ConversationSummary,
+    operation_id="fork_run",
+    responses={
+        404: {"model": ErrorResponse, "description": "Source run or operation not found"},
+        409: {
+            "model": ErrorResponse,
+            "description": "Conflicting submission or unavailable checkpoint",
+        },
+    },
+)
+async def fork_run(run_id: UUID, body: SubmitForkRequest, request: Request) -> ConversationSummary:
+    async with get_runtime(request).db.session() as session:
+        run = await create_fork(session, run_id, body)
+        await session.commit()
+        return await conversation_detail(session, run.conversation_id)
 
 
 @routes.get("/api/runs", response_model=list[RunSummary], operation_id="list_runs")
