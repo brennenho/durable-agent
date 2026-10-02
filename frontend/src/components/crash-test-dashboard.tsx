@@ -5,14 +5,13 @@ import { Activity, ArrowUpRight, Circle, RotateCcw, Square } from "lucide-react"
 import { crashRequest, serviceName, type CrashSnapshot } from "../lib/crash-test";
 import { Button } from "./ui/button";
 import { CrashTestTimeline } from "./crash-test-timeline";
+import { CrashTestScenario } from "./crash-test-scenario";
 
 export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const [snapshot, setSnapshot] = useState<CrashSnapshot | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [scenario, setScenario] = useState("saved-response-lost");
-  const [runId, setRunId] = useState("");
 
   useEffect(() => {
     if (pending) return;
@@ -58,7 +57,6 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const running = current?.status === "running";
   const unavailable = !!connectionError || !!snapshot?.services_error;
   const blocked = pending || running || unavailable;
-  const description = snapshot?.scenarios.find((item) => item.name === scenario)?.description;
 
   return (
     <main className="max-w-6xl space-y-8">
@@ -93,73 +91,14 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
         </p>
       )}
       {actionError && <p role="alert">{actionError}</p>}
-      <section aria-labelledby="scenario-heading" className="bg-muted/30">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="scenario-heading">Test a recovery boundary</h2>
-          <span className="text-xs text-muted-foreground">
-            Uses your existing containers and runs
-          </span>
-        </div>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void act("scenarios", { scenario, run_id: runId.trim() || null });
-          }}
-          className="mt-4"
-        >
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1">
-              <label htmlFor="scenario" className="mb-2 text-xs">
-                Scenario
-              </label>
-              <select
-                id="scenario"
-                value={scenario}
-                onChange={(event) => setScenario(event.target.value)}
-                disabled={!snapshot || blocked}
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                {snapshot?.scenarios.map((item) => (
-                  <option key={item.name} value={item.name}>
-                    {item.name.replaceAll("-", " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <Button type="submit" disabled={!snapshot || blocked}>
-              Arm scenario
-            </Button>
-            {running && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending || !!connectionError}
-                onClick={() => void act("scenarios/cancel", {})}
-              >
-                Cancel scenario
-              </Button>
-            )}
-          </div>
-          <p className="mb-2 text-sm text-muted-foreground">
-            {description ?? "Loading scenarios…"}
-          </p>
-          <details className="text-xs text-muted-foreground">
-            <summary>Target an existing run instead of the next worker claim</summary>
-            <label htmlFor="run-id" className="mt-3">
-              Run ID (optional)
-            </label>
-            <input
-              id="run-id"
-              value={runId}
-              onChange={(event) => setRunId(event.target.value)}
-              disabled={blocked}
-              placeholder="Paste a run UUID"
-              pattern="[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
-              className="mt-2 w-full rounded border bg-background p-2 font-mono"
-            />
-          </details>
-        </form>
-      </section>
+      <CrashTestScenario
+        scenarios={snapshot?.scenarios ?? []}
+        blocked={!snapshot || blocked}
+        running={running}
+        cancelDisabled={pending || !!connectionError}
+        onArm={(scenario, runId) => void act("scenarios", { scenario, run_id: runId })}
+        onCancel={() => void act("scenarios/cancel", {})}
+      />
       <div>
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2>Containers</h2>
