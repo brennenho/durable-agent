@@ -6,8 +6,15 @@ x-crash-test-environment: &crash-test-environment
 
 services:
   control:
+    labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
   tools:
+    labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
   worker:
+    labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
+  db:
+    labels: {durable-agent.crash-test: "true"}
+  frontend:
+    labels: {durable-agent.crash-test: "true"}
