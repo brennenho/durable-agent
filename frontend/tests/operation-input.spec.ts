@@ -200,7 +200,7 @@ test("shows full tool arguments without executing their contents", async ({ page
   await expect(workspace).toBeVisible();
 });
 
-for (const close of ["Output", "step", "Activity", "navigation"]) {
+for (const close of ["Output", "Timeline", "step", "Activity", "navigation"]) {
   test(`cancels inspection on ${close} and can load it again`, async ({ page }) => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {
@@ -223,7 +223,8 @@ for (const close of ["Output", "step", "Activity", "navigation"]) {
     const aborted = page.waitForEvent("requestfailed", (request) =>
       request.url().endsWith(`/operations/${operationId}`),
     );
-    if (close === "Output") await page.getByRole("tab", { name: "Output", exact: true }).click();
+    if (close === "Output" || close === "Timeline")
+      await page.getByRole("tab", { name: close, exact: true }).click();
     else if (close === "step") await step.click();
     else if (close === "Activity") await activity.click();
     else await page.getByRole("link", { name: "New chat", exact: true }).click();
@@ -231,7 +232,7 @@ for (const close of ["Output", "step", "Activity", "navigation"]) {
     release();
     if (close === "navigation") await page.goto(`/runs/${runDetail.id}`);
     if (close === "Activity" || close === "navigation") await activity.click();
-    if (close !== "Output") await step.click();
+    if (close !== "Output" && close !== "Timeline") await step.click();
     await page.getByRole("tab", { name: "Context", exact: true }).click();
     await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
     expect(calls).toBe(2);

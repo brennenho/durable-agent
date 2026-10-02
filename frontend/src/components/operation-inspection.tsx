@@ -5,6 +5,8 @@ import type { RunDetail } from "../lib/api";
 import { OperationInput, useOperationInput } from "./operation-input";
 import { AttemptMetadata, OperationOutput, OutputTechnical } from "./operation-output";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { operationEvents } from "../lib/execution-events";
+import { ExecutionEvents } from "./execution-events";
 
 type Operation = RunDetail["operations"][number];
 
@@ -16,7 +18,7 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
       value={tab}
       onValueChange={(value) => {
         setTab(value);
-        if (value === "output") input.cancel();
+        if (value === "output" || value === "timeline") input.cancel();
         else input.load();
       }}
       className="min-w-0 px-2 pt-2 pb-5 sm:pl-8"
@@ -24,7 +26,7 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
       <TabsList
         variant="line"
         aria-label="Step inspection"
-        className="mb-2 h-10! w-full justify-start gap-3 border-b p-0"
+        className="mb-2 h-auto! min-h-10 w-full flex-wrap justify-start gap-x-3 gap-y-1 border-b p-0"
       >
         <TabsTrigger value="output" className="flex-none px-0 text-xs after:bottom-0!">
           Output
@@ -35,12 +37,18 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
         <TabsTrigger value="technical" className="flex-none px-0 text-xs after:bottom-0!">
           Technical details
         </TabsTrigger>
+        <TabsTrigger value="timeline" className="flex-none px-0 text-xs after:bottom-0!">
+          Timeline
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="output">
         <OperationOutput result={operation.result} />
       </TabsContent>
       <TabsContent value="input">
         <OperationInput input={input} />
+      </TabsContent>
+      <TabsContent value="timeline">
+        <ExecutionEvents events={operationEvents(operation)} />
       </TabsContent>
       <TabsContent value="technical">
         <p className="run-id">Operation ID: {operation.id}</p>
