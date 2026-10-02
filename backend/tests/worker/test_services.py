@@ -5,6 +5,7 @@ from uuid import uuid4
 import httpx
 import pytest
 from durable_agent.contracts import ReportRequest, ToolOperation
+from durable_agent.sdk.types import ToolDefinition
 from durable_agent.worker.services import ServiceClient, ServiceError
 
 
@@ -205,6 +206,51 @@ def test_service_deadline_cancels_a_response_that_keeps_streaming(assignment):
             assert caught.value.error.retryable
             assert len(requests) == 1
             assert cancelled == [True]
+        finally:
+            await services.close()
+
+    asyncio.run(exercise())
+
+
+def test_custom_tool_receives_frozen_definition_and_attempt_identity(assignment):
+    definition = ToolDefinition(
+        name="summarize",
+        version="2",
+        entrypoint="example.tools:summarize",
+        parameters={"type": "object", "properties": {"path": {"type": "string"}}},
+        takes_context=True,
+    )
+    assignment.config.tool_definitions[definition.name] = definition
+    assignment.operation = ToolOperation(
+        kind="tool",
+        request={
+            "call": {"call_id": "sdk-call", "name": "summarize", "arguments": {"path": "a.md"}},
+            "input_version_id": assignment.config.initial_workspace_version_id,
+        },
+    )
+
+    def handler(http_request):
+        body = json.loads(http_request.content)
+        assert body["definition"] == definition.model_dump(mode="json")
+        assert body["run_id"] == str(assignment.run_id)
+        assert body["attempt_id"] == str(assignment.attempt_id)
+        assert body["operation_id"] == str(assignment.operation_id)
+        assert body["arguments"] == {"path": "a.md"}
+        assert body["deadline_at"] == assignment.deadline_at.isoformat().replace("+00:00", "Z")
+        return httpx.Response(
+            200,
+            json={
+                "output": {"status": "ok", "value": {"summary": "Saved summary"}},
+                "workspace_version_id": body["input_version_id"],
+            },
+        )
+
+    async def exercise():
+        services = client(handler)
+        try:
+            result = (await services.execute_tool(assignment, timeout_seconds=1)).result
+            assert result.call_id == "sdk-call"
+            assert result.output.value == {"summary": "Saved summary"}
         finally:
             await services.close()
 
