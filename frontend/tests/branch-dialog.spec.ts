@@ -47,12 +47,13 @@ test.beforeEach(async ({ page }) => {
 async function openBranch(page: Page) {
   await page.goto(`/runs/${source.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
-  await page.getByLabel("1. write_file", { exact: true }).locator(":scope > summary").click();
-  await page.getByRole("button", { name: "Branch from here" }).click();
+  const step = page.getByLabel("1. write_file", { exact: true });
+  await expect(step).not.toHaveAttribute("open");
+  await step.getByRole("button", { name: "Branch from here" }).click();
   return page.getByRole("dialog", { name: "Branch from step 1" });
 }
 
-for (const width of [390, 1440]) {
+for (const width of [320, 390, 1440]) {
   test(`opens eligible checkpoints with exact files and keyboard controls at ${width}px`, async ({
     page,
   }) => {
@@ -79,7 +80,25 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     await dialog.getByRole("textbox").fill("Do not submit this draft");
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Branch from here" })).toBeFocused();
+    const step = page.getByLabel("1. write_file", { exact: true });
+    const trigger = step.getByRole("button", { name: "Branch from here" });
+    await expect(trigger).toBeFocused();
+    await expect(step).not.toHaveAttribute("open");
+    const buttonBounds = await trigger.boundingBox();
+    const durationBounds = await step.getByTitle("Latest attempt duration").boundingBox();
+    expect(buttonBounds!.y).toBeGreaterThanOrEqual(durationBounds!.y + durationBounds!.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    await trigger.press("Enter");
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    await expect(step).not.toHaveAttribute("open");
+    await step.locator(":scope > summary").press("Enter");
+    await expect(step).toHaveAttribute("open");
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(step).toHaveAttribute("open");
     expect(submissions).toBe(0);
     await page.getByLabel("2. write_file", { exact: true }).locator(":scope > summary").click();
     await expect(page.getByRole("button", { name: "Branch from here" })).toHaveCount(1);
@@ -145,7 +164,10 @@ test("retries the same creation after a lost response and uses a new key for an 
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(dialog.getByRole("alert")).toContainText("Retry to open the same branch.");
   await dialog.getByRole("button", { name: "Close branch dialog" }).click();
-  await page.getByRole("button", { name: "Branch from here" }).click();
+  await page
+    .getByLabel("1. write_file", { exact: true })
+    .getByRole("button", { name: "Branch from here" })
+    .click();
   await dialog.getByRole("button", { name: "Retry creation" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
   expect(bodies[1]).toEqual(bodies[0]);
@@ -155,7 +177,6 @@ test("retries the same creation after a lost response and uses a new key for an 
   expect(bodies[2].submission_key).not.toBe(bodies[0].submission_key);
   await dialog.getByRole("button", { name: "Close branch dialog" }).click();
   const second = page.getByLabel("2. write_file", { exact: true });
-  await second.locator(":scope > summary").click();
   await second.getByRole("button", { name: "Branch from here" }).click();
   const next = page.getByRole("dialog", { name: "Branch from step 2" });
   await next.getByRole("textbox").fill("Different approach");
