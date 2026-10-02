@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { RunHistory } from "./run-history";
 import { SavedFiles } from "./saved-files";
+import { MarkdownAnswer } from "./markdown-answer";
 
 const statusLabels = {
   queued: "Waiting to start",
@@ -63,9 +64,7 @@ export function ChatTurn({ run }: { run: RunDetail }) {
         )}
         <section aria-label="Final output" className="m-0 border-0 bg-transparent p-0">
           {run.final_answer !== null ? (
-            <div className="whitespace-pre-wrap text-base leading-7 wrap-anywhere">
-              {run.final_answer || "The agent returned an empty answer."}
-            </div>
+            <MarkdownAnswer text={run.final_answer || "The agent returned an empty answer."} />
           ) : (
             <p className="text-muted-foreground">
               {finished

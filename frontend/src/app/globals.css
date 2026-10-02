@@ -82,8 +82,41 @@
   .run-id {
     @apply font-mono text-xs text-muted-foreground wrap-anywhere;
   }
-  .preserve-whitespace {
-    @apply whitespace-pre-wrap wrap-anywhere;
+  .markdown-answer {
+    @apply text-base leading-7 wrap-anywhere;
+  }
+  .markdown-answer :is(h1, h2, h3) {
+    @apply mt-6 mb-3 text-lg font-semibold;
+  }
+  .markdown-answer > :first-child {
+    @apply mt-0;
+  }
+  .markdown-answer > :last-child {
+    @apply mb-0;
+  }
+  .markdown-answer ul {
+    @apply my-3 list-disc pl-6;
+  }
+  .markdown-answer ol {
+    @apply my-3 list-decimal pl-6;
+  }
+  .markdown-answer li {
+    @apply my-1;
+  }
+  .markdown-answer a {
+    @apply underline underline-offset-4;
+  }
+  .markdown-answer blockquote {
+    @apply my-4 border-l-2 pl-4 text-muted-foreground;
+  }
+  .markdown-answer code {
+    @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .markdown-answer pre {
+    @apply my-4 overflow-x-auto rounded-lg bg-muted p-4 whitespace-pre text-xs leading-6;
+  }
+  .markdown-answer pre code {
+    @apply bg-transparent p-0 text-inherit;
   }
   .operation-list,
   .attempt-list {
