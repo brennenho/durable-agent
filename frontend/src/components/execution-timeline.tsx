@@ -127,6 +127,21 @@ export function ExecutionTimeline({ run, live }: { run: RunDetail; live: boolean
       </ol>
       <InspectionDisclosure title="Technical details · run">
         <p className="run-id">Run ID: {run.id}</p>
+        {run.agent && (
+          <dl aria-label="Agent identity" className="space-y-1 text-xs">
+            {[
+              ["Agent", run.agent.name],
+              ["Version", run.agent.version],
+              ["App", run.agent.app_ref],
+              ["Build", run.agent.build_id],
+            ].map(([label, value]) => (
+              <div key={label} className="grid grid-cols-[4rem_minmax(0,1fr)] gap-2">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="m-0 font-mono wrap-anywhere">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         <p className="text-xs text-muted-foreground">
           {run.model} ·{" "}
           <time dateTime={run.created_at}>{new Date(run.created_at).toLocaleString()}</time>
