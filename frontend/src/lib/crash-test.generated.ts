@@ -203,6 +203,8 @@ export interface components {
         HookEvent: {
             /** Attempt Id */
             attempt_id?: string | null;
+            /** Container Id */
+            container_id?: string | null;
             /**
              * Event Id
              * Format: uuid
@@ -234,6 +236,8 @@ export interface components {
             service: "control" | "tools" | "worker";
             /** Worker Id */
             worker_id?: string | null;
+            /** Worker Slot */
+            worker_slot?: number | null;
             /** Workspace Version Id */
             workspace_version_id?: string | null;
         };

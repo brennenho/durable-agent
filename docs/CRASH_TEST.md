@@ -15,6 +15,15 @@ The setting belongs to the running Crash Test service and resets to allowed when
 restarts. It takes effect at the next hook, not in the middle of an in-flight resize.
 It cannot override `WORKER_AUTOSCALE=false`, which prevents Control's scaler starting.
 
+The timeline also records Control's confirmed worker creation, start, restart, and
+removal, plus Tools' `sandbox.started` hooks. These observations work without an
+active scenario. Worker events include the slot and container ID; sandbox events
+include the operation and lease generation. Repeated inventory checks add no events.
+The dashboard keeps the latest 2,000 controller observations; `controls.jsonl` keeps
+the full received history. Hooks are best-effort: events missed while the controller
+is unavailable are not replayed. Docker or manual starts outside these hooks are not
+attributed to Control. A started container does not imply application readiness.
+
 Crash Test is the name for the fault-injection dashboard and scenario controller.
 The optional hook client is independent of application persistence: no new database,
 no event table, and no hook code in the pure harness.

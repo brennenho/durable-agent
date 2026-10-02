@@ -16,15 +16,16 @@ def now() -> str:
 
 
 class Journal:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, *, rolling: bool = False):
         self.path = path
+        self.rolling = rolling
         self.events: list[dict] = []
         self.lock = asyncio.Lock()
 
     async def record(self, kind: str, label: str, **data):
         event = {"id": str(uuid4()), "at": now(), "kind": kind, "label": label, **data}
         async with self.lock:
-            if len(self.events) >= 2000:
+            if len(self.events) >= 2000 and not self.rolling:
                 raise RuntimeError("Scenario observation limit exceeded")
 
             def append():
@@ -35,6 +36,8 @@ class Journal:
 
             await asyncio.to_thread(append)
             self.events.append(event)
+            if self.rolling:
+                del self.events[:-2000]
         return event
 
 

@@ -83,6 +83,7 @@ def create_app(room: ControlRoom | None = None, *, token: str | None = None):
             raise HTTPException(422, "Hook timestamp must include a timezone")
         if body.name == "control.before_scale" and body.service == "control":
             return request.app.state.room.autoscaling_hook()
+        await request.app.state.room.observe_lifecycle(body)
         current = request.app.state.room.current
         if current and current.status == "running":
             return await current.observe_hook(body)

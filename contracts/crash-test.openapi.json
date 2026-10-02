@@ -260,6 +260,18 @@
             ],
             "title": "Attempt Id"
           },
+          "container_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Id"
+          },
           "event_id": {
             "format": "uuid",
             "title": "Event Id",
@@ -348,6 +360,18 @@
               }
             ],
             "title": "Worker Id"
+          },
+          "worker_slot": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker Slot"
           },
           "workspace_version_id": {
             "anyOf": [

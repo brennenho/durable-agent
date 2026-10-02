@@ -14,6 +14,7 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
   const [source, setSource] = useState<Source>("all");
   const session = snapshot.current;
   const hook = snapshot.scenarios.find((item) => item.name === session?.scenario)?.hook;
+  const recordedHooks = new Set(snapshot.controls.map((event) => event.hook?.event_id));
   const saved =
     session?.run?.operations.flatMap((operation) =>
       operationEvents(operation, session.checkpoints[operation.id]).map((event) => ({
@@ -30,22 +31,34 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
     ) ?? [];
   const observations: (ExecutionEvent & { source: Source })[] = [
     ...snapshot.controls,
-    ...(session?.events ?? []),
+    ...(session?.events ?? []).filter(
+      (event) => !event.hook?.event_id || !recordedHooks.has(event.hook.event_id),
+    ),
   ]
     .filter(
       (event) =>
         event.kind !== "hook" ||
         [hook, "tools.result_reused", "sandbox.started"].includes(event.label),
     )
-    .map((event) => ({
-      id: `observed:${event.id}`,
-      operationId: event.operation_id ?? "",
-      at: event.at,
-      label: `Crash Test · ${event.label === "tools.result_reused" ? "Saved result reused" : event.label === "sandbox.started" ? "Sandbox started" : event.label}`,
-      detail: event.detail ?? event.target?.name ?? undefined,
-      failed: event.kind === "fault_error" || event.kind === "kill_observed",
-      source: "controller",
-    }));
+    .map((event) => {
+      const emitter = event.hook?.service === "control" ? "Control" : "Tools";
+      const owner = event.kind === "lifecycle" ? emitter : "Crash Test";
+      const label =
+        event.label === "tools.result_reused"
+          ? "Saved result reused"
+          : event.label === "sandbox.started"
+            ? "Sandbox started"
+            : event.label;
+      return {
+        id: `observed:${event.id}`,
+        operationId: event.operation_id ?? "",
+        at: event.at,
+        label: `${owner} · ${label}`,
+        detail: event.detail ?? event.target?.name ?? undefined,
+        failed: event.kind === "fault_error" || event.kind === "kill_observed",
+        source: "controller",
+      };
+    });
   const events = [...saved, ...observations]
     .filter((event) => source === "all" || event.source === source)
     .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
@@ -91,7 +104,7 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
           ) : (
             <p className="my-10 text-center text-sm text-muted-foreground">
               {source === "all"
-                ? "Events will appear when a scenario or manual action starts."
+                ? "Worker, sandbox, and crash observations will appear here."
                 : "No events from this source."}
             </p>
           )}
