@@ -55,17 +55,27 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [320, 390, 1440]) {
-  test(`aligns timestamps left of timeline dots at ${width}px`, async ({ page }) => {
+  test(`groups timestamps and duration left of timeline dots at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: completed }));
     await page.goto(`/runs/${runDetail.id}`);
     await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
     const timeline = page.getByRole("list", { name: "Run timeline", exact: true });
-    await expect(timeline.locator("li > time")).toHaveCount(3);
+    await expect(timeline.locator("li > div > time")).toHaveCount(3);
     const step = page.getByLabel("1. run_command", { exact: true });
     const name = await step.getByText("run_command", { exact: true }).boundingBox();
     const status = await step.getByText("Completed", { exact: true }).boundingBox();
     expect(status!.x >= name!.x + name!.width || status!.y >= name!.y + name!.height).toBe(true);
+    const duration = timeline.getByTitle("Latest attempt duration");
+    await expect(duration).toHaveText("4s");
+    await expect(step.getByTitle("Latest attempt duration")).toHaveCount(0);
+    const durationBounds = await duration.boundingBox();
+    const clockBounds = await timeline.getByLabel(/^Operation planned:/).boundingBox();
+    expect(durationBounds!.y).toBeGreaterThanOrEqual(clockBounds!.y + clockBounds!.height);
+    expect(
+      Math.abs(durationBounds!.x + durationBounds!.width - (clockBounds!.x + clockBounds!.width)),
+    ).toBeLessThan(1);
+    await page.screenshot({ path: test.info().outputPath("timing-gutter.png"), fullPage: true });
     await step.locator(":scope > summary").click();
     await page.getByRole("tab", { name: "Timeline", exact: true }).click();
     await expect(page.getByRole("list", { name: "Execution milestones" })).toBeVisible();
@@ -74,14 +84,15 @@ for (const width of [320, 390, 1440]) {
       const timelineBounds = await timeline.boundingBox();
       expect(inspection!.width).toBeGreaterThanOrEqual(timelineBounds!.width - 20);
     }
-    for (const stamp of await timeline.locator("li > time").all()) {
+    for (const stamp of await timeline.locator("li > div > time").all()) {
       await expect(stamp).toHaveText(/^\d{2}:\d{2}:\d{2}$/);
       await expect(stamp).toHaveAttribute("title", /2026/);
       const position = await stamp.evaluate((time) => {
         const text = document.createRange();
         text.selectNodeContents(time);
         const clock = text.getBoundingClientRect();
-        const dot = time.nextElementSibling!.firstElementChild!.getBoundingClientRect();
+        const dot =
+          time.parentElement!.nextElementSibling!.firstElementChild!.getBoundingClientRect();
         return {
           clockRight: clock.right,
           dotLeft: dot.left,

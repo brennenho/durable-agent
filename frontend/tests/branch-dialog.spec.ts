@@ -85,8 +85,8 @@ for (const width of [320, 390, 1440]) {
     await expect(trigger).toBeFocused();
     await expect(step).not.toHaveAttribute("open");
     const buttonBounds = await trigger.boundingBox();
-    const durationBounds = await step.getByTitle("Latest attempt duration").boundingBox();
-    expect(buttonBounds!.y).toBeGreaterThanOrEqual(durationBounds!.y + durationBounds!.height);
+    const statusBounds = await step.getByText("Completed", { exact: true }).boundingBox();
+    expect(buttonBounds!.y).toBeGreaterThanOrEqual(statusBounds!.y + statusBounds!.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     await trigger.press("Enter");
     await expect(dialog).toBeVisible();
