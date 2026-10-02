@@ -265,3 +265,16 @@ API usage. An inconclusive result means the requested crash was not verified.
 
 Offline unit tests keep provider-response fixtures under `backend/tests`. Crash Test
 has no alternate worker, special model, or additional application Compose stack.
+
+## Subagent recovery
+
+Scenarios selected on a parent also observe its persisted children. Faults match the
+actual child run/operation IDs; select a child directly to target only that child.
+The dashboard retains separate child timelines and workspace checkpoints.
+
+`control.after_children_commit` and `control.after_join_commit` run after their
+transactions close. They carry the parent run and delegation operation IDs, with
+no worker attempt or lease generation. The `children-created` and `children-joined`
+presets stop Control at these boundaries, then verify that child identities remain
+stable and the parent continues once. A completed delegation has no worker attempt;
+verification requires matching terminal child records and the accepted combined result.
