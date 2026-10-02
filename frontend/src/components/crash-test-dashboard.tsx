@@ -60,7 +60,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const current = snapshot?.current;
   const running = current?.status === "running";
   const unavailable = !!connectionError || !!snapshot?.services_error;
-  const blocked = pending || running || unavailable;
+  const blocked = pending || unavailable;
   const live = !!snapshot && !connectionError && !pending;
 
   return (
@@ -101,7 +101,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
         <div className="min-w-0 space-y-5 lg:col-start-2 lg:row-start-1">
           <CrashTestScenario
             scenarios={snapshot?.scenarios ?? []}
-            blocked={!snapshot || blocked}
+            blocked={!snapshot || running || blocked}
             running={running}
             activeScenario={running ? current?.scenario : undefined}
             cancelDisabled={pending || !!connectionError}
@@ -113,7 +113,6 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
             blocked={blocked}
             stale={unavailable}
             live={live}
-            running={running}
             onAction={(target, action) =>
               void act("containers/action", {
                 id: target.id,

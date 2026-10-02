@@ -10,14 +10,12 @@ export function CrashTestContainers({
   blocked,
   stale,
   live,
-  running,
   onAction,
 }: {
   services?: Container[];
   blocked: boolean;
   stale: boolean;
   live: boolean;
-  running: boolean;
   onAction: (target: Container, action: "kill" | "start") => void;
 }) {
   return (
@@ -95,9 +93,7 @@ export function CrashTestContainers({
         <p className="px-5 text-sm text-muted-foreground">No containers found.</p>
       )}
       <p className="m-0 border-t bg-muted/30 px-5 py-3 text-xs text-muted-foreground">
-        {running
-          ? "Manual controls are locked while a scenario runs."
-          : "Autoscaling may restart killed workers."}
+        Autoscaling may restart killed workers.
       </p>
     </section>
   );

@@ -82,7 +82,7 @@ test("autoscaling can change during a scenario and failed updates retain the set
   await page.goto("/");
   const toggle = page.getByRole("switch", { name: "Allow autoscaling" });
   await expect(toggle).toBeChecked();
-  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeEnabled();
   await expect(
     page.getByText("Waiting for Control. Enable Crash Test hooks in the app."),
   ).toBeVisible();
@@ -220,7 +220,86 @@ test("status dots pulse only while their data is live and motion is allowed", as
   await expect(container).toHaveCSS("animation-name", "none");
 });
 
-test("scenarios lock manual controls, cancel, and retain observations offline on mobile", async ({
+test("manual actions during scenarios appear in the timeline, result, and export", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const snapshot = crashSnapshot();
+  const session: NonNullable<CrashSnapshot["current"]> = {
+    id: "scenario",
+    scenario: "baseline",
+    status: "running",
+    manual_intervention: false,
+    run: null,
+    observed_at: null,
+    error: null,
+    checkpoints: {},
+    checks: {},
+    events: [],
+  };
+  snapshot.current = session;
+  let recovering = false;
+  await page.route("**/crash-api/**", async (route) => {
+    if (route.request().method() === "POST") {
+      expect(route.request().url()).toContain("/containers/action");
+      const body = route.request().postDataJSON();
+      expect(body.id).toBe(snapshot.services[0].id);
+      expect(body.started_at).toBe(snapshot.services[0].started_at);
+      if (recovering)
+        return route.fulfill({
+          status: 409,
+          json: { detail: "A container action is in progress. Try again shortly." },
+        });
+      snapshot.services[0].running = body.action === "start";
+      session.manual_intervention = true;
+      session.events.push({
+        id: `manual-${body.action}`,
+        kind: "manual_action",
+        at: "2026-10-01T12:00:00Z",
+        label: `Manual ${body.action} requested: tools`,
+      });
+      return route.fulfill({ json: snapshot.services[0] });
+    }
+    return route.fulfill({ json: snapshot });
+  });
+  await page.goto("/");
+  const result = page.getByRole("region", { name: "Baseline", exact: true });
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  await expect(result.getByText("Manual intervention", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Kill Tools", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Start Tools", exact: true })).toBeEnabled();
+  await expect(result.getByText("Manual intervention", { exact: true })).toBeVisible();
+  await expect(timeline).toContainText("Manual kill requested: tools");
+  recovering = true;
+  await page.getByRole("button", { name: "Start Tools", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "A container action is in progress",
+  );
+  await expect(result.getByRole("status")).toHaveText("Waiting for a run");
+  recovering = false;
+  await page.getByRole("button", { name: "Start Tools", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeEnabled();
+  await expect(timeline).toContainText("Manual start requested: tools");
+  await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+  session.status = "passed";
+  await expect(result.getByRole("status")).toHaveText("passed");
+  await expect(result.getByText("Manual intervention", { exact: true })).toBeVisible();
+  const download = page.waitForEvent("download");
+  await timeline.getByRole("button", { name: "Export JSON" }).click();
+  const evidence = await download;
+  const contents = JSON.parse(await readFile((await evidence.path())!, "utf8"));
+  expect(contents.current.manual_intervention).toBe(true);
+  expect(contents.current.events.map((event: { label: string }) => event.label)).toEqual([
+    "Manual kill requested: tools",
+    "Manual start requested: tools",
+  ]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("scenarios allow manual controls, cancel, and retain observations offline on mobile", async ({
   page,
 }) => {
   const snapshot = crashSnapshot();
@@ -255,9 +334,11 @@ test("scenarios lock manual controls, cancel, and retain observations offline on
   await page.goto("/");
   await page.getByRole("button", { name: "Arm scenario" }).click();
   await expect(page.getByRole("status")).toHaveText("Waiting for a run");
-  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeEnabled();
+  await expect(page.getByRole("combobox", { name: "Scenario", exact: true })).toBeDisabled();
   snapshot.services_error = "Docker unavailable";
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Docker unavailable");
+  await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Cancel scenario" })).toBeEnabled();
   await page.getByRole("button", { name: "Cancel scenario" }).click();
   await expect(page.getByRole("status")).toHaveText("inconclusive");

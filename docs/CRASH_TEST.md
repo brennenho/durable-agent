@@ -222,8 +222,13 @@ are needed to run, inspect, or cancel scenarios.
 
 Scenario kills automatically restart services. Autoscaling may restart manually killed
 workers; pause it through Crashboard to prevent that. Other manual kills stay stopped until
-Start is clicked. Sandbox restart belongs to Tools. Manual controls are disabled
-during a scenario to keep its observations attributable to that scenario.
+Start is clicked. Sandbox restart belongs to Tools.
+
+Manual controls remain available during scenarios. Actions and their outcomes appear
+in the scenario timeline and JSON report; the result shows **Manual intervention**
+and the session sets `manual_intervention: true`. Recovery checks still determine
+the verdict. A container action already in progress briefly blocks another manual
+action; automatic recovery finishes before a manual action can begin.
 
 The shared execution timeline combines application milestones derived from saved
 state with separately labelled controller observations. It retains the last observed
