@@ -7,9 +7,9 @@ from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ConfigDict, ValidationError
 
-from durable_agent.contracts import SandboxConfig, ToolError, ToolOutput
+from durable_agent.contracts import RunCommandArguments, SandboxConfig, ToolError, ToolOutput
 from durable_agent.tools.archives import (
     InvalidWorkspace,
     capture_workspace,
@@ -23,11 +23,8 @@ class InvalidCommand(ValueError):
     pass
 
 
-class CommandArgs(BaseModel):
+class CommandArgs(RunCommandArguments):
     model_config = ConfigDict(extra="forbid", strict=True)
-    command: str
-    cwd: str = "."
-    timeout_seconds: int = Field(default=120, ge=1, le=900)
 
 
 def prepare_workspace_root(path: Path) -> None:

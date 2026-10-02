@@ -1,19 +1,34 @@
 """Lease queries. Lock the run and use database time; callers commit explicitly."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from durable_agent.contracts import AgentConfig, Assignment, HeartbeatRequest, HeartbeatResponse
+from durable_agent.contracts import (
+    AgentConfig,
+    Assignment,
+    HeartbeatRequest,
+    HeartbeatResponse,
+    RunCommandArguments,
+)
 from durable_agent.contracts import Operation as WireOperation
 from durable_agent.control.errors import ControlError
 from durable_agent.db.models import Attempt, Operation, Run
 
 LEASE = timedelta(seconds=30)
 OPERATION = TypeAdapter(WireOperation)
+
+
+def _attempt_deadline(started_at: datetime, operation: Operation, run: Run) -> datetime:
+    seconds = run.config["call_timeout_seconds"]
+    if operation.kind == "tool" and operation.request["call"]["name"] == "run_command":
+        arguments = RunCommandArguments.model_validate(operation.request["call"]["arguments"])
+        # Reserve time for setup, cleanup, checkpoint publication, and reporting.
+        seconds = arguments.timeout_seconds + 30
+    return started_at + timedelta(seconds=seconds)
 
 
 async def claim(session: AsyncSession, worker_id: UUID) -> Assignment | None:
@@ -40,7 +55,7 @@ async def claim(session: AsyncSession, worker_id: UUID) -> Assignment | None:
     if count >= config.max_attempts:
         raise ValueError("Claimable operation has exhausted its attempt budget")
     now = await session.scalar(select(func.clock_timestamp()))
-    deadline = now + timedelta(seconds=config.call_timeout_seconds)
+    deadline = _attempt_deadline(now, operation, run)
     run.status, run.next_attempt_at = "running", None
     run.lease_owner = worker_id
     run.lease_generation += 1
@@ -87,8 +102,8 @@ async def lock_attempt(session: AsyncSession, attempt_id: UUID) -> tuple[Attempt
     return attempt, operation, run
 
 
-def check_lease(attempt: Attempt, run: Run, body: HeartbeatRequest, now):
-    deadline = attempt.started_at + timedelta(seconds=run.config["call_timeout_seconds"])
+def check_lease(attempt: Attempt, operation: Operation, run: Run, body: HeartbeatRequest, now):
+    deadline = _attempt_deadline(attempt.started_at, operation, run)
     if (
         attempt.worker_id != body.worker_id
         or attempt.lease_generation != body.lease_generation
@@ -106,9 +121,9 @@ def check_lease(attempt: Attempt, run: Run, body: HeartbeatRequest, now):
 async def heartbeat(
     session: AsyncSession, attempt_id: UUID, body: HeartbeatRequest
 ) -> HeartbeatResponse:
-    attempt, _, run = await lock_attempt(session, attempt_id)
+    attempt, operation, run = await lock_attempt(session, attempt_id)
     now = await session.scalar(select(func.clock_timestamp()))
-    deadline = check_lease(attempt, run, body, now)
+    deadline = check_lease(attempt, operation, run, body, now)
     run.last_heartbeat_at = now
     run.lease_expires_at = min(now + LEASE, deadline)
     await session.flush()

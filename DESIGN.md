@@ -59,9 +59,12 @@ Store full workspace copies in PostgreSQL initially. Tools do not need to declar
 | --- | --- |
 | Tool completed and was saved | Reuse its result and files. |
 | Sandbox crashed before saving | Retry that call from its saved input. |
+| Command reached its time limit and stopped | Discard its changes; let the agent split the work or choose a longer limit. |
 | Tests ran and failed | Save the output and files; let the agent fix the code. |
 
 Only files survive a restart. Recreate the environment from a fixed container image.
+Split long workflows into separate tool calls to save progress between steps. Commands
+do not checkpoint while running.
 
 #### Runtime Recovery
 
@@ -200,7 +203,8 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 | --- | --- |
 | Attempts per operation | 5 |
 | Lease / heartbeat | 30 seconds / 5 seconds |
-| Fixed call deadline | 120 seconds; heartbeats cannot extend it |
+| Command runtime | Agent selects 1–900 seconds; default 120 |
+| Fixed attempt deadline | Command budget + 30 seconds for setup and saving results; other calls 120 seconds. Heartbeats cannot extend it. |
 | Model turns / output tokens | 20 / 4,096 |
 | Workspace / returned logs | 20 MiB uncompressed / 64 KiB |
 | Idle worker polling | 1 second |

@@ -296,8 +296,20 @@ class WriteFileArguments(Contract):
 
 
 class RunCommandArguments(Contract):
+    """Run a command. Split long workflows into separate calls to save progress between steps."""
+
     command: str
     cwd: str = "."
+    timeout_seconds: int = Field(
+        default=120,
+        ge=1,
+        le=900,
+        strict=True,
+        description=(
+            "Maximum command runtime in seconds. On timeout, unsaved file changes are discarded. "
+            "Choose a longer budget or split the work into smaller commands."
+        ),
+    )
 
 
 class ReadFileOutput(Contract):

@@ -167,6 +167,32 @@ def test_incomplete_output_cannot_dispatch_tools_or_finish(state):
         assert advance(state, result).error.code == "incomplete_model_output"
 
 
+def test_command_timeout_returns_to_model_with_saved_input_workspace(state):
+    command = call(name="run_command", arguments={"command": "pytest", "timeout_seconds": 300})
+    planned = model(command)
+    assert advance(state, planned).next.call == command
+    state.history, state.pending_tool_calls, state.turn_count = [planned], [command], 1
+    result = ToolResult(
+        kind="tool",
+        call_id=command.call_id,
+        workspace_version_id=VERSION,
+        output={"status": "error", "code": "command_timeout", "message": "Command timed out"},
+    )
+    before = state.model_dump()
+    transition = advance(state, result)
+    assert transition.next.kind == "model"
+    assert transition.next.request.history == [planned, result]
+    assert state.model_dump() == before
+
+
+@pytest.mark.parametrize("timeout", [0, 901, True, "300", 1.5])
+def test_invalid_command_budget_rejects_entire_tool_plan(state, timeout):
+    command = call(name="run_command", arguments={"command": "pytest", "timeout_seconds": timeout})
+    transition = advance(state, model(call("first"), command))
+    assert transition.status == "failed"
+    assert transition.error.code == "invalid_tool_call"
+
+
 def test_unexpected_result_order_fails(state):
     assert advance(state, tool()).error.code == "invalid_result"
     state.pending_tool_calls = [call()]
