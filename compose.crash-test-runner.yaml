@@ -1,0 +1,52 @@
+# Optional controller/dashboard only. The application project must already exist.
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+      target: tools
+    command: ["uvicorn", "crash_test.app:app", "--host", "0.0.0.0", "--port", "9020"]
+    restart: unless-stopped
+    stop_grace_period: 45s
+    ports:
+      - "${CRASH_TEST_PORT:-9020}:9020"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      CRASH_TEST_PROJECT: ${CRASH_TEST_PROJECT:?Select the application project}
+      CRASH_TEST_COMPOSE_DIRECTORY: ${CRASH_TEST_COMPOSE_DIRECTORY:?Select its checkout}
+      CRASH_TEST_HOOK_TOKEN: ${CRASH_TEST_HOOK_TOKEN:?Set the shared hook token}
+      CRASH_TEST_CONTROL_URL: ${CRASH_TEST_CONTROL_URL:?Set the Control URL}
+      CRASH_TEST_LOG_DIR: /state/reports
+    volumes:
+      - ${DOCKER_SOCKET:?Select the local Docker socket}:/var/run/docker.sock
+      - ${CRASH_TEST_STATE_DIR:?Select the state directory}:/state
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,httpx; r=httpx.get('http://127.0.0.1:9020/snapshot', headers={'Authorization':'Bearer '+os.environ['CRASH_TEST_HOOK_TOKEN']}, timeout=10); r.raise_for_status(); assert not r.json()['services_error']"]
+      interval: 5s
+      timeout: 12s
+      retries: 12
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: crash-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CRASH_TEST_DASHBOARD_PORT:-3020}:3000"
+    environment:
+      CRASH_TEST_URL: http://controller:9020
+      CRASH_TEST_TOKEN_FILE: /state/token
+      CRASH_TEST_APP_URL: ${CRASH_TEST_APP_URL:-http://localhost:3000}
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ${CRASH_TEST_STATE_DIR:?Select the state directory}:/state:ro
+    depends_on:
+      controller:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/crash-test', {signal: AbortSignal.timeout(5000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 6s
+      retries: 12
+      start_period: 20s

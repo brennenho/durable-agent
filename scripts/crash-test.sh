@@ -1,5 +1,5 @@
 #!/bin/sh
-# Both processes run on the host; no Compose containers are created or restarted.
+# The application must already exist. Docker mode starts only its crash-test controls.
 set -eu
 if [ "$#" -ne 0 ]; then
     echo 'Usage: ./scripts/crash-test.sh (configure with CRASH_TEST_* environment variables)' >&2
@@ -14,6 +14,11 @@ export CRASH_TEST_STATE_DIR="$state"
 export CRASH_TEST_PORT="$port"
 export CRASH_TEST_URL="http://127.0.0.1:$port"
 export CRASH_TEST_TOKEN_FILE="$state/token"
+case "${CRASH_TEST_MODE:-host}" in
+    docker) exec uv run --project backend --locked python -m crash_test.compose ;;
+    host) ;;
+    *) echo 'CRASH_TEST_MODE must be host or docker' >&2; exit 2 ;;
+esac
 uv run --project backend --locked python -m crash_test.host &
 controller=$!
 dashboard=

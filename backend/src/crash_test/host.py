@@ -46,6 +46,8 @@ def installed_projects(directory: Path) -> set[str]:
                 "-a",
                 "--filter",
                 f"label=com.docker.compose.project.working_dir={directory}",
+                "--filter",
+                "label=com.docker.compose.service=control",
                 "--format",
                 '{{.Label "com.docker.compose.project"}}',
             ],
@@ -55,7 +57,7 @@ def installed_projects(directory: Path) -> set[str]:
     )
 
 
-def serve():
+def controller_environment() -> dict[str, str]:
     repo = repository(Path.cwd())
     selected_directory = os.environ.get("CRASH_TEST_COMPOSE_DIRECTORY")
     directory = (
@@ -73,6 +75,11 @@ def serve():
     if not projects and not selected_directory and directory != repo:
         directory = repo
         projects = installed_projects(directory)
+    if not projects:
+        raise ValueError(
+            f"No application containers found in {directory}. "
+            "Run CRASH_TEST=1 ./scripts/dev-up.sh from that checkout first."
+        )
     project = os.environ.get("CRASH_TEST_PROJECT") or (
         next(iter(projects)) if len(projects) == 1 else None
     )
@@ -81,20 +88,26 @@ def serve():
             "Select an existing project with CRASH_TEST_PROJECT and CRASH_TEST_COMPOSE_DIRECTORY"
         )
     token_file = ensure_token()
-    os.environ.update(
-        {
-            "CRASH_TEST_PROJECT": project,
-            "CRASH_TEST_COMPOSE_DIRECTORY": str(directory),
-            "CRASH_TEST_HOOK_TOKEN": token_file.read_text().strip(),
-            "CRASH_TEST_LOG_DIR": str(token_file.parent / "reports"),
-            "CRASH_TEST_CONTROL_URL": os.environ.get("CONTROL_URL", "http://127.0.0.1:8000"),
-        }
-    )
-    print(f"Crash Test controls {project} in {directory}.", flush=True)
+    return {
+        "CRASH_TEST_PROJECT": project,
+        "CRASH_TEST_COMPOSE_DIRECTORY": str(directory),
+        "CRASH_TEST_STATE_DIR": str(token_file.parent),
+        "CRASH_TEST_HOOK_TOKEN": token_file.read_text().strip(),
+        "CRASH_TEST_LOG_DIR": str(token_file.parent / "reports"),
+        "CRASH_TEST_CONTROL_URL": os.environ.get("CONTROL_URL", "http://127.0.0.1:8000"),
+    }
+
+
+def serve():
+    os.environ.update(controller_environment())
+    print(f"Crash Test controls {os.environ['CRASH_TEST_PROJECT']}.", flush=True)
     uvicorn.run(
         "crash_test.app:app", host="0.0.0.0", port=int(os.environ.get("CRASH_TEST_PORT", 9020))
     )
 
 
 if __name__ == "__main__":
-    serve()
+    try:
+        serve()
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
