@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { ExecutionTimeline } from "./execution-timeline";
@@ -24,6 +25,17 @@ export function ChatTurn({
 
   return (
     <article aria-label="Chat turn" className="space-y-8">
+      {run.parent && (
+        <div aria-label="Subagent context" className="space-y-2 text-xs text-muted-foreground">
+          <Link
+            href={`/chats/${encodeURIComponent(run.parent.conversation_id)}`}
+            className="underline underline-offset-4"
+          >
+            Back to parent chat
+          </Link>
+          <p className="m-0">{run.parent.name} · Managed by the parent agent</p>
+        </div>
+      )}
       <div
         aria-label="Your message"
         className="ml-auto w-fit max-w-[90%] rounded-xl bg-muted px-4 py-3 whitespace-pre-wrap wrap-anywhere"
@@ -33,7 +45,7 @@ export function ChatTurn({
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
         <div className="mb-2 flex items-start justify-between gap-3">
           <h2 className="m-0 shrink-0 py-1.5 text-sm font-medium">Applied Agent</h2>
-          {!finished && <RunControls run={run} onUpdate={onUpdate} />}
+          {!finished && !run.parent && <RunControls run={run} onUpdate={onUpdate} />}
         </div>
         <details
           aria-label="Activity"
