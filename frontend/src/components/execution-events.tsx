@@ -23,7 +23,9 @@ export function ExecutionEvents({ events }: { events: ExecutionEvent[] }) {
           </div>
           {event.detail && <p className="my-1 text-xs text-muted-foreground">{event.detail}</p>}
           {event.workspaceVersionId && (
-            <p className="run-id my-1">Accepted workspace: {event.workspaceVersionId}</p>
+            <p className="run-id my-1">
+              {event.workspaceLabel ?? "Accepted workspace"}: {event.workspaceVersionId}
+            </p>
           )}
         </li>
       ))}

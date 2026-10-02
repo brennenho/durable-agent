@@ -5,14 +5,18 @@ import type { RunDetail } from "../lib/api";
 import { OperationInput, useOperationInput } from "./operation-input";
 import { AttemptMetadata, OperationOutput, OutputTechnical } from "./operation-output";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { operationEvents } from "../lib/execution-events";
-import { ExecutionEvents } from "./execution-events";
+import { OperationTimeline, useToolCheckpoint } from "./operation-timeline";
 
 type Operation = RunDetail["operations"][number];
 
 export function OperationInspection({ run, operation }: { run: RunDetail; operation: Operation }) {
   const [tab, setTab] = useState("output");
   const input = useOperationInput(run.id, operation.id, operation.kind);
+  const checkpoint = useToolCheckpoint(
+    run.id,
+    operation.id,
+    tab === "timeline" && operation.kind === "tool",
+  );
   return (
     <Tabs
       value={tab}
@@ -48,7 +52,7 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
         <OperationInput input={input} />
       </TabsContent>
       <TabsContent value="timeline">
-        <ExecutionEvents events={operationEvents(operation)} />
+        <OperationTimeline operation={operation} checkpoint={checkpoint} />
       </TabsContent>
       <TabsContent value="technical">
         <p className="run-id">Operation ID: {operation.id}</p>
