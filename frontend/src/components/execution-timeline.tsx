@@ -56,7 +56,11 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
             className="mt-1 size-3.5 shrink-0 text-muted-foreground group-open/step:rotate-90"
           />
           <span className="min-w-0 flex-1">
-            <OperationSummary operation={operation} status={run.status} />
+            <OperationSummary
+              operation={operation}
+              status={run.status}
+              pauseRequested={run.pause_requested}
+            />
             {operation.checkpoint && (
               <span className="mt-1 flex justify-end">
                 <BranchDialog run={run} operation={operation} />
@@ -113,7 +117,7 @@ export function ExecutionTimeline({ run }: { run: RunDetail }) {
           {run.model} ·{" "}
           <time dateTime={run.created_at}>{new Date(run.created_at).toLocaleString()}</time>
         </p>
-        {run.next_attempt_at && (
+        {run.next_attempt_at && !run.pause_requested && (
           <p className="text-xs">
             Retry eligible at {new Date(run.next_attempt_at).toLocaleString()}; starts when a worker
             claims it.

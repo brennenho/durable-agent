@@ -93,7 +93,9 @@ export function FollowUp({
           : blocked
             ? "Refreshing chat…"
             : active
-              ? "You can reply when the agent finishes."
+              ? conversation.pause_requested
+                ? "Resume the agent to finish before replying."
+                : "You can reply when the agent finishes."
               : undefined
       }
     />

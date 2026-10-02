@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, requestJson, type RunDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
 import { ChatWorkspace } from "./chat-workspace";
@@ -8,9 +8,19 @@ import { ChatWorkspace } from "./chat-workspace";
 export function RunDetailView({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const polling = useRef<AbortController | null>(null);
+
+  function updateRun(saved: RunDetail) {
+    polling.current?.abort();
+    setRun(saved);
+    setError(null);
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
+    polling.current = controller;
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
       let retry = true;
@@ -41,7 +51,7 @@ export function RunDetailView({ runId }: { runId: string }) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [runId]);
+  }, [runId, revision]);
 
   return (
     <ChatWorkspace runs={run ? [run] : []}>
@@ -56,7 +66,7 @@ export function RunDetailView({ runId }: { runId: string }) {
           </p>
         )}
         {!run && !error && <p role="status">Loading chat…</p>}
-        {run && <ChatTurn run={run} />}
+        {run && <ChatTurn run={run} onUpdate={updateRun} />}
       </div>
     </ChatWorkspace>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ApiError, requestJson, type ConversationDetail } from "../lib/api";
+import { ApiError, requestJson, type ConversationDetail, type RunDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
 import { ChatWorkspace } from "./chat-workspace";
 import { FollowUp } from "./follow-up";
@@ -16,6 +16,20 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const [awaitingRefresh, setAwaitingRefresh] = useState(false);
   const latestTurn = useRef<HTMLDivElement | null>(null);
   const scrollOnRefresh = useRef(false);
+  const polling = useRef<AbortController | null>(null);
+
+  function updateRun(saved: RunDetail) {
+    // Prevent a read started before the action from replacing its confirmed state.
+    polling.current?.abort();
+    setConversation((current) => {
+      if (!current) return current;
+      const runs = current.runs.map((run) => (run.id === saved.id ? saved : run));
+      const latest = runs[runs.length - 1];
+      return { ...current, runs, status: latest.status, pause_requested: latest.pause_requested };
+    });
+    setError(null);
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
     if (conversation && scrollOnRefresh.current) {
@@ -32,6 +46,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   useEffect(() => {
     const controller = new AbortController();
+    polling.current = controller;
     let timer: ReturnType<typeof setTimeout>;
     let refreshing = false;
     async function refresh() {
@@ -110,7 +125,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         {!conversation && !error && <p role="status">Loading chat…</p>}
         {conversation?.runs.map((run, index) => (
           <div key={run.id} ref={index === conversation.runs.length - 1 ? latestTurn : undefined}>
-            <ChatTurn run={run} />
+            <ChatTurn run={run} onUpdate={updateRun} />
           </div>
         ))}
       </div>

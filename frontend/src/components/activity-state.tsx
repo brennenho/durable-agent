@@ -48,21 +48,27 @@ export function OperationDuration({
 export function OperationSummary({
   operation,
   status,
+  pauseRequested,
 }: {
   operation: Operation;
   status: RunDetail["status"];
+  pauseRequested?: boolean;
 }) {
   const attempt = operation.attempts.at(-1);
   const running = !operation.completed_at && status !== "failed" && attempt?.status === "running";
+  const paused =
+    !operation.completed_at && pauseRequested && (status === "queued" || status === "retrying");
   const label = operation.completed_at
     ? "Completed"
     : status === "failed"
       ? "Stopped"
       : running
         ? "Running"
-        : status === "retrying"
-          ? "Retry pending"
-          : "Queued";
+        : paused
+          ? "Paused"
+          : status === "retrying"
+            ? "Retry pending"
+            : "Queued";
   const failure = operation.attempts.findLast((item) => item.status === "unknown" || item.error);
   const note =
     failure?.status === "unknown"
@@ -89,13 +95,15 @@ export function OperationSummary({
       {note && (
         <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
           {note}{" "}
-          {retried
-            ? operation.completed_at
-              ? "Retried."
-              : "Retrying the same operation."
-            : status === "retrying"
-              ? "Waiting to retry."
-              : ""}
+          {paused
+            ? "Retry waits for Resume."
+            : retried
+              ? operation.completed_at
+                ? "Retried."
+                : "Retrying the same operation."
+              : status === "retrying"
+                ? "Waiting to retry."
+                : ""}
         </span>
       )}
       {output?.status === "error" && (
@@ -118,7 +126,7 @@ export function operationName(operation: Operation) {
 
 export function ActivityStatus({ run }: { run: RunDetail }) {
   const active = run.status !== "succeeded" && run.status !== "failed";
-  const now = useNow(active);
+  const now = useNow(active && (!run.pause_requested || run.status === "running"));
   const index = run.operations.findIndex((operation) => !operation.completed_at);
   const operation = run.operations[index];
   const attempt = operation?.attempts.at(-1);
@@ -147,6 +155,8 @@ export function ActivityStatus({ run }: { run: RunDetail }) {
         : "";
     label = `${phase}${operation.kind === "tool" ? `: ${operationName(operation)}` : ""}${elapsed}`;
   }
+  if (active && run.pause_requested)
+    label = run.status === "running" ? "Pausing after this call…" : "Paused";
   return (
     <span role="status" aria-label="Execution status">
       {label}
