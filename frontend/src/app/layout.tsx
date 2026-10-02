@@ -11,9 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body>{process.env.CRASH_TEST_URL ? children : <AppShell>{children}</AppShell>}</body>
     </html>
   );
 }

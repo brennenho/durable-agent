@@ -60,7 +60,7 @@ response.raise_for_status()
     sleep 1
 done
 kill -0 "$controller" 2>/dev/null || { wait "$controller"; exit 1; }
-printf 'Dashboard: http://127.0.0.1:%s/crash-test\n' "${CRASH_TEST_DASHBOARD_PORT:-3020}"
+printf 'Crashboard: http://127.0.0.1:%s/\n' "${CRASH_TEST_DASHBOARD_PORT:-3020}"
 pnpm --dir frontend exec next dev --hostname 127.0.0.1 --port "${CRASH_TEST_DASHBOARD_PORT:-3020}" &
 dashboard=$!
 wait "$dashboard"

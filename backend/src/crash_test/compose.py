@@ -44,7 +44,7 @@ def start():
         check=True,
     )
     port = environment.get("CRASH_TEST_DASHBOARD_PORT", "3020")
-    print(f"Crashboard: http://127.0.0.1:{port}/crash-test", flush=True)
+    print(f"Crashboard: http://127.0.0.1:{port}/", flush=True)
     print(f"Running in Docker project {project}. Stop it from Docker Desktop.", flush=True)
 
 

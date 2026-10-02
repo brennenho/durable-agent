@@ -31,6 +31,25 @@ export function crashSnapshot(): CrashSnapshot {
   };
 }
 
+test("the dashboard homepage omits app navigation", async ({ page }) => {
+  let chatRequests = 0;
+  await page.route("**/api/conversations", (route) => {
+    chatRequests++;
+    return route.fulfill({ json: [] });
+  });
+  await page.route("**/crash-api/**", (route) => route.fulfill({ json: crashSnapshot() }));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Crashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Scenario", exact: true })).toBeEnabled();
+  await expect(page.getByRole("navigation", { name: "Previous chats" })).toHaveCount(0);
+  expect(chatRequests).toBe(0);
+  await expect(page.getByRole("link", { name: "Open app" })).toHaveAttribute(
+    "href",
+    process.env.CRASH_TEST_APP_URL ?? "http://localhost:3000",
+  );
+  await expect(page).toHaveTitle("Crashboard · Applied Agent");
+});
+
 test("scenario selection supports the keyboard and validates an existing run", async ({ page }) => {
   const snapshot = crashSnapshot();
   snapshot.scenarios.push({ name: "baseline", hook: "none", description: "Observe a normal run." });
@@ -39,7 +58,7 @@ test("scenario selection supports the keyboard and validates an existing run", a
     if (route.request().method() === "POST") requests.push(route.request().postDataJSON());
     return route.fulfill({ json: snapshot });
   });
-  await page.goto("/crash-test");
+  await page.goto("/");
   const select = page.getByRole("combobox", { name: "Scenario", exact: true });
   await expect(select).toBeEnabled();
   await expect(select).toHaveText("Baseline");
@@ -90,7 +109,7 @@ test("manual controls preserve target identity and expose failed actions", async
     }
     return route.fulfill({ json: snapshot });
   });
-  await page.goto("/crash-test");
+  await page.goto("/");
   await expect(page.getByRole("heading", { name: "Crashboard", exact: true })).toBeVisible();
   await expect(page.getByText("1 of 1 running", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Kill Tools", exact: true }).click();
@@ -133,7 +152,7 @@ test("scenarios lock manual controls, cancel, and retain observations offline on
     }
     return route.fulfill({ json: snapshot });
   });
-  await page.goto("/crash-test");
+  await page.goto("/");
   await page.getByRole("button", { name: "Arm scenario" }).click();
   await expect(page.getByRole("status")).toHaveText("Waiting for a run");
   await expect(page.getByRole("button", { name: "Kill Tools", exact: true })).toBeDisabled();
@@ -164,7 +183,7 @@ test("stopped sandboxes cannot be restarted and empty inventory stays explicit",
     },
   ];
   await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
-  await page.goto("/crash-test");
+  await page.goto("/");
   await expect(page.getByRole("button", { name: "Start Sandbox", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Start Sandbox", exact: true })).toHaveAttribute(
     "title",
@@ -217,7 +236,7 @@ test("timeline combines saved state and observed crashes, filters and downloads 
     ],
   };
   await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
-  await page.goto("/crash-test");
+  await page.goto("/");
   await expect(page).toHaveTitle("Crashboard · Applied Agent");
   const result = page.getByRole("region", { name: "Saved response lost", exact: true });
   await expect(result.getByRole("status")).toHaveText("inconclusive");
@@ -226,7 +245,7 @@ test("timeline combines saved state and observed crashes, filters and downloads 
   );
   await expect(result.getByRole("link", { name: "Open run" })).toHaveAttribute(
     "href",
-    `http://localhost:3000/runs/${runDetail.id}`,
+    `${process.env.CRASH_TEST_APP_URL ?? "http://localhost:3000"}/runs/${runDetail.id}`,
   );
   const timeline = page.getByRole("region", { name: "Execution timeline" });
   await expect(timeline.getByRole("listitem")).toHaveCount(3);
