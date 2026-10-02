@@ -36,6 +36,7 @@ class Session(Contract):
     checkpoints: dict[str, ToolCheckpoint]
     checks: dict[str, bool]
     events: list[Observation]
+    manual_intervention: bool = False
 
 
 class Snapshot(Contract):

@@ -24,11 +24,13 @@ class ScenarioRun:
         root: Path,
         *,
         run_id: UUID | None = None,
+        container_lock: asyncio.Lock | None = None,
     ):
         self.hook, _ = SCENARIOS[scenario]
         self.id, self.scenario = str(uuid4()), scenario
         self.docker, self.client = docker, client
         self.journal = Journal(root / f"{self.id}.jsonl")
+        self.container_lock = container_lock or asyncio.Lock()
         self.controller: FaultController | None = None
         self.run_id = run_id
         self.armed = False
@@ -53,6 +55,7 @@ class ScenarioRun:
             "checkpoints": self.checkpoints.copy(),
             "checks": self.checks.copy(),
             "events": self.journal.events.copy(),
+            "manual_intervention": any(e["kind"] == "manual_action" for e in self.journal.events),
         }
 
     async def observe_hook(self, event: HookEvent) -> HookReply:
@@ -84,7 +87,13 @@ class ScenarioRun:
             if not self.armed or self.controller is not None:
                 return HookReply(action="continue")
             self.run_id = event.run_id
-            self.controller = FaultController(self.docker, self.journal, self.run_id, self.hook)
+            self.controller = FaultController(
+                self.docker,
+                self.journal,
+                self.run_id,
+                self.hook,
+                container_lock=self.container_lock,
+            )
             self.selected.set()
         if self.controller:
             return await self.controller.observe(event)
@@ -100,7 +109,11 @@ class ScenarioRun:
                     raise DockerError("Start Control, Tools, workers and Postgres before arming")
                 if self.run_id:
                     self.controller = FaultController(
-                        self.docker, self.journal, self.run_id, self.hook
+                        self.docker,
+                        self.journal,
+                        self.run_id,
+                        self.hook,
+                        container_lock=self.container_lock,
                     )
                     self.selected.set()
                 await self.journal.record("armed", f"Scenario armed: {self.scenario}")
@@ -114,17 +127,18 @@ class ScenarioRun:
                         self.error = None
                         if self.run.status in {"succeeded", "failed"}:
                             await self.controller.close()
-                            self.checks = evaluate(self.run, self.controller)
-                            missed = self.hook and (
-                                not self.controller.killed or self.controller.error
-                            )
-                            self.status = (
-                                "inconclusive"
-                                if missed
-                                else "passed"
-                                if all(self.checks.values())
-                                else "failed"
-                            )
+                            async with self.container_lock:
+                                self.checks = evaluate(self.run, self.controller)
+                                missed = self.hook and (
+                                    not self.controller.killed or self.controller.error
+                                )
+                                self.status = (
+                                    "inconclusive"
+                                    if missed
+                                    else "passed"
+                                    if all(self.checks.values())
+                                    else "failed"
+                                )
                             break
                     except httpx.HTTPError as exc:
                         self.error = str(exc)
@@ -142,9 +156,11 @@ class ScenarioRun:
                     await self.controller.close()
             except Exception as exc:
                 self.status, self.error = "inconclusive", f"Recovery failed: {exc}"
-            await self.journal.record("verdict", f"Scenario {self.status}", detail=self.error)
-            report = json.dumps(self.snapshot(), indent=2) + "\n"
-            await asyncio.to_thread(self.journal.path.with_suffix(".json").write_text, report)
+            # An action already attributed to this scenario must finish before its report is saved.
+            async with self.container_lock:
+                await self.journal.record("verdict", f"Scenario {self.status}", detail=self.error)
+                report = json.dumps(self.snapshot(), indent=2) + "\n"
+                await asyncio.to_thread(self.journal.path.with_suffix(".json").write_text, report)
 
     async def observe(self, run_id: UUID):
         response = await self.client.get(f"/api/runs/{run_id}")

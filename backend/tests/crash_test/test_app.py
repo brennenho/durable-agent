@@ -46,7 +46,14 @@ def test_api_authentication_stale_selection_and_exclusive_scenarios(tmp_path):
                     assert (
                         await client.post("/scenarios", json={"scenario": "baseline"})
                     ).status_code == 409
-                    assert (await client.post("/containers/action", json=body)).status_code == 409
+                    body.update(action="kill", started_at=docker.containers["worker"].started_at)
+                    assert (await client.post("/containers/action", json=body)).status_code == 200
+                    assert not docker.containers["worker"].running and room.current.armed
+                    body["action"] = "start"
+                    assert (await client.post("/containers/action", json=body)).status_code == 200
+                    current = (await client.get("/snapshot")).json()["current"]
+                    assert current["manual_intervention"]
+                    assert len([e for e in current["events"] if e["kind"] == "manual_action"]) == 2
                     response = await client.post(
                         "/hooks",
                         json={

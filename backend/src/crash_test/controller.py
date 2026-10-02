@@ -39,7 +39,15 @@ class Journal:
 
 
 class FaultController:
-    def __init__(self, docker: DockerControl, journal: Journal, run_id: UUID, hook: str | None):
+    def __init__(
+        self,
+        docker: DockerControl,
+        journal: Journal,
+        run_id: UUID,
+        hook: str | None,
+        *,
+        container_lock: asyncio.Lock | None = None,
+    ):
         self.docker, self.journal, self.run_id, self.hook = docker, journal, run_id, hook
         self.operations: dict[UUID, int] = {}
         self.seen: set[UUID] = set()
@@ -48,6 +56,7 @@ class FaultController:
         self.error: str | None = None
         self.task: asyncio.Task | None = None
         self.closed = False
+        self.container_lock = container_lock or asyncio.Lock()
 
     async def observe(self, event: HookEvent) -> HookReply:
         if self.closed or event.event_id in self.seen:
@@ -86,6 +95,20 @@ class FaultController:
         return HookReply(action="continue")
 
     async def _kill_and_restore(self, event: HookEvent):
+        remaining = max(0, 8 - (datetime.now(UTC) - event.observed_at).total_seconds())
+        try:
+            async with asyncio.timeout(remaining):
+                await self.container_lock.acquire()
+        except TimeoutError:
+            self.error = "Hook boundary expired while waiting for a container action"
+            await self.journal.record("fault_error", "Fault injection failed", detail=self.error)
+            return
+        try:
+            await self._apply_fault(event)
+        finally:
+            self.container_lock.release()
+
+    async def _apply_fault(self, event: HookEvent):
         target = None
         attempted = False
         try:

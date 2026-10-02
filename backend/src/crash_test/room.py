@@ -20,6 +20,7 @@ class ControlRoom:
         self.current: ScenarioRun | None = None
         self.task: asyncio.Task | None = None
         self.mutation = asyncio.Lock()
+        self.container_lock = asyncio.Lock()
         self.inventory_lock = asyncio.Lock()
         self.services, self.services_at, self.services_error = [], None, None
         self.journal = Journal(root / "controls.jsonl")
@@ -46,7 +47,14 @@ class ControlRoom:
         self.require_idle()
         if name not in SCENARIOS:
             raise HTTPException(422, "Unknown scenario")
-        self.current = ScenarioRun(name, self.docker, self.client, self.root, run_id=run_id)
+        self.current = ScenarioRun(
+            name,
+            self.docker,
+            self.client,
+            self.root,
+            run_id=run_id,
+            container_lock=self.container_lock,
+        )
         current = self.current
         self.task = asyncio.create_task(current.execute())
         self.task.add_done_callback(lambda task: self._finished(task, current))
@@ -64,25 +72,33 @@ class ControlRoom:
             current.status, current.error = "inconclusive", f"Runner error: {error}"
 
     async def action(self, body: ContainerAction):
-        self.require_idle()
-        async with self.mutation:
+        if self.mutation.locked() or self.container_lock.locked():
+            raise HTTPException(409, "A container action is in progress. Try again shortly.")
+        async with self.mutation, self.container_lock:
+            journal = (
+                self.current.journal
+                if self.current and self.current.status == "running"
+                else self.journal
+            )
             target = await self.docker.inspect(body.id)
             if target.started_at != body.started_at:
                 raise HTTPException(409, "Container restarted since it was selected")
-            await self.journal.record(
-                "action_requested",
-                f"{body.action.title()} requested: {target.service}",
+            await journal.record(
+                "manual_action",
+                f"Manual {body.action} requested: {target.service}",
                 target=target.json(),
             )
             try:
                 result = await getattr(self.docker, body.action)(target)
             except (DockerError, OSError) as exc:
-                await self.journal.record("fault_error", "Container action failed", detail=str(exc))
+                await journal.record(
+                    "fault_error", "Manual container action failed", detail=str(exc)
+                )
                 raise
             label = "Process stopped" if body.action == "kill" else "Container started"
-            await self.journal.record(
+            await journal.record(
                 "kill_observed" if body.action == "kill" else "restart",
-                f"{label}: {target.service}",
+                f"Manual {label.lower()}: {target.service}",
                 target=result.json(),
             )
             return result

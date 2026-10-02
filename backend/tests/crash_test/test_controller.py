@@ -153,3 +153,24 @@ def test_superseded_hook_cannot_kill_after_target_resolution(tmp_path):
         assert "superseded" in controller.error
 
     asyncio.run(exercise())
+
+
+def test_fault_waiting_for_manual_action_expires_with_the_hook_window(tmp_path):
+    async def exercise():
+        docker, run, operation = Docker(), uuid4(), uuid4()
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), run, "tools.after_commit"
+        )
+        await controller.observe(event("worker.after_claim", operation, run))
+        async with controller.container_lock:
+            await controller.observe(
+                event(
+                    "tools.after_commit",
+                    operation,
+                    observed_at=datetime.now(UTC) - timedelta(seconds=7.8),
+                )
+            )
+        assert docker.kills == 0 and not controller.killed
+        assert "expired while waiting" in controller.error
+
+    asyncio.run(exercise())
