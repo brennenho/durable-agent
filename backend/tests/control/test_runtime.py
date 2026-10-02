@@ -42,6 +42,7 @@ def test_startup_recovers_saved_work_and_builds_frozen_config(postgres_engine, d
                 "write_file",
                 "list_files",
                 "run_command",
+                "delegate",
             }
             async with asyncio.timeout(3):
                 while True:
