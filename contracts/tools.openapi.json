@@ -222,12 +222,12 @@
           },
           "status": {
             "const": "error",
+            "default": "error",
             "title": "Status",
             "type": "string"
           }
         },
         "required": [
-          "status",
           "code",
           "message"
         ],
