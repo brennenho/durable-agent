@@ -120,6 +120,9 @@ without it, built-in command budgets retain their existing behavior.
   Each child summary adds `name`, `parent_operation_id`, and zero-based `child_index`.
   Children remain available through their run/conversation URLs but are excluded from
   top-level run and conversation lists. Each detail shows only that run's saved files.
+  SDK details also expose the exact submitted JSON as `input`, including null, false,
+  and empty values; use `agent` to distinguish SDK runs from legacy runs. Empty
+  custom-agent prompts use the agent name as the conversation title.
 - Operation view: `id`, `position`, `kind`, `created_at`, `completed_at?`, `result?`,
   `attempts[]`, `tool_name?`, `tool_target?` (path or command, at most 160 characters),
   and `checkpoint?`. A checkpoint contains `workspace_version_id` and appears only

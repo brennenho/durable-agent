@@ -189,6 +189,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
         parent=await parent_reference(session, run),
         children=await child_summaries(session, operations),
         final_answer=final_answer,
+        input=run.agent_input if config.agent is not None else None,
         output=output,
         workspace_version_id=version,
         max_attempts=config.max_attempts,

@@ -790,6 +790,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            input?: components["schemas"]["JsonValue"];
             /** Last Heartbeat At */
             last_heartbeat_at: string | null;
             /** Last Progress At */

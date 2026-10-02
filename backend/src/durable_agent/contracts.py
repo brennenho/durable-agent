@@ -240,6 +240,7 @@ class ChildRunSummary(RunSummary):
 
 
 class RunDetail(RunSummary):
+    input: JsonValue = None
     output: JsonValue = None
     parent: RunParent | None = None
     children: list[ChildRunSummary] = Field(default_factory=list)
