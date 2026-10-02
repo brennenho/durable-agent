@@ -72,6 +72,11 @@ def test_builtin_sdk_loop_preserves_tool_identity_history_and_followup():
             "history": (*ctx.history, to_step_result(uuid4(), tool, workspace)),
         }
     )
+    fork = invoke(agent.start, ctx.model_copy(update={"input": "Fork here"}))
+    assert fork.step.context == [
+        *third.step.context,
+        {"role": "user", "content": "Fork here"},
+    ]
     done = invoke(agent.advance, ctx, to_step_result(uuid4(), final, workspace))
     assert isinstance(done, Done)
     assert done.output == "hello"
