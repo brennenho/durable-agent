@@ -158,6 +158,10 @@ class AttemptView(Contract):
     usage: JsonObject | None = None
 
 
+class BranchCheckpoint(Contract):
+    workspace_version_id: UUID
+
+
 class OperationView(Contract):
     id: UUID
     position: NonNegativeInt
@@ -166,6 +170,7 @@ class OperationView(Contract):
     completed_at: UtcDatetime | None
     result: OperationResult | None
     attempts: list[AttemptView]
+    checkpoint: BranchCheckpoint | None = None
     tool_name: str | None = None
     tool_target: str | None = None
 

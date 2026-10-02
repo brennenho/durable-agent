@@ -3,6 +3,7 @@ from uuid import UUID
 import pytest
 from durable_agent.contracts import AgentConfig, ModelResult, PreviousTurn, ToolCall, ToolResult
 from durable_agent.harness import advance, start
+from durable_agent.harness.checkpoints import closed_rounds
 from durable_agent.harness.contracts import AgentState
 
 VERSION = UUID("00000000-0000-4000-8000-000000000001")
@@ -57,6 +58,49 @@ def tool(call_id="write", error=False):
         else {"status": "ok", "value": {"bytes_written": 2}}
     )
     return ToolResult(kind="tool", call_id=call_id, output=output, workspace_version_id=VERSION)
+
+
+def test_checkpoints_require_closed_rounds_and_include_completed_tool_errors(state):
+    first, second = call(), call("read", "read_file", {"path": "a.md"})
+    state.history = [model(first, second), tool()]
+    assert closed_rounds(state) == {}
+    state.history.append(tool("read", error=True))
+    before = state.model_dump()
+    assert closed_rounds(state) == {2: VERSION}
+    assert state.model_dump() == before
+    state.history.append(model(status="incomplete"))
+    assert closed_rounds(state) == {2: VERSION}
+    state.history[-1] = model()
+    assert closed_rounds(state) == {2: VERSION, 3: VERSION}
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        model(status="incomplete"),
+        model(call(name="unknown")),
+        model(call(), call()),
+        model(call(arguments={"path": "missing-content"})),
+        tool(),
+    ],
+)
+def test_invalid_results_are_not_checkpoints(state, result):
+    state.history = [result]
+    assert closed_rounds(state) == {}
+
+
+def test_checkpoint_validation_includes_previous_turn_call_ids(state):
+    state.previous_turns = [
+        PreviousTurn(prompt="Earlier", history=[model(call()), tool(), model()])
+    ]
+    state.history = [model(call()), tool()]
+    assert closed_rounds(state) == {}
+
+
+def test_final_tool_closes_round_at_turn_limit(state):
+    state.config.max_turns = 1
+    state.history = [model(call()), tool(error=True)]
+    assert closed_rounds(state) == {1: VERSION}
 
 
 def test_start_and_final_answer_are_pure(state):

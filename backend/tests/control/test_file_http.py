@@ -65,7 +65,6 @@ def test_saved_files_use_accepted_version_and_allow_seed_download(
     def tools(request):
         calls.append(request.url)
         if request.url.path.endswith("/files"):
-            assert str(version) in request.url.path
             return httpx.Response(200, json={"entries": entries})
         assert request.url.params["path"] == path
         return httpx.Response(200, content=content)
@@ -74,7 +73,14 @@ def test_saved_files_use_accepted_version_and_allow_seed_download(
     with TestClient(app) as client:
         listing = client.get(f"/api/runs/{run_id}/files")
         assert listing.json() == {"workspace_version_id": str(version), "entries": entries}
+        assert str(version) in calls[-1].path
         for allowed in [config.initial_workspace_version_id, *versions]:
+            historical = client.get(
+                f"/api/runs/{run_id}/files", params={"version_id": str(allowed)}
+            )
+            assert historical.status_code == 200
+            assert historical.json() == {"workspace_version_id": str(allowed), "entries": entries}
+            assert str(allowed) in calls[-1].path
             response = client.get(
                 f"/api/runs/{run_id}/file", params={"version_id": str(allowed), "path": path}
             )
@@ -95,7 +101,12 @@ def test_saved_files_use_accepted_version_and_allow_seed_download(
                 params={"version_id": str(unknown_version), "path": path},
             )
             assert response.status_code == 404
+            response = client.get(
+                f"/api/runs/{unknown_run}/files", params={"version_id": str(unknown_version)}
+            )
+            assert response.status_code == 404
         assert client.get(f"/api/runs/{uuid4()}/files").status_code == 404
+        assert client.get(f"/api/runs/{run_id}/files?version_id=invalid").status_code == 422
         assert len(calls) == before
 
 

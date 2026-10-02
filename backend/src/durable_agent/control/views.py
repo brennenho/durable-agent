@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from durable_agent.contracts import (
     AgentConfig,
     AttemptView,
+    BranchCheckpoint,
     ModelRequest,
     ModelResult,
     OperationInspection,
@@ -21,6 +22,7 @@ from durable_agent.contracts import (
 )
 from durable_agent.control.errors import ControlError
 from durable_agent.db.models import Attempt, Operation, Run
+from durable_agent.harness.checkpoints import closed_rounds
 from durable_agent.harness.contracts import AgentState
 
 RESULT = TypeAdapter(OperationResult)
@@ -59,6 +61,19 @@ def workspace_version(state: AgentState) -> UUID:
         if result.kind == "tool":
             return result.workspace_version_id
     return state.config.initial_workspace_version_id
+
+
+def branch_checkpoints(run: Run, operations: list[Operation]) -> dict[UUID, BranchCheckpoint]:
+    accepted = []
+    for operation in operations:
+        if operation.completed_at is None:
+            break
+        accepted.append(operation)
+    rounds = closed_rounds(restore_state(run, accepted))
+    return {
+        accepted[index].id: BranchCheckpoint(workspace_version_id=version)
+        for index, version in rounds.items()
+    }
 
 
 def summary(run: Run, last_progress: datetime | None) -> RunSummary:
@@ -156,6 +171,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
             AttemptView.model_validate(attempt, from_attributes=True)
         )
     state = restore_state(run, operations)
+    checkpoints = branch_checkpoints(run, operations)
     final = state.history[-1] if state.history else None
     progress = max((op.completed_at for op in operations if op.completed_at), default=None)
     return RunDetail(
@@ -174,6 +190,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
                 completed_at=op.completed_at,
                 result=op.result,
                 attempts=by_operation[op.id],
+                checkpoint=checkpoints.get(op.id),
                 **tool_summary(op),
             )
             for op in operations
