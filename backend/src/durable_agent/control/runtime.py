@@ -5,7 +5,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -14,6 +14,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 from durable_agent.contracts import AgentConfig, WorkspaceVersion
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.autoscaling import run_worker_pool
 from durable_agent.control.coordinator import advance_delegations
 from durable_agent.control.errors import ControlError
@@ -21,6 +22,7 @@ from durable_agent.control.recovery import recover_expired
 from durable_agent.crash_test import CrashTestHooks, HookInterrupted, open_hooks
 from durable_agent.db.session import Database
 from durable_agent.harness import ARGUMENTS
+from durable_agent.sdk.loading import load_app
 
 DATABASE_UNAVAILABLE = (InterfaceError, OperationalError, PoolTimeout)
 logger = logging.getLogger(__name__)
@@ -31,12 +33,16 @@ class Settings(BaseModel):
     tools_url: str
     model: str = Field(min_length=1)
     image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    agent_app: str | None = Field(default=None, min_length=1)
+    agent_build_id: str | None = Field(default=None, min_length=1)
     worker_autoscale: bool = False
     worker_project: str = ""
     worker_max: int = Field(default=4, ge=2)
 
     @model_validator(mode="after")
-    def require_worker_project(self):
+    def validate_deployment(self):
+        if (self.agent_app is None) != (self.agent_build_id is None):
+            raise ValueError("AGENT_APP and AGENT_BUILD_ID must be configured together")
         if self.worker_autoscale and not self.worker_project:
             raise ValueError("WORKER_POOL_PROJECT is required when worker autoscaling is enabled")
         return self
@@ -48,6 +54,8 @@ class Settings(BaseModel):
             tools_url=os.environ["TOOLS_URL"],
             model=os.environ["OPENAI_MODEL"],
             image_digest=os.environ["SANDBOX_IMAGE_DIGEST"],
+            agent_app=os.environ.get("AGENT_APP"),
+            agent_build_id=os.environ.get("AGENT_BUILD_ID"),
             worker_autoscale=os.environ.get("WORKER_AUTOSCALE", "false"),
             worker_project=os.environ.get("WORKER_POOL_PROJECT", ""),
             worker_max=os.environ.get("WORKER_MAX", "4"),
@@ -60,6 +68,7 @@ class Runtime:
     tools: httpx.AsyncClient
     settings: Settings
     hooks: CrashTestHooks | None = None
+    agents: AgentRuntime = field(default_factory=AgentRuntime)
 
     async def tools_get(self, path: str, *, params: dict[str, str] | None = None) -> httpx.Response:
         try:
@@ -74,7 +83,7 @@ class Runtime:
             raise ControlError(503, "tools_unavailable", "Tool service unavailable", retryable=True)
         return response
 
-    async def new_config(self) -> AgentConfig:
+    async def new_config(self, agent: str | None = None) -> AgentConfig:
         response = await self.tools_get("/tools/workspace/initial")
         try:
             seed = WorkspaceVersion.model_validate_json(response.content).workspace_version_id
@@ -85,7 +94,7 @@ class Runtime:
                 "Tool service returned an invalid workspace",
                 retryable=True,
             ) from exc
-        return AgentConfig(
+        config = AgentConfig(
             model=self.settings.model,
             model_params={"max_output_tokens": 4096},
             tool_schemas=[
@@ -116,6 +125,7 @@ class Runtime:
             max_turns=20,
             call_timeout_seconds=120,
         )
+        return self.agents.freeze(config, agent) if agent is not None else config
 
 
 async def recovery_loop(db: Database) -> None:
@@ -149,6 +159,15 @@ async def delegation_loop(db: Database, hooks: CrashTestHooks) -> None:
 async def open_runtime(
     settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
 ) -> AsyncIterator[Runtime]:
+    agents = (
+        AgentRuntime(
+            await asyncio.to_thread(load_app, settings.agent_app),
+            settings.agent_app,
+            settings.agent_build_id,
+        )
+        if settings.agent_app is not None
+        else AgentRuntime()
+    )
     db = Database(settings.database_url)
     try:
         async with db.session() as session:
@@ -173,7 +192,7 @@ async def open_runtime(
                 )
                 delegation = tasks.create_task(delegation_loop(db, hooks))
                 try:
-                    yield Runtime(db, tools, settings, hooks)
+                    yield Runtime(db, tools, settings, hooks, agents)
                 finally:
                     recovery.cancel()
                     if scaling:
