@@ -3,9 +3,16 @@
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
 
-from durable_agent.contracts import ToolError, ToolOutput, ToolSuccess
+from durable_agent.contracts import (
+    ListFilesArguments,
+    ReadFileArguments,
+    ToolError,
+    ToolOutput,
+    ToolSuccess,
+    WriteFileArguments,
+)
 from durable_agent.tools.archives import (
     InvalidWorkspace,
     capture_workspace,
@@ -21,28 +28,19 @@ class InvalidToolCall(ValueError):
     pass
 
 
-class FileArgs(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    path: str
-
-
-class ListArgs(FileArgs):
-    path: str = "."
-
-
-class WriteArgs(FileArgs):
-    content: str
-
-
 def execute_file_tool(
     archive: bytes, name: str, arguments: dict, max_bytes: int
 ) -> tuple[ToolOutput, bytes | None]:
     """Return the output and an updated checkpoint, or None when files are unchanged."""
-    schemas = {"list_files": ListArgs, "read_file": FileArgs, "write_file": WriteArgs}
+    schemas = {
+        "list_files": ListFilesArguments,
+        "read_file": ReadFileArguments,
+        "write_file": WriteFileArguments,
+    }
     if name not in schemas:
         raise InvalidToolCall(f"Unknown file tool: {name}")
     try:
-        args = schemas[name].model_validate(arguments)
+        args = schemas[name].model_validate(arguments, strict=True)
     except ValidationError as exc:
         raise InvalidToolCall(f"Invalid arguments for {name}: {exc}") from exc
     try:
