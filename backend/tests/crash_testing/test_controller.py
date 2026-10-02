@@ -1,0 +1,155 @@
+import asyncio
+import json
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
+
+from durable_agent.crash_test import HookEvent
+from durable_agent.crash_testing.controller import FaultController, Journal
+from durable_agent.crash_testing.docker import Container, DockerError
+
+
+class Docker:
+    def __init__(self):
+        self.target = Container(
+            "tools-id", "tools", "tools", "host", True, "2026-01-01T00:00:00Z", 0, "none"
+        )
+        self.kills, self.starts = 0, 0
+        self.reached, self.release = asyncio.Event(), asyncio.Event()
+
+    async def inventory(self):
+        return [self.target]
+
+    async def inspect(self, container):
+        return self.target
+
+    async def kill(self, target):
+        self.kills += 1
+        self.reached.set()
+        await self.release.wait()
+        self.target = replace(target, running=False, exit_code=137)
+        return self.target
+
+    async def start(self, target):
+        self.starts += 1
+        self.target = replace(target, running=True)
+        return self.target
+
+
+def event(name, operation, run=None, generation=1, **kwargs):
+    return HookEvent(
+        name=name,
+        service="worker" if run else "tools",
+        instance="host",
+        pid=1,
+        run_id=run,
+        operation_id=operation,
+        lease_generation=generation,
+        **kwargs,
+    )
+
+
+def test_rule_is_scoped_consumed_once_and_survives_request_cancellation(tmp_path):
+    async def exercise():
+        docker, journal, run, operation = (
+            Docker(),
+            Journal(tmp_path / "events.jsonl"),
+            uuid4(),
+            uuid4(),
+        )
+        controller = FaultController(docker, journal, run, "tools.after_commit")
+        await controller.observe(event("tools.after_commit", operation))
+        await controller.observe(event("worker.after_claim", operation, uuid4()))
+        assert not journal.events
+        await controller.observe(event("worker.after_claim", operation, run))
+        await controller.observe(event("tools.after_commit", operation, uuid4()))
+        assert docker.kills == 0
+        stale = event(
+            "tools.after_commit", operation, observed_at=datetime.now(UTC) - timedelta(seconds=20)
+        )
+        await controller.observe(stale)
+        assert docker.kills == 0
+        trigger = event("tools.after_commit", operation)
+        pending = asyncio.create_task(controller.observe(trigger))
+        await asyncio.wait_for(docker.reached.wait(), 1)
+        pending.cancel()
+        await asyncio.gather(pending, return_exceptions=True)
+        await controller.observe(trigger)
+        await controller.observe(event("tools.after_commit", operation))
+        docker.release.set()
+        await controller.close()
+        assert docker.kills == docker.starts == 1
+        assert controller.killed and controller.error is None
+        kinds = [e["kind"] for e in journal.events]
+        assert kinds.index("kill_requested") < kinds.index("kill_observed") < kinds.index("restart")
+        assert [
+            json.loads(line) for line in journal.path.read_text().splitlines()
+        ] == journal.events
+
+    asyncio.run(exercise())
+
+
+def test_failed_kill_is_not_reported_as_observed(tmp_path):
+    async def exercise():
+        docker, run, operation = Docker(), uuid4(), uuid4()
+
+        async def failed(target):
+            raise DockerError("Docker offline")
+
+        docker.kill = failed
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), run, "tools.after_commit"
+        )
+        await controller.observe(event("worker.after_claim", operation, run, generation=2))
+        await controller.observe(event("tools.after_commit", operation, generation=1))
+        assert controller.trigger is None
+        await controller.observe(event("tools.after_commit", operation, generation=2))
+        assert not controller.killed and controller.error == "Docker offline"
+        assert "kill_observed" not in [e["kind"] for e in controller.journal.events]
+
+    asyncio.run(exercise())
+
+
+def test_close_disarms_hook_waiting_on_journal(tmp_path):
+    async def exercise():
+        docker, run, operation = Docker(), uuid4(), uuid4()
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), run, "tools.after_commit"
+        )
+        await controller.observe(event("worker.after_claim", operation, run))
+        async with controller.journal.lock:
+            pending = asyncio.create_task(
+                controller.observe(event("tools.after_commit", operation))
+            )
+            await asyncio.sleep(0)
+            await controller.close()
+        await pending
+        assert controller.trigger is None and docker.kills == 0
+
+    asyncio.run(exercise())
+
+
+def test_superseded_hook_cannot_kill_after_target_resolution(tmp_path):
+    async def exercise():
+        docker, run, operation = Docker(), uuid4(), uuid4()
+        selected, release = asyncio.Event(), asyncio.Event()
+
+        async def inventory():
+            selected.set()
+            await release.wait()
+            return [docker.target]
+
+        docker.inventory = inventory
+        controller = FaultController(
+            docker, Journal(tmp_path / "events.jsonl"), run, "tools.after_commit"
+        )
+        await controller.observe(event("worker.after_claim", operation, run))
+        pending = asyncio.create_task(controller.observe(event("tools.after_commit", operation)))
+        await selected.wait()
+        await controller.observe(event("worker.after_claim", operation, run, generation=2))
+        release.set()
+        await pending
+        assert docker.kills == 0 and not controller.killed
+        assert "superseded" in controller.error
+
+    asyncio.run(exercise())
