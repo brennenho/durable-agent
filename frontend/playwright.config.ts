@@ -9,7 +9,9 @@ const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./tests",
   testMatch: process.env.CRASH_TEST_URL ? ["**/crash-*.spec.ts"] : undefined,
-  testIgnore: process.env.CRASH_TEST_URL ? undefined : ["**/crash-test.spec.ts"],
+  testIgnore: process.env.CRASH_TEST_URL
+    ? undefined
+    : ["**/crash-test.spec.ts", "**/crash-subagents.spec.ts"],
   forbidOnly: Boolean(process.env.CI),
   workers: 1,
   use: { baseURL, trace: "retain-on-failure" },

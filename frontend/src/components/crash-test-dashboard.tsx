@@ -148,7 +148,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
         </div>
         <div className="min-w-0 space-y-5 lg:col-start-1 lg:row-start-1">
           <CrashTestResult session={current} appUrl={appUrl} />
-          {snapshot && <CrashTestTimeline snapshot={snapshot} />}
+          {snapshot && <CrashTestTimeline snapshot={snapshot} appUrl={appUrl} />}
         </div>
       </div>
     </main>

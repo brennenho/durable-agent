@@ -2,7 +2,13 @@ import type { ExecutionEvent } from "../lib/execution-events";
 import { cn } from "../lib/utils";
 import { TimelineStamp } from "./timeline-stamp";
 
-export function ExecutionEvents({ events }: { events: ExecutionEvent[] }) {
+export function ExecutionEvents({
+  events,
+  appUrl = "",
+}: {
+  events: ExecutionEvent[];
+  appUrl?: string;
+}) {
   return (
     <ol
       aria-label="Execution milestones"
@@ -12,6 +18,16 @@ export function ExecutionEvents({ events }: { events: ExecutionEvent[] }) {
         <li key={event.id} className="col-span-3 grid grid-cols-subgrid" data-event-id={event.id}>
           <TimelineStamp at={event.at} label={event.label} failed={event.failed} />
           <div className="min-w-0 py-3.5 text-xs">
+            {event.runId && event.runName && (
+              <a
+                href={`${appUrl}/runs/${encodeURIComponent(event.runId)}`}
+                target={appUrl ? "_blank" : undefined}
+                rel={appUrl ? "noreferrer" : undefined}
+                className="mb-1 block text-muted-foreground underline underline-offset-4 wrap-anywhere"
+              >
+                {event.runName}
+              </a>
+            )}
             <span className={cn("font-medium", event.failed && "text-destructive")}>
               {event.label}
             </span>

@@ -47,9 +47,11 @@ export function useToolCheckpoint(runId: string, operationId: string, enabled: b
 export function OperationTimeline({
   operation,
   checkpoint,
+  subagents,
 }: {
   operation: RunDetail["operations"][number];
   checkpoint: ReturnType<typeof useToolCheckpoint>;
+  subagents?: RunDetail["children"];
 }) {
   const { saved, checkedAt, error } = checkpoint;
   return (
@@ -82,7 +84,7 @@ export function OperationTimeline({
           )}
         </div>
       )}
-      <ExecutionEvents events={operationEvents(operation, saved)} />
+      <ExecutionEvents events={operationEvents(operation, saved, subagents)} />
     </>
   );
 }

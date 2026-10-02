@@ -52,7 +52,7 @@ export function OperationInspection({ run, operation }: { run: RunDetail; operat
         <OperationInput input={input} />
       </TabsContent>
       <TabsContent value="timeline">
-        <OperationTimeline operation={operation} checkpoint={checkpoint} />
+        <OperationTimeline operation={operation} checkpoint={checkpoint} subagents={run.children} />
       </TabsContent>
       <TabsContent value="technical">
         <p className="run-id">Operation ID: {operation.id}</p>
