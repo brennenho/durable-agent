@@ -26,6 +26,7 @@ class Engine:
         self.requests = []
         self.created = []
         self.lose_create_ack = False
+        self.create_conflict = False
 
     def handle(self, request):
         self.requests.append(request)
@@ -41,6 +42,9 @@ class Engine:
             slot = payload["Labels"][NUMBER]
             assert request.url.params["name"] == f"test-worker-{slot}"
             self.workers[slot] = {"Id": slot, "Labels": payload["Labels"], "State": "created"}
+            if self.create_conflict:
+                self.create_conflict = False
+                return httpx.Response(409)
             if self.lose_create_ack:
                 self.lose_create_ack = False
                 raise httpx.ReadTimeout("Create acknowledgment lost")
@@ -104,19 +108,38 @@ def test_resize_reuses_slots_after_control_restart_and_only_retires_managed_extr
     asyncio.run(exercise())
 
 
-def test_lost_create_ack_does_not_create_an_extra_worker():
+@pytest.mark.parametrize("conflict", [False, True])
+def test_lost_create_ack_or_name_conflict_does_not_create_an_extra_worker(conflict):
     async def exercise():
         engine = Engine()
-        engine.lose_create_ack = True
+        engine.lose_create_ack, engine.create_conflict = not conflict, conflict
         async with httpx.AsyncClient(
             base_url="http://docker", transport=httpx.MockTransport(engine.handle)
         ) as client:
-            with pytest.raises(httpx.ReadTimeout):
+            with pytest.raises(WorkerPoolError if conflict else httpx.ReadTimeout):
                 await DockerWorkers(client, "test", 4).resize(4)
             assert engine.workers["3"]["State"] == "created"
             await DockerWorkers(client, "test", 4).resize(4)
             assert len(engine.created) == 2
             assert all(w["State"] == "running" for w in engine.workers.values())
+
+    asyncio.run(exercise())
+
+
+def test_stopped_baseline_is_restarted_before_extra_workers_stop():
+    async def exercise():
+        engine = Engine()
+        async with httpx.AsyncClient(
+            base_url="http://docker", transport=httpx.MockTransport(engine.handle)
+        ) as client:
+            pool = DockerWorkers(client, "test", 4)
+            await pool.resize(4)
+            engine.workers["1"]["State"] = "exited"
+            engine.requests.clear()
+            await pool.resize(2)
+            mutations = [r.url.path for r in engine.requests if r.method != "GET"]
+            assert mutations[0] == "/v1.47/containers/1/start"
+            assert set(engine.workers) == {"1", "2"}
 
     asyncio.run(exercise())
 

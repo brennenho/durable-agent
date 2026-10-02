@@ -46,11 +46,19 @@ services:
       TOOLS_URL: http://tools:8001
       OPENAI_MODEL: ${OPENAI_MODEL:?Set OPENAI_MODEL in .env}
       SANDBOX_IMAGE_DIGEST: ${SANDBOX_IMAGE_DIGEST:-}
+      WORKER_AUTOSCALE: ${WORKER_AUTOSCALE:-true}
+      WORKER_POOL_PROJECT: ${COMPOSE_PROJECT_NAME:-durable-agent}
+      WORKER_MAX: ${WORKER_MAX:-4}
+    volumes:
+      - ./backend/src:/app/backend/src:ro
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     depends_on:
       migrate:
         condition: service_completed_successfully
       tools:
         condition: service_healthy
+      worker:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=2)"]
       interval: 5s
@@ -88,14 +96,14 @@ services:
 
   worker:
     <<: *backend
+    scale: 2
     command: ["python", "-m", "durable_agent.worker"]
+    stop_grace_period: 1000s
     environment:
       CONTROL_URL: http://control:8000
       TOOLS_URL: http://tools:8001
       OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env}
     depends_on:
-      control:
-        condition: service_healthy
       tools:
         condition: service_healthy
 

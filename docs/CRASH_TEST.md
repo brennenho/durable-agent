@@ -1,5 +1,10 @@
 # Crash Test hooks
 
+Control emits `control.before_scale` before each worker-pool reconciliation. Returning
+`interrupt` skips that pass without stopping existing workers or changing run recovery.
+The next pass checks the hook again. A resize already in progress may finish. As with
+other hooks, a missing controller leaves normal execution enabled.
+
 Crash Test is the name for the fault-injection dashboard and scenario controller.
 The optional hook client is independent of application persistence: no new database,
 no event table, and no hook code in the pure harness.

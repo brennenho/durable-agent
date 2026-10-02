@@ -53,6 +53,10 @@ class DockerWorkers:
         # Compose creates the two baseline workers after Control becomes ready.
         if not {1, 2}.issubset(slots):
             raise WorkerPoolError("Waiting for Compose's two baseline workers")
+        # Repair stopped baseline capacity before retiring any surplus workers.
+        for slot, worker in slots.items():
+            if slot <= desired and worker["State"] in {"created", "exited"}:
+                await self._request("POST", f"/containers/{worker['Id']}/start")
         for slot, worker in sorted(slots.items(), reverse=True):
             if slot <= desired or worker["Labels"].get(MANAGED) != self.project:
                 continue
@@ -67,8 +71,6 @@ class DockerWorkers:
             del slots[slot]
         for slot in range(1, desired + 1):
             if slot in slots:
-                if slots[slot]["State"] in {"created", "exited"}:
-                    await self._request("POST", f"/containers/{slots[slot]['Id']}/start")
                 continue
             if len(slots) >= self.maximum:
                 break
@@ -102,7 +104,7 @@ class DockerWorkers:
             # A previous request may have created the slot but lost its acknowledgment.
             # Re-list on the next pass; never pick another name and exceed the cap.
             if response.status_code == 409:
-                return
+                raise WorkerPoolError("Worker slot already exists; reconcile again before creating")
             if response.is_error:
                 raise WorkerPoolError(f"Docker create returned {response.status_code}")
             container_id = response.json()["Id"]

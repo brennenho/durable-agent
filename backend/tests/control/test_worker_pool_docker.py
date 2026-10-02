@@ -6,14 +6,19 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from durable_agent.control.autoscaling import scale_workers
 from durable_agent.control.worker_pool import NUMBER, PROJECT, SERVICE, DockerWorkers
+from durable_agent.db.models import Run
+from sqlalchemy import update
+
+from .test_leases import queued
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("TEST_DOCKER_SOCKET"), reason="Set TEST_DOCKER_SOCKET for a real Docker test"
 )
 
 
-def test_real_docker_grows_adopts_and_drains_pool():
+def test_real_docker_grows_adopts_and_drains_pool(database, config):
     async def exercise():
         project = f"worker-pool-test-{uuid4().hex[:12]}"
         transport = httpx.AsyncHTTPTransport(uds=os.environ["TEST_DOCKER_SOCKET"])
@@ -58,6 +63,31 @@ def test_real_docker_grows_adopts_and_drains_pool():
                 after = await pool.inventory()
                 assert {w["Labels"][NUMBER] for w in after} == {"1", "2"}
                 assert all(w["State"] == "running" for w in after)
+                async with database() as db:
+                    for _ in range(6):
+                        await queued(db, config)
+                    task = asyncio.create_task(scale_workers(db, pool, interval=0.01, down_delay=0))
+
+                    async def wait_for_size(size):
+                        async with asyncio.timeout(10):
+                            while True:
+                                inventory = await pool.inventory()
+                                if len(inventory) == size and all(
+                                    w["State"] == "running" for w in inventory
+                                ):
+                                    return
+                                await asyncio.sleep(0.01)
+
+                    try:
+                        await wait_for_size(4)
+                        async with db.session() as session:
+                            await session.execute(update(Run).values(pause_requested=True))
+                            await session.commit()
+                        await wait_for_size(2)
+                    finally:
+                        task.cancel()
+                        with pytest.raises(asyncio.CancelledError):
+                            await task
             finally:
                 for worker in await pool.inventory():
                     removed = await client.delete(
