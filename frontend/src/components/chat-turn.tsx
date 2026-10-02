@@ -1,15 +1,8 @@
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { RunHistory } from "./run-history";
+import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
-
-const statusLabels = {
-  queued: "Waiting to start",
-  running: "Working",
-  retrying: "Retrying",
-  succeeded: "Completed",
-  failed: "Stopped",
-};
 
 export function ChatTurn({ run }: { run: RunDetail }) {
   const finished = run.status === "succeeded" || run.status === "failed";
@@ -31,9 +24,7 @@ export function ChatTurn({ run }: { run: RunDetail }) {
               aria-hidden="true"
               className="size-3.5 transition-transform group-open:rotate-90"
             />
-            <span role="status" aria-label="Execution status">
-              {statusLabels[run.status]}
-            </span>
+            <ActivityStatus run={run} />
             {completed > 0 && (
               <span>
                 · {completed} {completed === 1 ? "step" : "steps"}
@@ -46,7 +37,7 @@ export function ChatTurn({ run }: { run: RunDetail }) {
               {run.model} ·{" "}
               <time dateTime={run.created_at}>{new Date(run.created_at).toLocaleString()}</time>
             </p>
-            <RunHistory operations={run.operations} status={run.status} />
+            <RunHistory run={run} />
           </div>
         </details>
         {run.terminal_error && (
@@ -57,9 +48,6 @@ export function ChatTurn({ run }: { run: RunDetail }) {
           >
             {run.terminal_error.message}
           </p>
-        )}
-        {run.status === "retrying" && (
-          <p className="text-sm text-muted-foreground">The last attempt failed. Retrying…</p>
         )}
         <section aria-label="Final output" className="m-0 border-0 bg-transparent p-0">
           {run.final_answer !== null ? (
