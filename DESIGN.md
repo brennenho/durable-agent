@@ -3,6 +3,8 @@
 ## Overall Design
 
 Run agents that write code and edit documents. Each run has a workspace: the files the agent is working on.
+A conversation contains ordered runs, one per user prompt. Follow-ups reuse accepted
+history and saved files; only one run can be active in a conversation.
 
 After each tool call, save its result and workspace together. If the sandbox crashes, restore the last saved workspace and retry the interrupted call. Completed calls are reused.
 
