@@ -145,8 +145,9 @@ This enables hooks on the same Compose project and database. It may
 recreate service containers to apply their environment, like a normal development
 restart. Internal startup in `crash_test.host` discovers an existing Compose project
 whose directory belongs to this Git repository. It starts only the host controller;
-it never creates containers. Dashboard launch and controls are supplied by the
-following dashboard changes; there is no operator CLI.
+it never creates containers. `./scripts/crash-test.sh` starts the controller and
+dashboard together, waits for authenticated readiness, and stops both on Ctrl-C.
+Scenario selection, status, and cancellation are handled through the dashboard.
 
 For another checkout or project, set `CRASH_TEST_COMPOSE_DIRECTORY` and
 `CRASH_TEST_PROJECT` on the launcher. For a nondefault Control port, set `CONTROL_URL`.
