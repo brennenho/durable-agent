@@ -171,6 +171,74 @@ test("manual controls preserve target identity and expose failed actions", async
   await expect(page.getByText("stopped", { exact: true })).toBeVisible();
 });
 
+test("failed action confirmation keeps stale controls locked until a fresh snapshot arrives", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const snapshot = crashSnapshot();
+  const beforeAction = structuredClone(snapshot);
+  let actionRequests = 0;
+  let holdPoll = false;
+  let oldPollStarted = false;
+  let oldPollReturned = false;
+  let confirmationFailed = false;
+  let recoveryStarted = false;
+  let releaseOldPoll!: () => void;
+  let releaseRecovery!: () => void;
+  const oldPoll = new Promise<void>((resolve) => {
+    releaseOldPoll = resolve;
+  });
+  const recovery = new Promise<void>((resolve) => {
+    releaseRecovery = resolve;
+  });
+  await page.route("**/crash-api/**", async (route) => {
+    if (route.request().method() === "POST") {
+      actionRequests++;
+      snapshot.services[0].running = false;
+      return route.fulfill({ json: snapshot.services[0] });
+    }
+    if (actionRequests) {
+      if (!confirmationFailed) {
+        confirmationFailed = true;
+        return route.fulfill({ status: 503, json: { detail: "Snapshots unavailable" } });
+      }
+      recoveryStarted = true;
+      await recovery;
+    } else if (holdPoll) {
+      oldPollStarted = true;
+      await oldPoll;
+      await route.fulfill({ json: beforeAction });
+      oldPollReturned = true;
+      return;
+    }
+    return route.fulfill({ json: snapshot });
+  });
+  await page.goto("/");
+  const kill = page.getByRole("button", { name: "Kill Tools", exact: true });
+  await expect(kill).toBeEnabled();
+  holdPoll = true;
+  await page.clock.fastForward(1500);
+  await expect.poll(() => oldPollStarted).toBe(true);
+  await kill.click();
+  await expect.poll(() => recoveryStarted).toBe(true);
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(kill).toBeDisabled();
+  await expect(alert).toHaveText("Snapshots unavailable Showing the last observations.");
+  await expect(page.getByText("Last known state", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Arm scenario" })).toBeDisabled();
+  await expect(page.getByRole("switch", { name: "Allow autoscaling" })).toBeDisabled();
+
+  releaseOldPoll();
+  await expect.poll(() => oldPollReturned).toBe(true);
+  await expect(alert).toBeVisible();
+  await expect(kill).toBeDisabled();
+  releaseRecovery();
+  await expect(page.getByRole("button", { name: "Start Tools", exact: true })).toBeEnabled();
+  await expect(alert).toHaveCount(0);
+  await expect(page.getByText("0 of 1 running", { exact: true })).toBeVisible();
+  expect(actionRequests).toBe(1);
+});
+
 test("status dots pulse only while their data is live and motion is allowed", async ({ page }) => {
   await page.clock.install();
   const snapshot = crashSnapshot();

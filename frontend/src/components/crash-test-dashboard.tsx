@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { crashRequest, type CrashSnapshot } from "../lib/crash-test";
 import { Button } from "./ui/button";
@@ -17,44 +17,45 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const refreshSnapshot = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const next = await crashRequest<CrashSnapshot>("snapshot", undefined, signal);
+      if (!signal?.aborted) {
+        setSnapshot(next);
+        setConnectionError(null);
+      }
+    } catch (error) {
+      if (!signal?.aborted)
+        setConnectionError(error instanceof Error ? error.message : "Controller unavailable");
+    }
+  }, []);
+
   useEffect(() => {
     if (pending) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
-      try {
-        const next = await crashRequest<CrashSnapshot>("snapshot", undefined, controller.signal);
-        if (!controller.signal.aborted) {
-          setSnapshot(next);
-          setConnectionError(null);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted)
-          setConnectionError(error instanceof Error ? error.message : "Controller unavailable");
-      } finally {
-        if (!controller.signal.aborted) timer = setTimeout(poll, 1500);
-      }
+      await refreshSnapshot(controller.signal);
+      if (!controller.signal.aborted) timer = setTimeout(poll, 1500);
     }
     void poll();
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [pending]);
+  }, [pending, refreshSnapshot]);
 
   async function act(path: string, body: unknown) {
     setPending(true);
     setActionError(null);
     try {
       await crashRequest(path, body);
-      // Keep actions locked until the controller confirms the resulting state.
-      setSnapshot(await crashRequest<CrashSnapshot>("snapshot"));
-      setConnectionError(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Action failed");
-    } finally {
-      setPending(false);
     }
+    // A failed refresh retains observations and locks controls until polling recovers.
+    await refreshSnapshot();
+    setPending(false);
   }
 
   const current = snapshot?.current;
