@@ -8,7 +8,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from pydantic import ConfigDict, ValidationError
+from pydantic import ValidationError
 
 from durable_agent.contracts import RunCommandArguments, SandboxConfig, ToolError, ToolOutput
 from durable_agent.tools.archives import (
@@ -22,10 +22,6 @@ from durable_agent.tools.runner import DockerRunner, SandboxConfiguration
 
 class InvalidCommand(ValueError):
     pass
-
-
-class CommandArgs(RunCommandArguments):
-    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 def prepare_workspace_root(path: Path) -> None:
@@ -64,7 +60,7 @@ async def execute_command_tool(
     on_started: Callable[[str], Awaitable[None]] | None = None,
 ) -> tuple[ToolOutput, bytes | None]:
     try:
-        args = CommandArgs.model_validate(arguments)
+        args = RunCommandArguments.model_validate(arguments, strict=True)
     except ValidationError as exc:
         raise InvalidCommand(f"Invalid run_command arguments: {exc}") from exc
     if "\0" in args.command:

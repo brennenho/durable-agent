@@ -1,10 +1,9 @@
 import asyncio
 
 import pytest
-from durable_agent.contracts import SandboxConfig
+from durable_agent.contracts import RunCommandArguments, SandboxConfig
 from durable_agent.tools.archives import InvalidWorkspace, capture_workspace, unpack_workspace
 from durable_agent.tools.commands import (
-    CommandArgs,
     InvalidCommand,
     execute_command_tool,
     prepare_workspace_root,
@@ -109,7 +108,8 @@ def test_invalid_command_schema_fails_before_launch(saved_input, arguments):
     "arguments,expected", [({}, 120), ({"timeout_seconds": 1}, 1), ({"timeout_seconds": 900}, 900)]
 )
 def test_command_budget_defaults_and_bounds(arguments, expected):
-    assert CommandArgs.model_validate({"command": "true", **arguments}).timeout_seconds == expected
+    args = RunCommandArguments.model_validate({"command": "true", **arguments}, strict=True)
+    assert args.timeout_seconds == expected
 
 
 def test_command_budget_starts_after_setup(saved_input, docker_runner, monkeypatch):
