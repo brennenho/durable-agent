@@ -494,11 +494,137 @@ test("lifecycle observations appear without a scenario and are not duplicated by
     ],
   };
   await expect(page.getByRole("button", { name: "Cancel scenario" })).toBeEnabled();
+  await expect(timeline.getByRole("combobox", { name: "Timeline view" })).toHaveText(
+    "This scenario",
+  );
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  await expect(timeline).toContainText("Tools · Sandbox started");
+  await timeline.getByRole("combobox", { name: "Timeline view" }).click();
+  await page.getByRole("option", { name: "All activity", exact: true }).click();
   await expect(timeline.getByRole("listitem")).toHaveCount(3);
   const download = page.waitForEvent("download");
   await timeline.getByRole("button", { name: "Export JSON" }).click();
   const contents = JSON.parse(await readFile((await (await download).path())!, "utf8"));
   expect(contents.controls[2].hook.event_id).toBe("sandbox-hook");
+});
+
+test("new scenarios get a focused timeline and keep unrelated activity out of exports", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 320, height: 800 });
+  const snapshot = crashSnapshot();
+  const { runDetail } = await import("./fixtures");
+  snapshot.controls = [
+    { id: "old", at: "2026-10-01T11:00:00Z", kind: "manual_action", label: "Earlier manual kill" },
+  ];
+  snapshot.current = {
+    id: "first",
+    scenario: "saved-response-lost",
+    status: "running",
+    manual_intervention: false,
+    run: null,
+    observed_at: null,
+    error: null,
+    checkpoints: {},
+    checks: {},
+    events: [
+      {
+        id: "armed",
+        at: "2026-10-01T12:00:00Z",
+        kind: "armed",
+        label: "Scenario armed: saved-response-lost",
+      },
+    ],
+  };
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/");
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  const view = timeline.getByRole("combobox", { name: "Timeline view" });
+  await expect(view).toHaveText("This scenario");
+  await expect(timeline).toContainText("Saved response lost · Waiting for a run");
+  await expect(timeline).not.toContainText("Earlier manual kill");
+  await expect(timeline.locator("[data-slot='status-dot']").first()).toHaveCSS(
+    "animation-name",
+    "pulse",
+  );
+  snapshot.current.run = {
+    ...runDetail,
+    status: "running",
+    operations: [
+      {
+        id: "current-op",
+        position: 0,
+        kind: "tool",
+        tool_name: "write_file",
+        created_at: "2026-10-01T12:00:01Z",
+        completed_at: null,
+        result: null,
+        attempts: [],
+      },
+    ],
+  };
+  snapshot.controls.push(
+    {
+      id: "related",
+      kind: "lifecycle",
+      at: "2026-10-01T12:00:02Z",
+      label: "Current sandbox",
+      operation_id: "current-op",
+      hook: { service: "tools" },
+    },
+    {
+      id: "unrelated",
+      kind: "lifecycle",
+      at: "2026-10-01T12:00:02Z",
+      label: "Unrelated sandbox",
+      operation_id: "other-op",
+      hook: { service: "tools" },
+    },
+  );
+  await page.clock.fastForward(1500);
+  await expect(timeline).toContainText("Saved response lost · Running");
+  await expect(timeline).toContainText("Current sandbox");
+  await expect(timeline).not.toContainText("Unrelated sandbox");
+  const download = page.waitForEvent("download");
+  await timeline.getByRole("button", { name: "Export JSON" }).click();
+  const contents = JSON.parse(await readFile((await (await download).path())!, "utf8"));
+  expect(contents.controls.map((event: { id: string }) => event.id)).toEqual(["related"]);
+  await view.click();
+  await page.getByRole("option", { name: "All activity", exact: true }).click();
+  await expect(timeline).toContainText("Earlier manual kill");
+  await expect(timeline).toContainText("Unrelated sandbox");
+  await timeline.getByRole("tab", { name: "Saved state", exact: true }).click();
+  snapshot.current = {
+    ...snapshot.current,
+    id: "second",
+    run: null,
+    scenario: "baseline",
+    events: [
+      {
+        id: "second-arm",
+        kind: "armed",
+        at: "2026-10-01T12:00:03Z",
+        label: "Scenario armed: baseline",
+      },
+    ],
+  };
+  await page.clock.fastForward(1500);
+  await expect(view).toHaveText("This scenario");
+  await expect(timeline.getByRole("tab", { name: "All events", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(timeline.getByRole("listitem")).toHaveCount(1);
+  await expect(timeline).toContainText("Scenario armed: baseline");
+  snapshot.current.status = "passed";
+  await page.clock.fastForward(1500);
+  await expect(timeline).toContainText("Baseline · Finished · passed");
+  await expect(timeline.locator("[data-slot='status-dot']").first()).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test("timeline combines saved state and observed crashes, filters and downloads evidence", async ({
