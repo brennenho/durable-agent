@@ -76,22 +76,24 @@ test("separates saved model output from failed attempts and requested tool inten
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await history.getByLabel("1. Model call").locator(":scope > summary").click();
-  await expect(history).toContainText("Accepted from attempt 2.");
+  await expect(history.getByText("Accepted from attempt 2.")).toBeHidden();
   await expect(history).toContainText("Response status: incomplete");
   await expect(history).toContainText("I started editing.");
-  await history.getByText("Requested tools (1)", { exact: true }).click();
-  await expect(history).toContainText("write_file · Call ID: call_write");
-  await expect(history).toContainText("Requested calls; execution is shown in the timeline.");
+  await expect(history.getByRole("heading", { name: "Requested tools (1)" })).toBeVisible();
+  await expect(history.getByText("write_file · Call ID: call_write")).toBeHidden();
+  await expect(
+    history.getByText("Requests only; execution appears as separate steps."),
+  ).toBeVisible();
   await expect(history).not.toContainText("Next: execute");
-  await history.getByText("Provider output items", { exact: true }).click();
+  await history.getByText("Technical details", { exact: true }).click();
+  await expect(history.getByText("Accepted from attempt 2.")).toBeVisible();
+  await expect(history.getByText("write_file · Call ID: call_write")).toBeVisible();
+  await history.getByText("Raw provider output", { exact: true }).click();
   await expect(history).toContainText("Encrypted context present");
   await expect(history).not.toContainText("opaque-secret");
-  await history.getByText("Technical details", { exact: true }).click();
   const attempts = history.locator(".attempt-list > li");
-  await attempts.nth(0).getByText("Attempt details", { exact: true }).click();
   await expect(attempts.nth(0)).toContainText("No saved model response for this attempt.");
   await expect(attempts.nth(0)).toContainText("Unavailable; this does not mean zero tokens.");
-  await attempts.nth(1).getByText("Attempt details", { exact: true }).click();
   await expect(attempts.nth(1)).toContainText("Duration: 2s");
   await expect(attempts.nth(1)).toContainText("Provider request ID: req_model");
   await expect(attempts.nth(1).locator("pre")).toContainText('"total_tokens": 15');
@@ -137,6 +139,11 @@ test("shows completed command failure with readable logs and its saved workspace
   await expect(history.getByRole("heading", { name: "stdout", exact: true })).toBeVisible();
   await expect(history.locator("pre").first()).toHaveText("One test failed\nAssertionError");
   await expect(history).toContainText("Logs were truncated at the configured limit.");
-  await expect(history).toContainText(`Saved workspace: ${runDetail.workspace_version_id}`);
+  const workspace = history.getByText(`Saved workspace: ${runDetail.workspace_version_id}`, {
+    exact: false,
+  });
+  await expect(workspace).toBeHidden();
+  await history.getByText("Technical details", { exact: true }).click();
+  await expect(workspace).toBeVisible();
   await expect(history).not.toContainText("Retry policy");
 });
