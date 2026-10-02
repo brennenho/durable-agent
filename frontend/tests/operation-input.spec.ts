@@ -47,7 +47,7 @@ const input: Inspection = {
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/runs/*/files", (route) =>
+  await page.route("**/api/runs/*/files?**", (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
   );
   await page.route(`**/api/runs/${runDetail.id}`, (route) =>

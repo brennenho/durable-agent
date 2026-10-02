@@ -25,8 +25,11 @@ export function SavedFiles({
 
   useEffect(() => {
     const controller = new AbortController();
-    requestJson<RunFileListing>(`${base}/files`, { signal: controller.signal })
+    const query = new URLSearchParams({ version_id: workspaceVersionId });
+    requestJson<RunFileListing>(`${base}/files?${query}`, { signal: controller.signal })
       .then((files) => {
+        if (files.workspace_version_id !== workspaceVersionId)
+          throw new Error("The returned files do not match the selected version. Please retry.");
         if (!controller.signal.aborted) {
           setListing(files);
           setError(null);
