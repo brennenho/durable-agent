@@ -48,8 +48,8 @@ generations, and execution limits are positive; operation positions are nonnegat
 uses them to reconstruct subsequent requests; the harness treats them as opaque.
 `previous_turns` contains ordered accepted history from prior user turns, separate
 from the current prompt/history. Old saved requests omit it and default to an empty
-list. Runtime will freeze this context in each new turn's first model operation;
-Worker will replay it without modifying saved results. Follow-up submission uses
+list. Runtime freezes this context in each new turn's first model operation;
+Worker replays it without modifying saved results. Follow-up submission uses
 `SubmitFollowUpRequest`: submission key, prompt, and `after_run_id`.
 Send only tool output to the model, not runtime workspace IDs. Run configuration
 is immutable and travels with assignments; tool schemas come from the fixed registry.
@@ -100,12 +100,25 @@ Existing run/file URLs remain valid; an initial run and its conversation share a
 | POST | `/api/conversations` | `SubmitRunRequest` → `ConversationSummary` |
 | GET | `/api/conversations` | → `ConversationSummary[]`, newest updated first |
 | GET | `/api/conversations/{conversation_id}` | → `ConversationDetail` |
+| POST | `/api/conversations/{conversation_id}/runs` | `SubmitFollowUpRequest` → `RunSummary` |
 
 `ConversationSummary`: `id`, `title`, `created_at`, `updated_at`, `status`, `latest_run_id`.
 The title is the first prompt normalized to one line and limited to 80 characters.
 Status and updated time come from the latest run's saved progress. `ConversationDetail`
 adds `runs: RunDetail[]`, oldest first. Creation submits the first prompt; matching
-submission keys reuse the original conversation. Follow-up submission is not yet exposed.
+submission keys reuse the original conversation.
+
+A follow-up names the latest terminal run in `after_run_id`. It inherits frozen
+configuration, prior accepted context, and the latest accepted workspace, with fresh
+execution limits. Active turns return `409 conversation_busy`; an outdated predecessor
+returns `409 stale_conversation`. Matching submission-key replays return their original
+run before these checks; changed prompt, conversation, or predecessor returns
+`409 submission_conflict`.
+
+Follow-ups are allowed after failure. Unanswered tool calls receive interruption errors
+only in the next model input; saved history stays unchanged. Tool checkpoints that Control
+never accepted are excluded. Malformed final model output is retained as a labeled text
+record when its native tool calls cannot be replayed safely.
 
 ## Worker → control
 
