@@ -51,6 +51,11 @@ CRASH_TEST=1 ./scripts/dev-up.sh
 CRASH_TEST_MODE=docker ./scripts/crash-test.sh
 ```
 
+Both scripts load the repository's `.env` automatically. To keep these settings,
+add `CRASH_TEST=1` and `CRASH_TEST_MODE=docker` there, then run the scripts without
+prefixes. Shell variables take precedence, so `CRASH_TEST_MODE=host ./scripts/crash-test.sh`
+still selects terminal mode.
+
 Open [Crashboard](http://127.0.0.1:3020/crash-test) to choose scenarios and control the
 existing app containers. The controller and dashboard run in their own Compose
 project, sharing the app's database through its APIs. For live frontend development,

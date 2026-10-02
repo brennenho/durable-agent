@@ -1,4 +1,5 @@
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -12,9 +13,17 @@ LAUNCHER = Path(__file__).resolve().parents[3] / "scripts" / "crash-test.sh"
 
 @pytest.mark.parametrize("startup_fails", [False, True])
 def test_launcher_waits_for_controller_and_cleans_up_children(tmp_path, startup_fails):
+    checkout = tmp_path / "checkout"
+    (checkout / "scripts").mkdir(parents=True)
+    launcher = checkout / "scripts" / LAUNCHER.name
+    shutil.copy2(LAUNCHER, launcher)
+    (checkout / ".env").write_text("CRASH_TEST_MODE=host\n")
+    uv = shutil.which("uv")
+    assert uv is not None
     # Real child processes stand in for uvicorn/Next so the shell's signal handling is exercised.
     child = (
         f"#!{sys.executable}\n"
+        + f"import os, sys\nif '--env-file' in sys.argv: os.execv({uv!r}, sys.argv)\n"
         + """
 import os, signal, sys, time
 from pathlib import Path
@@ -48,7 +57,7 @@ while True:
         FAIL_STARTUP="1" if startup_fails else "",
     )
     process = subprocess.Popen(
-        [str(LAUNCHER)], env=environment, start_new_session=True, stdout=subprocess.DEVNULL
+        [str(launcher)], env=environment, start_new_session=True, stdout=subprocess.DEVNULL
     )
     try:
         if startup_fails:

@@ -131,6 +131,11 @@ original workspace, observed cache reuse, and no observed execution after saving
 
 ## Startup
 
+Both startup scripts load `.env` from the repository root before reading settings.
+Set `CRASH_TEST=1` and `CRASH_TEST_MODE=docker` there to use plain
+`./scripts/dev-up.sh` and `./scripts/crash-test.sh`. Exported shell variables override
+the file, including one-command overrides such as `CRASH_TEST_MODE=host`.
+
 Crash Test lives in `backend/src/crash_test`, beside the application package. Only
 the small hook client remains in `durable_agent`. It shares the Python environment,
 uses the application's public APIs, and stores controller reports in `.crash-test`.
