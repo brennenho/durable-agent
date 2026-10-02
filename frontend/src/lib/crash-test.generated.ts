@@ -394,6 +394,11 @@ export interface components {
             events: components["schemas"]["Observation"][];
             /** Id */
             id: string;
+            /**
+             * Manual Intervention
+             * @default false
+             */
+            manual_intervention: boolean;
             /** Observed At */
             observed_at: string | null;
             run: components["schemas"]["RunDetail"] | null;

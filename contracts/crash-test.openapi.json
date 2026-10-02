@@ -860,6 +860,11 @@
             "title": "Id",
             "type": "string"
           },
+          "manual_intervention": {
+            "default": false,
+            "title": "Manual Intervention",
+            "type": "boolean"
+          },
           "observed_at": {
             "anyOf": [
               {
