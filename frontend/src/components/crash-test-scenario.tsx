@@ -33,7 +33,7 @@ export function CrashTestScenario({
       <h2 id="scenario-heading">Scenario</h2>
       <p className="mt-1 mb-5 text-xs text-muted-foreground">
         {running
-          ? "Services restart automatically during the scenario."
+          ? "Scenario kills restart automatically."
           : "Arm a scenario, then send a task in the app."}
       </p>
       <form

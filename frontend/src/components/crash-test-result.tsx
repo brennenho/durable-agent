@@ -20,16 +20,19 @@ export function CrashTestResult({
         <h2 id="result-heading">
           {session ? scenarioName(session.scenario) : "No scenario running"}
         </h2>
-        {status && (
-          <Badge
-            role="status"
-            variant={status === "failed" ? "destructive" : "secondary"}
-            className={status === "passed" ? "bg-emerald-50 text-emerald-800" : undefined}
-          >
-            {running && <CircleDashed aria-hidden="true" />}
-            {status}
-          </Badge>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {session?.manual_intervention && <Badge variant="outline">Manual intervention</Badge>}
+          {status && (
+            <Badge
+              role="status"
+              variant={status === "failed" ? "destructive" : "secondary"}
+              className={status === "passed" ? "bg-emerald-50 text-emerald-800" : undefined}
+            >
+              {running && <CircleDashed aria-hidden="true" />}
+              {status}
+            </Badge>
+          )}
+        </div>
       </div>
       {!session && (
         <p className="mb-0 text-sm text-muted-foreground">
