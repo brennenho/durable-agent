@@ -52,7 +52,7 @@ test("shows the loop position, named tool, and elapsed execution", async ({ page
   );
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await expect(history.getByRole("heading", { name: "2. write_file" })).toBeVisible();
+  await expect(history.getByLabel("2. write_file", { exact: true })).toBeVisible();
   await expect(history.getByText("report.md", { exact: true })).toBeVisible();
   current = {
     ...current,
@@ -78,6 +78,7 @@ test("shows the loop position, named tool, and elapsed execution", async ({ page
   await page.clock.fastForward(2000);
   await expect(page.getByRole("status")).toContainText("Running tool: write_file · 14s elapsed");
   await expect(history.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(history.getByText("14s", { exact: true })).toBeVisible();
 });
 
 test("explains retry eligibility and unknown outcomes without claiming a sandbox crash", async ({
@@ -110,9 +111,10 @@ test("explains retry eligibility and unknown outcomes without claiming a sandbox
   await expect(page.getByRole("status")).toContainText("Waiting to retry");
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await expect(history).toContainText("Attempt 1 of 5 · unknown");
-  await expect(history).toContainText("No conclusive result was recorded.");
-  await expect(history).toContainText("starts when a worker claims it.");
+  await expect(
+    history.getByText("Worker lease expired; outcome unknown. Waiting to retry."),
+  ).toBeVisible();
+  await expect(history.getByText("Attempt 1 of 5 · unknown")).toBeHidden();
   await expect(history).not.toContainText("sandbox crash");
   await page.clock.fastForward(9000);
   await expect(page.getByRole("status")).toContainText("Waiting for a worker to retry");
@@ -153,8 +155,8 @@ test("a failed command is a completed result and the next model call waits for a
   await expect(page.getByRole("status")).toHaveText("Model round 2 · Waiting for a worker");
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await expect(history).toContainText(
-    "Next: request a model response with the saved tool results.",
-  );
+  await expect(history.getByText("Command exited with code 1.")).toBeVisible();
+  await expect(history.getByLabel("2. run_command").locator("summary")).toContainText("Completed");
+  await expect(history).not.toContainText("Next:");
   await expect(history).not.toContainText("Retry pending");
 });

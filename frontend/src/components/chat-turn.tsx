@@ -18,11 +18,11 @@ export function ChatTurn({ run }: { run: RunDetail }) {
       </div>
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
         <h2 className="mb-3 text-sm font-medium">Applied Agent</h2>
-        <details aria-label="Activity" className="group mb-5">
+        <details aria-label="Activity" className="group/activity mb-5">
           <summary className="flex w-fit list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
             <ChevronRight
               aria-hidden="true"
-              className="size-3.5 transition-transform group-open:rotate-90"
+              className="size-3.5 transition-transform group-open/activity:rotate-90"
             />
             <ActivityStatus run={run} />
             {completed > 0 && (
@@ -31,14 +31,7 @@ export function ChatTurn({ run }: { run: RunDetail }) {
               </span>
             )}
           </summary>
-          <div className="mt-4 rounded-lg border p-4">
-            <p className="run-id m-0">Run ID: {run.id}</p>
-            <p className="text-xs text-muted-foreground">
-              {run.model} ·{" "}
-              <time dateTime={run.created_at}>{new Date(run.created_at).toLocaleString()}</time>
-            </p>
-            <RunHistory run={run} />
-          </div>
+          <RunHistory run={run} />
         </details>
         {run.terminal_error && (
           <p

@@ -51,8 +51,7 @@ export function OperationOutput({ operation }: { operation: Operation }) {
   if (!result) return null;
   const accepted = operation.attempts.find((attempt) => attempt.status === "accepted");
   return (
-    <details className="mt-4 rounded-md border bg-background px-4 py-3">
-      <summary className="text-xs font-medium">Saved {result.kind} output</summary>
+    <div className="pt-3" aria-label={`Saved ${result.kind} output`}>
       {accepted && (
         <p className="text-xs text-muted-foreground">
           Accepted from attempt {accepted.attempt_no}.
@@ -92,7 +91,7 @@ export function OperationOutput({ operation }: { operation: Operation }) {
           </p>
         </>
       )}
-    </details>
+    </div>
   );
 }
 

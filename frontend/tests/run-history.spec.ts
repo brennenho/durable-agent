@@ -72,7 +72,12 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
   await page.goto(`/runs/${detail.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await expect(history.getByRole("heading", { name: "1. Tool call" })).toBeVisible();
+  await expect(history.getByLabel("1. Tool call", { exact: true })).toBeVisible();
+  await expect(history.getByText("Worker lease expired; outcome unknown. Retried.")).toBeVisible();
+  await history.getByLabel("1. Tool call").locator(":scope > summary").click();
+  await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
+  await expect(history.getByText("sandbox_crash: The sandbox stopped.")).toBeHidden();
+  await history.getByText("Technical details", { exact: true }).click();
   await expect(history.locator(".attempt-list > li")).toHaveCount(3);
   await expect(history.locator(".attempt-list > li").nth(0)).toContainText(
     "sandbox_crash: The sandbox stopped.",
@@ -81,7 +86,6 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
     "No conclusive result was recorded.",
   );
   await expect(history.locator(".attempt-list > li").nth(2)).toContainText("Attempt 3 · accepted");
-  await history.getByText("Saved tool output").click();
   await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Completed");
 });
@@ -101,8 +105,8 @@ test("shows an empty history and a planned operation awaiting a worker", async (
     ],
   };
   await page.clock.fastForward(2_000);
-  await expect(history.getByRole("heading", { name: "1. Model call" })).toBeVisible();
-  await expect(history).toContainText("Waiting for a worker.");
+  await expect(history.getByLabel("1. Model call", { exact: true })).toBeVisible();
+  await expect(history.getByText("Queued", { exact: true })).toBeVisible();
   await expect(history.getByText("Saved tool output")).toHaveCount(0);
 });
 
@@ -125,3 +129,27 @@ test("shows unfinished work as stopped when the run has failed", async ({ page }
   await expect(history.getByText("Pending", { exact: true })).toHaveCount(0);
   await expect(history.getByText("Waiting for a worker.")).toHaveCount(0);
 });
+
+for (const width of [390, 1440]) {
+  test(`keeps long command rows readable at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const command = "python -m pytest tests/calculator/test_division.py --verbose --tb=short";
+    await page.route(`**/api/runs/${detail.id}`, (route) =>
+      route.fulfill({
+        json: {
+          ...detail,
+          operations: [{ ...detail.operations[0], tool_name: "run_command", tool_target: command }],
+        },
+      }),
+    );
+    await page.goto(`/runs/${detail.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    const step = page.getByLabel("1. run_command", { exact: true });
+    await expect(step.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(step.getByTitle(command)).toBeVisible();
+    await step.locator(":scope > summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(step.getByText("1 test failed", { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  });
+}

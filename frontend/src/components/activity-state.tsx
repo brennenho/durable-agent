@@ -5,6 +5,100 @@ import type { RunDetail } from "../lib/api";
 
 type Operation = RunDetail["operations"][number];
 
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
+export function OperationSummary({
+  operation,
+  status,
+}: {
+  operation: Operation;
+  status: RunDetail["status"];
+}) {
+  const attempt = operation.attempts.at(-1);
+  const running = !operation.completed_at && status !== "failed" && attempt?.status === "running";
+  const now = useNow(running);
+  const duration =
+    attempt && (attempt.finished_at || running)
+      ? Math.max(
+          0,
+          (attempt.finished_at ? Date.parse(attempt.finished_at) : now) -
+            Date.parse(attempt.started_at),
+        ) / 1000
+      : null;
+  const label = operation.completed_at
+    ? "Completed"
+    : status === "failed"
+      ? "Stopped"
+      : running
+        ? "Running"
+        : status === "retrying"
+          ? "Retry pending"
+          : "Queued";
+  const failure = operation.attempts.findLast((item) => item.status === "unknown" || item.error);
+  const note =
+    failure?.status === "unknown"
+      ? "Worker lease expired; outcome unknown."
+      : failure?.error?.message;
+  const retried = failure && attempt && attempt.attempt_no > failure.attempt_no;
+  const output = operation.result?.kind === "tool" ? operation.result.output : null;
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[minmax(0,1fr)_auto_3rem]">
+        <span className="row-span-2 min-w-0 sm:row-span-1 sm:flex sm:items-baseline sm:gap-2">
+          <span className="shrink-0 font-medium">{operationName(operation)}</span>
+          {operation.tool_target && (
+            <code
+              className="block truncate text-xs text-muted-foreground"
+              title={operation.tool_target}
+            >
+              {operation.tool_target}
+            </code>
+          )}
+        </span>
+        <span className="text-right text-xs leading-5">{label}</span>
+        <span
+          className="text-right text-xs leading-5 text-muted-foreground tabular-nums"
+          title="Latest attempt duration"
+        >
+          {duration === null
+            ? "—"
+            : `${running ? Math.floor(duration) : Number(duration.toFixed(1))}s`}
+        </span>
+      </span>
+      {note && (
+        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+          {note}{" "}
+          {retried
+            ? operation.completed_at
+              ? "Retried."
+              : "Retrying the same operation."
+            : status === "retrying"
+              ? "Waiting to retry."
+              : ""}
+        </span>
+      )}
+      {output?.status === "error" && (
+        <span className="mt-1 block text-xs text-destructive">{output.message}</span>
+      )}
+      {output?.status === "ok" &&
+        typeof output.value.exit_code === "number" &&
+        output.value.exit_code !== 0 && (
+          <span className="mt-1 block text-xs text-destructive">
+            Command exited with code {output.value.exit_code}.
+          </span>
+        )}
+    </span>
+  );
+}
+
 export function operationName(operation: Operation) {
   return operation.kind === "model" ? "Model call" : operation.tool_name || "Tool call";
 }
@@ -23,13 +117,8 @@ export function loopPosition(operations: Operation[], index: number) {
 }
 
 export function ActivityStatus({ run }: { run: RunDetail }) {
-  const [now, setNow] = useState(() => Date.now());
   const active = run.status !== "succeeded" && run.status !== "failed";
-  useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
+  const now = useNow(active);
   const index = run.operations.findIndex((operation) => !operation.completed_at);
   const operation = run.operations[index];
   const attempt = operation?.attempts.at(-1);
