@@ -95,6 +95,7 @@ class Runtime:
                     "strict": False,
                 }
                 for name, arguments in ARGUMENTS.items()
+                if name != "delegate"
             ],
             initial_workspace_version_id=seed,
             sandbox={

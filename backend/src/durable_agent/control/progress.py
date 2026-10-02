@@ -45,7 +45,10 @@ async def accept_result(
                 request=request.model_dump(mode="json"),
             )
         )
-        run.status, run.next_attempt_at = "queued", now
+        if next_op.kind == "tool" and next_op.call.name == "delegate":
+            run.status, run.next_attempt_at = "waiting", None
+        else:
+            run.status, run.next_attempt_at = "queued", now
     else:
         run.status = "succeeded" if transition.status == "finished" else "failed"
         run.finished_at, run.next_attempt_at = now, None

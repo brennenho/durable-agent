@@ -263,3 +263,41 @@ def test_invalid_tool_configuration_fails_before_a_model_call(state, schemas):
     state.config.tool_schemas = schemas
     assert start(state.config, state.prompt).error.code == "invalid_configuration"
     assert advance(state, model()).error.code == "invalid_configuration"
+
+
+def delegation(call_id="delegate"):
+    return call(
+        call_id,
+        "delegate",
+        {"tasks": [{"name": "Review", "prompt": "Review the files"}]},
+    )
+
+
+def test_delegation_is_explicitly_enabled_and_preserves_tool_order(state):
+    assert advance(state, model(delegation())).error.code == "invalid_tool_call"
+    state.config.tool_schemas.append({"name": "delegate"})
+    planned = model(call(), delegation())
+    assert advance(state, planned).next.call == call()
+    state.history, state.pending_tool_calls = [planned], [call(), delegation()]
+    assert advance(state, tool()).next.call == delegation()
+
+
+def test_only_one_batch_per_run_but_previous_turns_do_not_consume_it(state):
+    state.config.tool_schemas.append({"name": "delegate"})
+    assert (
+        advance(state, model(delegation(), delegation("second"))).error.code == "delegation_limit"
+    )
+    state.history = [model(delegation())]
+    assert advance(state, model(delegation("second"))).error.code == "delegation_limit"
+    state.history = []
+    state.previous_turns = [PreviousTurn(prompt="Earlier", history=[model(delegation())])]
+    assert advance(state, model(delegation("second"))).next.call == delegation("second")
+
+
+@pytest.mark.parametrize(
+    "tasks", [[], [{"name": "n", "prompt": "p"}] * 4, [{"name": "", "prompt": "p"}]]
+)
+def test_invalid_batches_reject_the_whole_plan(state, tasks):
+    state.config.tool_schemas.append({"name": "delegate"})
+    invalid = call("delegate", "delegate", {"tasks": tasks})
+    assert advance(state, model(call(), invalid)).error.code == "invalid_tool_call"
