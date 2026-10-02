@@ -8,10 +8,12 @@ import httpx
 
 from durable_agent.contracts import (
     ChildRunSummary,
+    ConversationSummary,
     OperationInspection,
     OperationView,
     RunDetail,
     RunSummary,
+    SubmitForkRequest,
     SubmitRunRequest,
 )
 
@@ -115,6 +117,31 @@ class RunHandle:
     async def status(self) -> RunDetail:
         response = await self._client._request("GET", f"/api/runs/{self.id}")
         return RunDetail.model_validate(response.json())
+
+    async def pause(self) -> RunSummary:
+        """Prevent new claims; the in-progress call may still complete."""
+        response = await self._client._request("POST", f"/api/runs/{self.id}/pause")
+        return RunSummary.model_validate(response.json())
+
+    async def resume(self) -> RunSummary:
+        """Continue the same pending operation and retry budget."""
+        response = await self._client._request("POST", f"/api/runs/{self.id}/resume")
+        return RunSummary.model_validate(response.json())
+
+    async def fork(
+        self, *, prompt: str, after_operation_id: UUID, submission_key: UUID
+    ) -> "RunHandle":
+        """Start a new conversation from an operation with an accepted checkpoint."""
+        request = SubmitForkRequest(
+            prompt=prompt, after_operation_id=after_operation_id, submission_key=submission_key
+        )
+        response = await self._client._request(
+            "POST",
+            f"/api/runs/{self.id}/forks",
+            json=request.model_dump(mode="json", exclude_unset=True),
+        )
+        conversation = ConversationSummary.model_validate(response.json())
+        return RunHandle(self._client, conversation.latest_run_id)
 
     async def history(self) -> list[OperationView]:
         """Accepted results and execution attempts in operation order."""
