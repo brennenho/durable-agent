@@ -15,11 +15,14 @@ export type ExecutionEvent = {
   failed?: boolean;
   workspaceVersionId?: string;
   workspaceLabel?: string;
+  runId?: string;
+  runName?: string;
 };
 
 export function operationEvents(
   operation: Operation,
   checkpoint?: ToolCheckpoint | null,
+  subagents: NonNullable<RunDetail["children"]> = [],
 ): ExecutionEvent[] {
   const events: ExecutionEvent[] = [
     {
@@ -50,6 +53,28 @@ export function operationEvents(
       });
     }
   }
+  if (operation.tool_name === "delegate") {
+    for (const child of subagents.filter((child) => child.parent_operation_id === operation.id)) {
+      const identity = { operationId: operation.id, runId: child.id, runName: child.name };
+      events.push({
+        ...identity,
+        id: `${child.id}:created`,
+        at: child.created_at,
+        label: "Subagent created",
+      });
+      if (child.finished_at && (child.status === "succeeded" || child.status === "failed")) {
+        events.push({
+          ...identity,
+          id: `${child.id}:finished`,
+          at: child.finished_at,
+          label: child.status === "succeeded" ? "Subagent completed" : "Subagent failed",
+          failed: child.status === "failed",
+          detail: child.terminal_error?.message,
+        });
+      }
+    }
+    events.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  }
   if (operation.completed_at) {
     const accepted = attempts.find((attempt) => attempt.status === "accepted");
     events.push({
@@ -57,13 +82,17 @@ export function operationEvents(
       operationId: operation.id,
       attemptId: accepted?.id,
       at: operation.completed_at,
-      label: "Result accepted by Control",
+      label:
+        operation.tool_name === "delegate"
+          ? "Subagent reports accepted by Control"
+          : "Result accepted by Control",
       detail: accepted ? `From attempt ${accepted.attempt_no}.` : undefined,
       workspaceVersionId:
         operation.result?.kind === "tool" ? operation.result.workspace_version_id : undefined,
+      workspaceLabel: operation.tool_name === "delegate" ? "Parent workspace unchanged" : undefined,
     });
   }
-  if (checkpoint && operation.kind === "tool") {
+  if (checkpoint && operation.kind === "tool" && operation.tool_name !== "delegate") {
     const saved: ExecutionEvent = {
       id: `${operation.id}:saved`,
       operationId: operation.id,

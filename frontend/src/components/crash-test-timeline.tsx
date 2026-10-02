@@ -10,15 +10,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 type Source = "all" | "app" | "controller";
 
-export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
+export function CrashTestTimeline({
+  snapshot,
+  appUrl,
+}: {
+  snapshot: CrashSnapshot;
+  appUrl: string;
+}) {
   const [source, setSource] = useState<Source>("all");
+  const [selectedRun, setSelectedRun] = useState("all");
   const session = snapshot.current;
+  const runs = session?.run ? [session.run, ...(session.child_runs ?? [])] : [];
+  const runFilter = runs.some((run) => run.id === selectedRun) ? selectedRun : "all";
+  const runNames = new Map(runs.map((run) => [run.id, run.parent?.name ?? "Parent agent"]));
+  const operationRuns = new Map(
+    runs.flatMap((run) => run.operations.map((operation) => [operation.id, run.id] as const)),
+  );
   const hook = snapshot.scenarios.find((item) => item.name === session?.scenario)?.hook;
   const recordedHooks = new Set(snapshot.controls.map((event) => event.hook?.event_id));
-  const saved =
-    session?.run?.operations.flatMap((operation) =>
-      operationEvents(operation, session.checkpoints[operation.id]).map((event) => ({
+  const saved = runs.flatMap((run) =>
+    run.operations.flatMap((operation) =>
+      operationEvents(operation, session?.checkpoints[operation.id], run.children).map((event) => ({
         ...event,
+        runId: event.runId ?? run.id,
+        runName: event.runName ?? (runs.length > 1 ? runNames.get(run.id) : undefined),
         label: `App · ${event.label}`,
         source: "app" as const,
         detail: [
@@ -28,7 +43,8 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
           .filter(Boolean)
           .join(" "),
       })),
-    ) ?? [];
+    ),
+  );
   const observations: (ExecutionEvent & { source: Source })[] = [
     ...snapshot.controls,
     ...(session?.events ?? []).filter(
@@ -52,6 +68,11 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
       return {
         id: `observed:${event.id}`,
         operationId: event.operation_id ?? "",
+        runId: event.operation_id ? operationRuns.get(event.operation_id) : undefined,
+        runName:
+          runs.length > 1 && event.operation_id
+            ? runNames.get(operationRuns.get(event.operation_id) ?? "")
+            : undefined,
         at: event.at,
         label: `${owner} · ${label}`,
         detail: event.detail ?? event.target?.name ?? undefined,
@@ -61,6 +82,7 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
     });
   const events = [...saved, ...observations]
     .filter((event) => source === "all" || event.source === source)
+    .filter((event) => runFilter === "all" || event.runId === runFilter)
     .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
   function download() {
@@ -87,20 +109,37 @@ export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
         Saved app state and controller observations, in time order.
       </p>
       <Tabs value={source} onValueChange={(value) => setSource(value as Source)}>
-        <TabsList aria-label="Timeline source">
-          <TabsTrigger value="all" className="text-xs">
-            All events
-          </TabsTrigger>
-          <TabsTrigger value="app" className="text-xs">
-            Saved state
-          </TabsTrigger>
-          <TabsTrigger value="controller" className="text-xs">
-            Crash Test
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center gap-3">
+          <TabsList aria-label="Timeline source">
+            <TabsTrigger value="all" className="text-xs">
+              All events
+            </TabsTrigger>
+            <TabsTrigger value="app" className="text-xs">
+              Saved state
+            </TabsTrigger>
+            <TabsTrigger value="controller" className="text-xs">
+              Crash Test
+            </TabsTrigger>
+          </TabsList>
+          {runs.length > 1 && (
+            <select
+              aria-label="Timeline run"
+              value={runFilter}
+              onChange={(event) => setSelectedRun(event.target.value)}
+              className="min-w-0 max-w-full rounded-md border bg-background px-2 py-1 text-xs"
+            >
+              <option value="all">All agents</option>
+              {runs.map((run) => (
+                <option key={run.id} value={run.id}>
+                  {runNames.get(run.id)}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <TabsContent value={source}>
           {events.length ? (
-            <ExecutionEvents events={events} />
+            <ExecutionEvents events={events} appUrl={appUrl} />
           ) : (
             <p className="my-10 text-center text-sm text-muted-foreground">
               {source === "all"
