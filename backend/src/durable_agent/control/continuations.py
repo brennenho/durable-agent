@@ -53,6 +53,10 @@ async def create_continuation(
     )
     if previous is None or previous.id != body.after_run_id:
         raise ControlError(409, "stale_conversation", "A newer conversation turn exists")
+    if previous.parent_operation_id is not None:
+        raise ControlError(
+            409, "child_run_read_only", "Control this subagent through its parent run"
+        )
     if previous.status not in ("succeeded", "failed"):
         raise ControlError(409, "conversation_busy", "The current turn is still running")
 
