@@ -15,7 +15,7 @@ function useNow(active: boolean) {
   return now;
 }
 
-export function OperationSummary({
+export function OperationDuration({
   operation,
   status,
 }: {
@@ -33,6 +33,27 @@ export function OperationSummary({
             Date.parse(attempt.started_at),
         ) / 1000
       : null;
+  const text =
+    duration === null ? "—" : `${running ? Math.floor(duration) : Number(duration.toFixed(1))}s`;
+  return (
+    <span
+      title="Latest attempt duration"
+      aria-label={`Latest attempt duration: ${duration === null ? "unavailable" : text}`}
+    >
+      {text}
+    </span>
+  );
+}
+
+export function OperationSummary({
+  operation,
+  status,
+}: {
+  operation: Operation;
+  status: RunDetail["status"];
+}) {
+  const attempt = operation.attempts.at(-1);
+  const running = !operation.completed_at && status !== "failed" && attempt?.status === "running";
   const label = operation.completed_at
     ? "Completed"
     : status === "failed"
@@ -51,7 +72,7 @@ export function OperationSummary({
   const output = operation.result?.kind === "tool" ? operation.result.output : null;
   return (
     <span className="@container block min-w-0 flex-1">
-      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 @min-[16rem]:grid-cols-[minmax(0,1fr)_auto_3rem]">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3">
         <span className="col-span-2 min-w-0 @min-[16rem]:col-span-1 @min-[16rem]:flex @min-[16rem]:items-baseline @min-[16rem]:gap-2">
           <span className="shrink-0 font-medium">{operationName(operation)}</span>
           {operation.tool_target && (
@@ -64,14 +85,6 @@ export function OperationSummary({
           )}
         </span>
         <span className="text-xs leading-5 @min-[16rem]:text-right">{label}</span>
-        <span
-          className="text-right text-xs leading-5 text-muted-foreground tabular-nums"
-          title="Latest attempt duration"
-        >
-          {duration === null
-            ? "—"
-            : `${running ? Math.floor(duration) : Number(duration.toFixed(1))}s`}
-        </span>
       </span>
       {note && (
         <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">

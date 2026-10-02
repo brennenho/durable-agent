@@ -52,6 +52,8 @@ test("shows the named tool and elapsed execution", async ({ page }) => {
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByLabel("2. write_file", { exact: true })).toBeVisible();
   await expect(history.getByText("report.md", { exact: true })).toBeVisible();
+  const duration = history.getByTitle("Latest attempt duration").nth(1);
+  await expect(duration).toHaveText("—");
   current = {
     ...current,
     status: "running",
@@ -76,7 +78,35 @@ test("shows the named tool and elapsed execution", async ({ page }) => {
   await page.clock.fastForward(2000);
   await expect(page.getByRole("status")).toContainText("Running tool: write_file · 14s elapsed");
   await expect(history.locator('[aria-current="step"]')).toHaveCount(1);
-  await expect(history.getByText("14s", { exact: true })).toBeVisible();
+  await expect(duration).toHaveText("14s");
+  await page.clock.fastForward(2000);
+  await expect(duration).toHaveText("16s");
+  const runningTool = current.operations[1];
+  current = {
+    ...current,
+    status: "succeeded",
+    finished_at: "2026-10-01T12:00:17Z",
+    operations: [
+      model,
+      {
+        ...runningTool,
+        completed_at: "2026-10-01T12:00:17Z",
+        result: {
+          kind: "tool",
+          call_id: "one",
+          workspace_version_id: runDetail.workspace_version_id,
+          output: { status: "ok", value: { bytes_written: 2 } },
+        },
+        attempts: [
+          { ...runningTool.attempts[0], status: "accepted", finished_at: "2026-10-01T12:00:17Z" },
+        ],
+      },
+    ],
+  };
+  await page.clock.fastForward(2000);
+  await expect(duration).toHaveText("17s");
+  await page.clock.fastForward(5000);
+  await expect(duration).toHaveText("17s");
 });
 
 test("explains retry eligibility and unknown outcomes without claiming a sandbox crash", async ({

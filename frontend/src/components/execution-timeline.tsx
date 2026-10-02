@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { cn } from "../lib/utils";
 import { OperationInspection } from "./operation-inspection";
-import { operationName, OperationSummary } from "./activity-state";
+import { operationName, OperationDuration, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
 import { BranchDialog } from "./branch-dialog";
 import { TimelineStamp } from "./timeline-stamp";
@@ -24,7 +24,18 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
     : operation.attempts.at(-1)?.status === "error";
   return (
     <li aria-current={current ? "step" : undefined} className="grid grid-cols-subgrid col-span-3">
-      <TimelineStamp at={operation.created_at} label="Operation planned" active={current} />
+      <TimelineStamp
+        at={operation.created_at}
+        label="Operation planned"
+        active={current}
+        duration={
+          <OperationDuration
+            key={operation.attempts.at(-1)?.id}
+            operation={operation}
+            status={run.status}
+          />
+        }
+      />
       <details
         aria-label={`${operation.position + 1}. ${operationName(operation)}`}
         className="group/step min-w-0"
@@ -44,11 +55,7 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
             className="mt-1 size-3.5 shrink-0 text-muted-foreground group-open/step:rotate-90"
           />
           <span className="min-w-0 flex-1">
-            <OperationSummary
-              key={operation.attempts.at(-1)?.id}
-              operation={operation}
-              status={run.status}
-            />
+            <OperationSummary operation={operation} status={run.status} />
             {operation.checkpoint && (
               <span className="mt-1 flex justify-end">
                 <BranchDialog run={run} operation={operation} />
