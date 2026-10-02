@@ -75,7 +75,12 @@ def test_conversation_views_order_turns_and_sort_by_latest_progress(postgres_eng
             connection.execute(
                 update(Run)
                 .where(Run.id == first["id"])
-                .values(status="succeeded", finished_at=later, next_attempt_at=None)
+                .values(
+                    status="succeeded",
+                    output="First answer",
+                    finished_at=later,
+                    next_attempt_at=None,
+                )
             )
             connection.execute(
                 update(Operation)

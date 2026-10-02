@@ -152,7 +152,7 @@ def test_coordinator_waits_through_database_outage_and_cancels_cleanly(database,
         reached = asyncio.Event()
         calls = 0
 
-        async def recover(session):
+        async def recover(session, *, agents=None):
             nonlocal calls
             calls += 1
             if calls == 1:

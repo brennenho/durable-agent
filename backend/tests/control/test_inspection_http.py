@@ -56,7 +56,11 @@ def test_inspection_reads_saved_context_and_config_and_scopes_both_ids(client):
     response = client.get(f"{path}/{model['operation_id']}")
     assert response.status_code == 200
     assert response.json() == {"operation": model["operation"], "config": model["config"]}
-    assert model["operation"]["request"]["previous_turns"][0]["history"] == [model_result()]
+    assert model["operation"]["request"]["explicit_input"] == [
+        {"role": "user", "content": "Edit a file"},
+        *model_result()["native_context"],
+        {"role": "user", "content": "Continue"},
+    ]
 
     plan = model_result(
         "Editing",
@@ -85,7 +89,15 @@ def test_inspection_reads_saved_context_and_config_and_scopes_both_ids(client):
     assert saved["config"] == model["config"]
     assert saved["operation"]["request"] == {
         **model["operation"]["request"],
-        "history": [plan, output],
+        "explicit_input": [
+            *model["operation"]["request"]["explicit_input"],
+            *plan["native_context"],
+            {
+                "type": "function_call_output",
+                "call_id": "edit",
+                "output": '{"status":"ok","value":{}}',
+            },
+        ],
     }
     assert all("request" not in op for op in detail["operations"])
     assert pending["tool_name"] is pending["tool_target"] is None

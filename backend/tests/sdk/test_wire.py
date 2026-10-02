@@ -78,7 +78,7 @@ def test_legacy_submission_with_serialized_defaults_still_uses_prompt():
         (f"/api/runs/{uuid4()}/forks", {"after_operation_id": str(uuid4())}),
     ],
 )
-def test_custom_submission_never_silently_runs_the_legacy_agent(path, extra):
+def test_custom_submission_requires_a_started_control_runtime(path, extra):
     import asyncio
 
     import httpx
@@ -97,7 +97,7 @@ def test_custom_submission_never_silently_runs_the_legacy_agent(path, extra):
                     **extra,
                 },
             )
-        assert response.status_code == 501
-        assert response.json()["error"]["code"] == "sdk_unavailable"
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "not_ready"
 
     asyncio.run(check())
