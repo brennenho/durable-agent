@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import httpx
-from durable_agent.contracts import ModelRequest
 from durable_agent.control.app import create_app
 from fastapi.testclient import TestClient
 
@@ -66,24 +65,21 @@ def test_follow_up_http_survives_restart_and_replays_without_fetching_configurat
         assert client.post(path, json=body).json() == created.json()
         assert client.get(f"/api/runs/{first_id}").json() == first_view
         second = complete_model(client, worker, second_id)
-        assert second["config"] == first["config"]
+        inherited = second["config"]["agent_history"]
+        assert {**second["config"], "agent_history": []} == first["config"]
+        assert len(inherited) == 1
+        assert inherited[0]["operation_id"] == first["operation_id"]
+        assert inherited[0]["workspace_version_id"] == seed
+        assert inherited[0]["value"] == {
+            **model_result()["output"],
+            "native_context": model_result()["native_context"],
+        }
         assert second["attempt_no"] == second["lease_generation"] == 1
-        saved_request = ModelRequest.model_validate(second["operation"]["request"])
-        expected = ModelRequest(
-            prompt="Follow up",
-            history=[],
-            previous_turns=[
-                {"prompt": initial["prompt"], "history": [model_result()], "terminal_error": None}
-            ],
-        )
-        if saved_request.explicit_input is None:
-            assert saved_request == expected
-        else:
-            assert saved_request.explicit_input == [
-                {"role": "user", "content": initial["prompt"]},
-                *model_result()["native_context"],
-                {"role": "user", "content": body["prompt"]},
-            ]
+        assert second["operation"]["request"]["explicit_input"] == [
+            {"role": "user", "content": initial["prompt"]},
+            *model_result()["native_context"],
+            {"role": "user", "content": body["prompt"]},
+        ]
         replay = client.post(path, json=body)
         assert replay.status_code == 200
         assert replay.json()["id"] == second_id

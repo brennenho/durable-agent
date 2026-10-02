@@ -74,15 +74,13 @@ async def readiness(request: Request) -> dict[str, str]:
     },
 )
 async def submit_run(body: SubmitRunRequest, request: Request) -> RunSummary:
-    if body.is_sdk_input:
-        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     runtime = get_runtime(request)
     async with runtime.db.session() as session:
         if existing := await find_submission(session, body):
             return await detail(session, existing.id)
-    config = await runtime.new_config()
+    config = await runtime.new_config(body.agent or "builtin")
     async with runtime.db.session() as session:
-        run = await create_run(session, body, config)
+        run = await create_run(session, body, config, agents=runtime.agents)
         await session.commit()
         return await detail(session, run.id)
 
@@ -135,10 +133,10 @@ async def get_conversation(conversation_id: UUID, request: Request) -> Conversat
 async def submit_follow_up(
     conversation_id: UUID, body: SubmitFollowUpRequest, request: Request
 ) -> RunSummary:
-    if body.is_sdk_input:
-        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     async with get_runtime(request).db.session() as session:
-        run = await create_continuation(session, conversation_id, body)
+        run = await create_continuation(
+            session, conversation_id, body, agents=get_runtime(request).agents
+        )
         await session.commit()
         return await detail(session, run.id)
 
@@ -156,10 +154,8 @@ async def submit_follow_up(
     },
 )
 async def fork_run(run_id: UUID, body: SubmitForkRequest, request: Request) -> ConversationSummary:
-    if body.is_sdk_input:
-        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     async with get_runtime(request).db.session() as session:
-        run = await create_fork(session, run_id, body)
+        run = await create_fork(session, run_id, body, agents=get_runtime(request).agents)
         await session.commit()
         return await conversation_detail(session, run.conversation_id)
 

@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 import httpx
@@ -22,7 +23,18 @@ def model_result(text="Done", calls=None):
     return {
         "kind": "model",
         "output": {"status": "completed", "text": text, "tool_calls": calls or []},
-        "native_context": [],
+        "native_context": (
+            [{"type": "message", "role": "assistant", "content": text}] if text else []
+        )
+        + [
+            {
+                "type": "function_call",
+                "call_id": call["call_id"],
+                "name": call["name"],
+                "arguments": json.dumps(call["arguments"]),
+            }
+            for call in calls or []
+        ],
     }
 
 

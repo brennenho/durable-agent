@@ -139,11 +139,13 @@ async def recovery_loop(db: Database) -> None:
         await asyncio.sleep(1)
 
 
-async def delegation_loop(db: Database, hooks: CrashTestHooks) -> None:
+async def delegation_loop(
+    db: Database, hooks: CrashTestHooks, agents: AgentRuntime | None = None
+) -> None:
     while True:
         try:
             async with db.session() as session:
-                events = await advance_delegations(session)
+                events = await advance_delegations(session, agents=agents)
                 await session.commit()
             for name, run_id, operation_id in events:
                 try:
@@ -190,7 +192,7 @@ async def open_runtime(
                     if settings.worker_autoscale
                     else None
                 )
-                delegation = tasks.create_task(delegation_loop(db, hooks))
+                delegation = tasks.create_task(delegation_loop(db, hooks, agents))
                 try:
                     yield Runtime(db, tools, settings, hooks, agents)
                 finally:
