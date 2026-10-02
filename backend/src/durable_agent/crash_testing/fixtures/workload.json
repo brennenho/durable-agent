@@ -1,0 +1,49 @@
+{
+  "plan": {
+    "id": "resp_crash_test",
+    "object": "response",
+    "created_at": 1790899200,
+    "model": "crash-test-recorded",
+    "status": "completed",
+    "error": null,
+    "parallel_tool_calls": false,
+    "tool_choice": "auto",
+    "tools": [],
+    "output": [
+      {
+        "id": "fc_marker",
+        "type": "function_call",
+        "status": "completed",
+        "call_id": "call_marker",
+        "name": "run_command",
+        "arguments": "{\"command\": \"python -c 'import time; time.sleep(3); from pathlib import Path; from uuid import uuid4; marker = str(uuid4()); Path(\\\"crash-proof.txt\\\").write_text(marker); print(marker)'\", \"timeout_seconds\": 10}"
+      }
+    ]
+  },
+  "done": {
+    "id": "resp_crash_test_done",
+    "object": "response",
+    "created_at": 1790899200,
+    "model": "crash-test-recorded",
+    "status": "completed",
+    "error": null,
+    "parallel_tool_calls": false,
+    "tool_choice": "auto",
+    "tools": [],
+    "output": [
+      {
+        "id": "msg_done",
+        "type": "message",
+        "role": "assistant",
+        "status": "completed",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "The execution marker is saved in crash-proof.txt.",
+            "annotations": []
+          }
+        ]
+      }
+    ]
+  }
+}

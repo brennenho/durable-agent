@@ -99,3 +99,14 @@ exit, and restart is appended to a local JSONL journal independently of Postgres
 An in-flight kill/recovery task survives cancellation of the hook HTTP request;
 closing the controller waits for it. A controller process crash can still interrupt
 recovery; the operator must inspect the journal and restore stopped services.
+
+## Recorded workload
+
+`compose.crash-test-recorded.yaml` selects a dedicated worker entry point using checked-in
+model responses. It never constructs an OpenAI client. Its only supported prompt is
+`Crash Test: write a unique execution marker to crash-proof.txt and return it.`
+The tool is a real sandbox command: it writes and prints a fresh UUID. Retried model
+calls select the same response from saved input, independent of how often they execute.
+The final response requires a successful accepted tool result; unsupported input fails.
+Normal application workers remain unchanged. Use the recorded overlay only in an
+isolated `crash-test-*` project, alongside `compose.crash-test.yaml`.

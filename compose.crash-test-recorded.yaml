@@ -1,0 +1,10 @@
+# Use only for the isolated scenario project; the normal worker stays unchanged.
+services:
+  control:
+    environment:
+      OPENAI_MODEL: crash-test-recorded
+  worker:
+    command: ["python", "-m", "durable_agent.crash_testing.worker"]
+    environment:
+      CRASH_TEST_PROJECT: ${COMPOSE_PROJECT_NAME:?Set a crash-test-* project name}
+      OPENAI_API_KEY: unused-recorded-workload
