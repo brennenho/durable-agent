@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { components } from "../lib/api.generated";
 import { OperationOutput } from "./operation-output";
+import { Button } from "./ui/button";
 import { requestJson } from "../lib/api";
 import { InspectionDisclosure, InspectionJson, ToolArguments } from "./inspection-json";
 
@@ -122,63 +123,64 @@ function InputTechnical({ data }: { data: Inspection }) {
   );
 }
 
-export function OperationInput({
-  runId,
-  operationId,
-  kind,
-}: {
-  runId: string;
-  operationId: string;
-  kind: "model" | "tool";
-}) {
-  const [open, setOpen] = useState(false);
+export function useOperationInput(runId: string, operationId: string, kind: "model" | "tool") {
   const [data, setData] = useState<Inspection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
-  return (
-    <details
-      className="mt-4 rounded-md border bg-background px-4 py-3"
-      onToggle={(event) => {
-        if (event.target !== event.currentTarget) return;
-        const expanded = event.currentTarget.open;
-        setOpen(expanded);
-        controller.current?.abort();
-        if (!expanded) return;
-        const pending = new AbortController();
-        controller.current = pending;
-        setData(null);
-        setError(null);
-        requestJson<Inspection>(
-          `/api/runs/${encodeURIComponent(runId)}/operations/${encodeURIComponent(operationId)}`,
-          { signal: pending.signal },
-        )
-          .then((value) => checkedInput(value, kind))
-          .then((value) => {
-            if (!pending.signal.aborted) setData(value);
-          })
-          .catch((cause) => {
-            if (!pending.signal.aborted)
-              setError(cause instanceof Error ? cause.message : "Could not load the saved input.");
-          });
-      }}
-    >
-      <summary className="text-xs font-medium">Saved {kind} input</summary>
-      {open &&
-        (error ? (
-          <p role="alert" aria-label="Input inspection error">
-            {error} Close and reopen to retry.
-          </p>
-        ) : data ? (
-          <>
-            <InputContent data={data} />
-            <InspectionDisclosure title="Input technical details">
-              <InputTechnical data={data} />
-            </InspectionDisclosure>
-          </>
-        ) : (
-          <p aria-live="polite">Loading saved input…</p>
-        ))}
-    </details>
-  );
+
+  function cancel() {
+    controller.current?.abort();
+    controller.current = null;
+  }
+
+  function load() {
+    if (data || controller.current) return;
+    const pending = new AbortController();
+    controller.current = pending;
+    setError(null);
+    requestJson<Inspection>(
+      `/api/runs/${encodeURIComponent(runId)}/operations/${encodeURIComponent(operationId)}`,
+      { signal: pending.signal },
+    )
+      .then((value) => checkedInput(value, kind))
+      .then((value) => {
+        if (!pending.signal.aborted) setData(value);
+      })
+      .catch((cause) => {
+        if (!pending.signal.aborted)
+          setError(cause instanceof Error ? cause.message : "Could not load the saved input.");
+      })
+      .finally(() => {
+        if (controller.current === pending) controller.current = null;
+      });
+  }
+  return { data, error, load, cancel };
+}
+
+export function OperationInput({
+  input,
+  technical = false,
+}: {
+  input: ReturnType<typeof useOperationInput>;
+  technical?: boolean;
+}) {
+  if (input.error)
+    return (
+      <div>
+        <p role="alert" aria-label="Input inspection error" className="text-xs">
+          {input.error}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={input.load}>
+          Retry inspection
+        </Button>
+      </div>
+    );
+  if (!input.data)
+    return (
+      <p className="text-xs text-muted-foreground" aria-live="polite">
+        Loading saved input…
+      </p>
+    );
+  return technical ? <InputTechnical data={input.data} /> : <InputContent data={input.data} />;
 }

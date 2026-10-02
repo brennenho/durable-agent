@@ -4,8 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { cn } from "../lib/utils";
-import { OperationInput } from "./operation-input";
-import { AttemptMetadata, OperationOutput, OutputTechnical } from "./operation-output";
+import { OperationInspection } from "./operation-inspection";
 import { operationName, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
 
@@ -39,63 +38,7 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
             status={run.status}
           />
         </summary>
-        {open && (
-          <div className="px-3 pb-4 sm:pl-8">
-            <OperationOutput result={operation.result} />
-            <OperationInput runId={run.id} operationId={operation.id} kind={operation.kind} />
-            <InspectionDisclosure title="Technical details">
-              <p className="run-id">Operation ID: {operation.id}</p>
-              <OutputTechnical operation={operation} />
-              <ol className="attempt-list">
-                {operation.attempts.map((attempt) => (
-                  <li key={attempt.id}>
-                    <p className="my-1">
-                      <strong>
-                        Attempt {attempt.attempt_no}
-                        {run.max_attempts ? ` of ${run.max_attempts}` : ""}
-                      </strong>{" "}
-                      · {attempt.status}
-                    </p>
-                    <p className="my-1 text-xs text-muted-foreground">
-                      Started{" "}
-                      <time dateTime={attempt.started_at}>
-                        {new Date(attempt.started_at).toLocaleString()}
-                      </time>
-                      {attempt.finished_at && (
-                        <>
-                          {" "}
-                          · Finished{" "}
-                          <time dateTime={attempt.finished_at}>
-                            {new Date(attempt.finished_at).toLocaleString()}
-                          </time>
-                        </>
-                      )}
-                    </p>
-                    <AttemptMetadata attempt={attempt} kind={operation.kind} />
-                    {attempt.error && (
-                      <p className="attempt-error my-2 rounded-md bg-destructive/5 px-3 py-2 text-xs">
-                        {attempt.error.code}: {attempt.error.message}
-                      </p>
-                    )}
-                    {attempt.error && (
-                      <p className="my-2 text-xs text-muted-foreground">
-                        {attempt.error.retryable
-                          ? "This error allows another attempt within the attempt limit."
-                          : "This error is not retryable."}
-                      </p>
-                    )}
-                    {attempt.status === "unknown" && (
-                      <p className="my-2 text-xs text-muted-foreground">
-                        No conclusive result was recorded. The worker did not report before its
-                        lease expired.
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </InspectionDisclosure>
-          </div>
-        )}
+        {open && <OperationInspection run={run} operation={operation} />}
       </details>
     </li>
   );

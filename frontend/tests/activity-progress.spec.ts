@@ -43,13 +43,11 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("shows the loop position, named tool, and elapsed execution", async ({ page }) => {
+test("shows the named tool and elapsed execution", async ({ page }) => {
   let current: RunDetail = { ...runDetail, operations: [model, tool] };
   await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${runDetail.id}`);
-  await expect(page.getByRole("status")).toHaveText(
-    "Model round 1 · Tool 1 of 2 · Waiting for a worker: write_file",
-  );
+  await expect(page.getByRole("status")).toHaveText("Waiting for a worker: write_file");
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByLabel("2. write_file", { exact: true })).toBeVisible();
@@ -152,7 +150,7 @@ test("a failed command is a completed result and the next model call waits for a
   };
   await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${runDetail.id}`);
-  await expect(page.getByRole("status")).toHaveText("Model round 2 · Waiting for a worker");
+  await expect(page.getByRole("status")).toHaveText("Waiting for a worker");
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByText("Command exited with code 1.")).toBeVisible();

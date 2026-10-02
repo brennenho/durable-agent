@@ -85,15 +85,20 @@ test("loads context lazily without repeating the current prompt or exposing prov
   await page.clock.fastForward(4000);
   expect(calls).toBe(0);
   await page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary").click();
-  await page.getByText("Saved model input", { exact: true }).click();
+  await page.getByRole("tab", { name: "Output", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByText("Fix the failing test.", { exact: true })).toBeVisible();
   await expect(page.getByText("Fix the failing test.", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
   await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
   await expect(page.getByText("Earlier file contents", { exact: true })).toBeVisible();
   await expect(page.getByText("Create a calculator.", { exact: true })).toBeVisible();
   await expect(page.getByText("This turn failed: Interrupted")).toBeVisible();
   await expect(page.getByText(/Encrypted context present/)).toBeHidden();
-  await page.getByText("Input technical details", { exact: true }).click();
+  await page.getByRole("tab", { name: "Technical details", exact: true }).click();
   await page.getByText("Raw saved context", { exact: true }).click();
   await expect(page.getByText(/Encrypted context present/)).toBeVisible();
   await expect(page.getByText("opaque-blob", { exact: false })).toHaveCount(0);
@@ -102,7 +107,7 @@ test("loads context lazily without repeating the current prompt or exposing prov
 });
 
 for (const failure of ["malformed", "unavailable"]) {
-  test(`shows loading and ${failure} responses, and retries when reopened`, async ({ page }) => {
+  test(`shows loading and ${failure} responses, and retries on demand`, async ({ page }) => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {
       release = resolve;
@@ -122,15 +127,14 @@ for (const failure of ["malformed", "unavailable"]) {
     await page.goto(`/runs/${runDetail.id}`);
     await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
     await page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary").click();
-    const trigger = page.getByText("Saved model input", { exact: true });
+    const trigger = page.getByRole("tab", { name: "Context", exact: true });
     await trigger.click();
     await expect(page.getByText("Loading saved input…")).toBeVisible();
     release();
     await expect(page.getByRole("alert", { name: "Input inspection error" })).toContainText(
       failure === "malformed" ? "The saved input response is invalid." : "Inspection unavailable",
     );
-    await trigger.click();
-    await trigger.click();
+    await page.getByRole("button", { name: "Retry inspection" }).click();
     await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
     expect(calls).toBe(2);
   });
@@ -181,7 +185,7 @@ test("shows full tool arguments without executing their contents", async ({ page
   await page.goto(`/runs/${runDetail.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   await page.getByLabel("1. write_file", { exact: true }).locator(":scope > summary").click();
-  await page.getByText("Saved tool input", { exact: true }).click();
+  await page.getByRole("tab", { name: "Arguments", exact: true }).click();
   await expect(page.getByRole("region", { name: "Execution history" })).toContainText(
     "<script>not executable</script>",
   );
@@ -192,6 +196,44 @@ test("shows full tool arguments without executing their contents", async ({ page
     exact: false,
   });
   await expect(workspace).toBeHidden();
-  await page.getByText("Input technical details", { exact: true }).click();
+  await page.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(workspace).toBeVisible();
 });
+
+for (const close of ["Output", "step", "Activity", "navigation"]) {
+  test(`cancels inspection on ${close} and can load it again`, async ({ page }) => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    await page.route(endpoint, async (route) => {
+      calls++;
+      if (calls === 1) await pending;
+      await route.fulfill({ json: input });
+    });
+    await page.goto(`/runs/${runDetail.id}`);
+    const activity = page.getByLabel("Activity", { exact: true }).locator(":scope > summary");
+    const step = page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary");
+    await activity.click();
+    await step.click();
+    expect(calls).toBe(0);
+    await page.getByRole("tab", { name: "Context", exact: true }).click();
+    await expect(page.getByText("Loading saved input…")).toBeVisible();
+    const aborted = page.waitForEvent("requestfailed", (request) =>
+      request.url().endsWith(`/operations/${operationId}`),
+    );
+    if (close === "Output") await page.getByRole("tab", { name: "Output", exact: true }).click();
+    else if (close === "step") await step.click();
+    else if (close === "Activity") await activity.click();
+    else await page.getByRole("link", { name: "New chat", exact: true }).click();
+    await aborted;
+    release();
+    if (close === "navigation") await page.goto(`/runs/${runDetail.id}`);
+    if (close === "Activity" || close === "navigation") await activity.click();
+    if (close !== "Output") await step.click();
+    await page.getByRole("tab", { name: "Context", exact: true }).click();
+    await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
+    expect(calls).toBe(2);
+  });
+}

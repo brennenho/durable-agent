@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { RunHistory } from "./run-history";
@@ -5,8 +8,9 @@ import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
 
 export function ChatTurn({ run }: { run: RunDetail }) {
+  const [activityOpen, setActivityOpen] = useState(false);
   const finished = run.status === "succeeded" || run.status === "failed";
-  const completed = run.operations.filter((operation) => operation.completed_at !== null).length;
+  const steps = run.operations.length;
 
   return (
     <article aria-label="Chat turn" className="space-y-8">
@@ -18,20 +22,26 @@ export function ChatTurn({ run }: { run: RunDetail }) {
       </div>
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
         <h2 className="mb-3 text-sm font-medium">Applied Agent</h2>
-        <details aria-label="Activity" className="group/activity mb-5">
+        <details
+          aria-label="Activity"
+          className="group/activity mb-5"
+          onToggle={(event) => {
+            if (event.target === event.currentTarget) setActivityOpen(event.currentTarget.open);
+          }}
+        >
           <summary className="flex w-fit list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
             <ChevronRight
               aria-hidden="true"
               className="size-3.5 transition-transform group-open/activity:rotate-90"
             />
             <ActivityStatus run={run} />
-            {completed > 0 && (
+            {steps > 0 && (
               <span>
-                · {completed} {completed === 1 ? "step" : "steps"}
+                · {steps} {steps === 1 ? "step" : "steps"}
               </span>
             )}
           </summary>
-          <RunHistory run={run} />
+          {activityOpen && <RunHistory run={run} />}
         </details>
         {run.terminal_error && (
           <p
