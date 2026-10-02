@@ -21,6 +21,7 @@ from durable_agent.contracts import (
     FileListing,
     HeartbeatRequest,
     HeartbeatResponse,
+    OperationInspection,
     ReportRequest,
     ReportResponse,
     RunDetail,
@@ -37,7 +38,7 @@ from durable_agent.control.leases import claim, heartbeat
 from durable_agent.control.reports import accept_report
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.control.runtime import DATABASE_UNAVAILABLE, Runtime, Settings, open_runtime
-from durable_agent.control.views import detail, list_summaries
+from durable_agent.control.views import detail, inspect_operation, list_summaries
 
 health = APIRouter()
 routes = APIRouter(
@@ -149,6 +150,17 @@ async def list_runs(request: Request) -> list[RunSummary]:
 async def get_run(run_id: UUID, request: Request) -> RunDetail:
     async with get_runtime(request).db.session() as session:
         return await detail(session, run_id)
+
+
+@routes.get(
+    "/api/runs/{run_id}/operations/{operation_id}",
+    response_model=OperationInspection,
+    operation_id="inspect_operation",
+    responses={404: {"model": ErrorResponse, "description": "Operation not found in this run"}},
+)
+async def get_operation(run_id: UUID, operation_id: UUID, request: Request) -> OperationInspection:
+    async with get_runtime(request).db.session() as session:
+        return await inspect_operation(session, run_id, operation_id)
 
 
 @routes.get(

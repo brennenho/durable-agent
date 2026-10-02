@@ -25,6 +25,7 @@ def client():
         ),
         ("GET", "/api/runs", None),
         ("GET", f"/api/runs/{ID}", None),
+        ("GET", f"/api/runs/{ID}/operations/{ID}", None),
         ("GET", f"/api/runs/{ID}/files", None),
         ("GET", f"/api/runs/{ID}/file?version_id={ID}&path=a.md", None),
         ("POST", "/internal/claims", {"worker_id": ID}),

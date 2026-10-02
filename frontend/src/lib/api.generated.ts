@@ -125,6 +125,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/operations/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Operation */
+        get: operations["inspect_operation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -291,6 +308,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Provider Request Id */
+            provider_request_id?: string | null;
             /**
              * Started At
              * Format: date-time
@@ -301,6 +320,10 @@ export interface components {
              * @enum {string}
              */
             status: "running" | "accepted" | "error" | "unknown";
+            /** Usage */
+            usage?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /** ClaimRequest */
         ClaimRequest: {
@@ -487,6 +510,12 @@ export interface components {
             }[];
             output: components["schemas"]["ModelOutput"];
         };
+        /** OperationInspection */
+        OperationInspection: {
+            config: components["schemas"]["AgentConfig"];
+            /** Operation */
+            operation: components["schemas"]["ModelOperation"] | components["schemas"]["ToolOperation"];
+        };
         /** OperationView */
         OperationView: {
             /** Attempts */
@@ -512,6 +541,10 @@ export interface components {
             position: number;
             /** Result */
             result: (components["schemas"]["ModelResult"] | components["schemas"]["ToolResult"]) | null;
+            /** Tool Name */
+            tool_name?: string | null;
+            /** Tool Target */
+            tool_target?: string | null;
         };
         /** PreviousTurn */
         PreviousTurn: {
@@ -561,6 +594,8 @@ export interface components {
             last_heartbeat_at: string | null;
             /** Last Progress At */
             last_progress_at: string | null;
+            /** Max Attempts */
+            max_attempts?: number | null;
             /** Model */
             model: string;
             /** Next Attempt At */
@@ -1230,6 +1265,65 @@ export interface operations {
                 };
             };
             /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspect_operation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationInspection"];
+                };
+            };
+            /** @description Operation not found in this run */
             404: {
                 headers: {
                     [name: string]: unknown;
