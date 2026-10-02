@@ -1,7 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { RunHistory } from "./run-history";
-import { SavedFiles } from "./saved-files";
 import { MarkdownAnswer } from "./markdown-answer";
 
 const statusLabels = {
@@ -75,7 +74,6 @@ export function ChatTurn({ run }: { run: RunDetail }) {
             </p>
           )}
         </section>
-        <SavedFiles runId={run.id} workspaceVersionId={run.workspace_version_id} />
       </section>
     </article>
   );

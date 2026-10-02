@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, requestJson, type RunDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
+import { ChatWorkspace } from "./chat-workspace";
 
 export function RunDetailView({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunDetail | null>(null);
@@ -43,18 +44,20 @@ export function RunDetailView({ runId }: { runId: string }) {
   }, [runId]);
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <p
-          role="alert"
-          aria-label="Run update error"
-          className="rounded-md border border-destructive/20 bg-destructive/5 p-4"
-        >
-          {error}
-        </p>
-      )}
-      {!run && !error && <p role="status">Loading chat…</p>}
-      {run && <ChatTurn run={run} />}
-    </div>
+    <ChatWorkspace runs={run ? [run] : []}>
+      <div className="space-y-6">
+        {error && (
+          <p
+            role="alert"
+            aria-label="Run update error"
+            className="rounded-md border border-destructive/20 bg-destructive/5 p-4"
+          >
+            {error}
+          </p>
+        )}
+        {!run && !error && <p role="status">Loading chat…</p>}
+        {run && <ChatTurn run={run} />}
+      </div>
+    </ChatWorkspace>
   );
 }

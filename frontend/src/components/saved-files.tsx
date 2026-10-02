@@ -72,12 +72,14 @@ export function SavedFiles({
 
   const files = listing?.entries.filter((entry) => entry.kind === "file");
   const preview = files?.find((entry) => entry.path === previewPath);
-  if (files?.length === 0 && !error && !downloadError && !downloading) return null;
 
   return (
-    <section aria-label="Saved files" className="mt-5 min-w-0 border-0 bg-transparent p-0">
+    <section aria-label="Saved files" className="m-0 min-w-0 border-0 bg-transparent p-0">
       <h2 className="sr-only">Saved files</h2>
       {!listing && !error && <p className="text-xs text-muted-foreground">Loading files…</p>}
+      {files?.length === 0 && !error && (
+        <p className="text-xs text-muted-foreground">No saved files yet.</p>
+      )}
       {error && (
         <div>
           <p role="alert" aria-label="File listing error" className="mt-0">
@@ -96,26 +98,34 @@ export function SavedFiles({
         </div>
       )}
       {files && (
-        <ul className="m-0 flex flex-wrap gap-2 p-0">
+        <ul className="m-0 space-y-1 p-0">
           {files.map((entry) => (
-            <li key={entry.path} className="flex min-w-0 max-w-full rounded-md border">
+            <li key={entry.path} className="flex min-w-0 items-center rounded-md hover:bg-muted/60">
               <Button
                 variant="ghost"
-                className="h-auto min-w-0 justify-start gap-2 rounded-r-none px-3 py-2 text-left whitespace-normal"
+                className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-2 text-left"
                 onClick={(event) => {
                   previewTrigger.current = event.currentTarget;
                   setDownloadError(null);
                   setPreviewPath(entry.path);
                 }}
                 aria-label={`Preview ${entry.path}`}
+                title={entry.path}
               >
                 <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" />
-                <span className="min-w-0 break-all text-xs font-normal">{entry.path}</span>
+                <span className="min-w-0 text-xs font-normal">
+                  <span className="block truncate">{entry.path.split("/").pop()}</span>
+                  {entry.path.includes("/") && (
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {entry.path.slice(0, entry.path.lastIndexOf("/"))}
+                    </span>
+                  )}
+                </span>
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-auto rounded-l-none border-l"
+                className="size-8 shrink-0"
                 disabled={downloading !== null}
                 aria-busy={downloading === entry.path}
                 onClick={() => download(entry.path)}
