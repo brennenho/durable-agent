@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { ExecutionTimeline } from "./execution-timeline";
 import { ActivityStatus } from "./activity-state";
-import { MarkdownAnswer } from "./markdown-answer";
+import { RunOutput } from "./run-output";
 import { RunControls } from "./run-controls";
 import { FailedAttemptsBadge } from "./failed-attempts-badge";
 import { SubagentList } from "./subagent-list";
@@ -88,15 +88,7 @@ export function ChatTurn({
             {run.terminal_error.message}
           </p>
         )}
-        {(run.final_answer !== null || (finished && !run.terminal_error)) && (
-          <section aria-label="Final output" className="m-0 border-0 bg-transparent p-0">
-            {run.final_answer ? (
-              <MarkdownAnswer text={run.final_answer} />
-            ) : (
-              <p className="text-muted-foreground">No final answer.</p>
-            )}
-          </section>
-        )}
+        <RunOutput run={run} />
       </section>
     </article>
   );
