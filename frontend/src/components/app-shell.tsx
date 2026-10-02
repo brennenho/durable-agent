@@ -35,8 +35,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Link
         href="/"
         onClick={() => setOpen(false)}
-        className="px-3 py-3 font-semibold tracking-tight"
+        className="flex items-center gap-2.5 px-3 py-3 font-semibold tracking-tight"
       >
+        <span aria-hidden="true" className="size-2.5 shrink-0 rounded-xs bg-primary" />
         Applied Agent
       </Link>
       <Button asChild variant="outline" className="justify-start bg-card shadow-none">
@@ -73,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setOpen(false)}
                   title={conversation.title}
                   aria-current={pathname === href ? "page" : undefined}
-                  className="block truncate rounded-md px-3 py-2.5 hover:bg-accent aria-[current=page]:bg-accent"
+                  className="block truncate rounded-md border-l-2 border-transparent px-3 py-2.5 hover:bg-accent aria-[current=page]:border-l-primary aria-[current=page]:bg-primary/8"
                 >
                   {conversation.title}
                 </Link>
@@ -117,7 +118,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>
-          <span className="font-medium">Applied Agent</span>
+          <span className="flex items-center gap-2.5 font-medium">
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-xs bg-primary" />
+            Applied Agent
+          </span>
         </header>
         {children}
       </div>

@@ -219,7 +219,7 @@ test("tints failed results and attempts without treating unknown or recovered ou
       swatch.fillStyle = getComputedStyle(element).backgroundColor;
       swatch.fillRect(0, 0, 1, 1);
       const [red, green, blue, alpha] = swatch.getImageData(0, 0, 1, 1).data;
-      return red > green && red > blue && alpha > 0 && alpha < 40;
+      return red > green && Math.abs(green - blue) < 20 && alpha > 0 && alpha < 40;
     });
     expect(redTint).toBe(tinted);
   }

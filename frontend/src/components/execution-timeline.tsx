@@ -46,7 +46,8 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
         <summary
           className={cn(
             "flex list-none gap-2 border-l-2 border-transparent px-2 py-3 hover:bg-muted/50 [&::-webkit-details-marker]:hidden",
-            current && "border-l-foreground bg-muted/50",
+            current && "border-l-primary",
+            current && !failed && "bg-primary/5 hover:bg-primary/8",
             failed && "bg-destructive/5 hover:bg-destructive/10",
           )}
         >

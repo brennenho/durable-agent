@@ -33,7 +33,7 @@ export function TimelineStamp({
         <span
           className={cn(
             "absolute top-[18px] left-1/2 size-2 -translate-x-1/2 rounded-full border bg-background",
-            active && "border-foreground bg-foreground",
+            active && "border-primary bg-primary",
             failed && "border-destructive bg-destructive",
           )}
         />
