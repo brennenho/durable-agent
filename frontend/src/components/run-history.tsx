@@ -1,5 +1,6 @@
 import type { RunDetail } from "../lib/api";
 import { Badge } from "./ui/badge";
+import { OperationInput } from "./operation-input";
 import { loopPosition, operationName } from "./activity-state";
 
 export function RunHistory({ run }: { run: RunDetail }) {
@@ -122,6 +123,7 @@ export function RunHistory({ run }: { run: RunDetail }) {
                           : null}
                 </p>
               )}
+              <OperationInput runId={run.id} operationId={operation.id} kind={operation.kind} />
               {operation.result?.kind === "tool" && (
                 <details className="mt-4 rounded-md border bg-background px-4 py-3">
                   <summary className="text-xs font-medium">Saved tool output</summary>
