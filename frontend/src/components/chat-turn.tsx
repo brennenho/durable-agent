@@ -6,8 +6,15 @@ import type { RunDetail } from "../lib/api";
 import { ExecutionTimeline } from "./execution-timeline";
 import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
+import { RunControls } from "./run-controls";
 
-export function ChatTurn({ run }: { run: RunDetail }) {
+export function ChatTurn({
+  run,
+  onUpdate,
+}: {
+  run: RunDetail;
+  onUpdate: (run: RunDetail) => void;
+}) {
   const [activityOpen, setActivityOpen] = useState(false);
   const finished = run.status === "succeeded" || run.status === "failed";
   const steps = run.operations.length;
@@ -59,12 +66,17 @@ export function ChatTurn({ run }: { run: RunDetail }) {
             <p className="text-muted-foreground">
               {finished
                 ? "This task ended without a final answer."
-                : run.status === "queued"
-                  ? "Your task is queued."
-                  : "Working on your task…"}
+                : run.pause_requested
+                  ? run.status === "running"
+                    ? "The current call will finish before pausing."
+                    : "Your task is paused. Resume to continue."
+                  : run.status === "queued"
+                    ? "Your task is queued."
+                    : "Working on your task…"}
             </p>
           )}
         </section>
+        {!finished && <RunControls run={run} onUpdate={onUpdate} />}
       </section>
     </article>
   );
