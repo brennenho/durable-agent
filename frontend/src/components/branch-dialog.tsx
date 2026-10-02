@@ -85,13 +85,15 @@ export function BranchDialog({ run, operation }: { run: RunDetail; operation: Op
 
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
-      <div className="px-2 pb-3 sm:pl-8">
-        <Dialog.Trigger asChild>
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
-            <GitBranch aria-hidden="true" /> Branch from here
-          </Button>
-        </Dialog.Trigger>
-      </div>
+      <Dialog.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-mr-1.5 h-6 justify-self-end px-1.5 text-xs text-muted-foreground"
+        >
+          <GitBranch aria-hidden="true" /> Branch from here
+        </Button>
+      </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-foreground/20" />
         <Dialog.Content

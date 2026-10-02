@@ -54,16 +54,18 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
               operation={operation}
               status={run.status}
             />
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Planned{" "}
-              <time dateTime={operation.created_at}>
-                {new Date(operation.created_at).toLocaleString()}
-              </time>
+            <span className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 text-xs text-muted-foreground">
+              <span>
+                Planned{" "}
+                <time dateTime={operation.created_at}>
+                  {new Date(operation.created_at).toLocaleString()}
+                </time>
+              </span>
+              {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
             </span>
           </span>
         </summary>
         {open && <OperationInspection run={run} operation={operation} />}
-        {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
       </details>
     </li>
   );
