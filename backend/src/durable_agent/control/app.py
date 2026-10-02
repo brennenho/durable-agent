@@ -48,7 +48,6 @@ from durable_agent.crash_test import HookInterrupted
 health = APIRouter()
 routes = APIRouter(
     responses={
-        501: {"model": ErrorResponse, "description": "Handler not implemented"},
         503: {"model": ErrorResponse, "description": "Service unavailable"},
     }
 )
