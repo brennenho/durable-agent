@@ -82,7 +82,7 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
   );
   await expect(history.locator(".attempt-list > li").nth(2)).toContainText("Attempt 3 · accepted");
   await history.getByText("Saved tool output").click();
-  await expect(history.locator("pre")).toContainText("1 test failed");
+  await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Completed");
 });
 
