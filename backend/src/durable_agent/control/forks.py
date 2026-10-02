@@ -47,6 +47,10 @@ async def create_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRe
     )
     if source is None:
         raise ControlError(404, "run_not_found", "Run not found")
+    if source.parent_operation_id is not None:
+        raise ControlError(
+            409, "child_run_read_only", "Control this subagent through its parent run"
+        )
     operations = await load_operations(session, source_id)
     selected = next((op for op in operations if op.id == body.after_operation_id), None)
     if selected is None:
