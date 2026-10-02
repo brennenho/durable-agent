@@ -153,3 +153,96 @@ def test_invalid_retry_after_is_ignored(value):
 def test_retry_after_accepts_http_date():
     value = format_datetime(datetime.now(UTC) + timedelta(seconds=30), usegmt=True)
     assert 28 < retry_after_seconds(value) <= 30
+
+
+def test_sdk_request_uses_saved_input_and_selected_model_tools(config, response_payload):
+    explicit = [
+        {"role": "developer", "content": "Return a short report."},
+        {"role": "user", "content": "Review the saved document."},
+    ]
+    tools = [{"type": "function", "name": "review", "parameters": {"type": "object"}}]
+    request = ModelRequest(
+        prompt="Not part of the explicit input",
+        history=[],
+        explicit_input=explicit,
+        model="selected-model",
+        model_params={"max_output_tokens": 512},
+        tool_schemas=tools,
+    )
+    original = request.model_dump()
+
+    def handler(http_request):
+        body = json.loads(http_request.content)
+        assert body["input"] == explicit
+        assert body["model"] == "selected-model"
+        assert body["max_output_tokens"] == 512
+        assert body["tools"] == tools
+        assert body["stream"] is body["background"] is body["store"] is False
+        return httpx.Response(200, json=response_payload)
+
+    assert isinstance(run_client(config, handler, request), SuccessfulOutcome)
+    assert request.model_dump() == original
+
+
+def test_empty_sdk_fields_do_not_fall_back_to_legacy_defaults(config, response_payload):
+    config.tool_schemas = [{"name": "unexpected_tool"}]
+    request = ModelRequest(
+        prompt="Do not append this prompt",
+        history=[],
+        explicit_input=[],
+        model_params={},
+        tool_schemas=[],
+    )
+
+    def handler(http_request):
+        body = json.loads(http_request.content)
+        assert body["input"] == []
+        assert body["tools"] == []
+        assert body["model"] == config.model
+        assert "max_output_tokens" not in body
+        return httpx.Response(200, json=response_payload)
+
+    assert isinstance(run_client(config, handler, request), SuccessfulOutcome)
+
+
+@pytest.mark.parametrize("key", ["stream", "timeout", "extra_body", "previous_response_id"])
+def test_sdk_parameters_cannot_override_execution_fields(config, key):
+    request = ModelRequest(prompt="", history=[], explicit_input=[], model_params={key: None})
+
+    def handler(request):
+        pytest.fail("Invalid configuration must not reach the provider")
+
+    outcome = run_client(config, handler, request)
+    assert outcome.error.code == "invalid_model_config"
+    assert not outcome.error.retryable
+
+
+def test_sdk_provider_failure_is_reported_without_retrying(config):
+    requests = []
+    request = ModelRequest(
+        prompt="", history=[], explicit_input=[{"role": "user", "content": "Hi"}]
+    )
+
+    def handler(http_request):
+        requests.append(http_request)
+        return httpx.Response(429, json={"error": {"message": "Unavailable"}})
+
+    outcome = run_client(config, handler, request)
+    assert outcome.error.retryable
+    assert outcome.error.code == "openai_http_429"
+    assert len(requests) == 1
+
+
+def test_sdk_request_cannot_extend_the_assigned_deadline(config):
+    cancelled = []
+    request = ModelRequest(prompt="", history=[], explicit_input=[], timeout_seconds=900)
+
+    async def handler(http_request):
+        try:
+            await asyncio.Future()
+        finally:
+            cancelled.append(True)
+
+    outcome = run_client(config, handler, request, timeout=0.01)
+    assert outcome.error.code == "call_timeout"
+    assert cancelled == [True]

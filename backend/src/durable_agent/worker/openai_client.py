@@ -43,6 +43,9 @@ class OpenAIClient:
     async def execute(
         self, config: AgentConfig, request: ModelRequest, *, timeout_seconds: float
     ) -> AttemptOutcome:
+        parameters = (
+            request.model_params if request.model_params is not None else config.model_params
+        )
         reserved = {
             "model",
             "input",
@@ -58,7 +61,7 @@ class OpenAIClient:
             "extra_headers",
             "extra_query",
         }
-        if reserved.intersection(config.model_params):
+        if reserved.intersection(parameters):
             return FailedOutcome(
                 status="failed",
                 error=ExecutionError(
@@ -72,10 +75,14 @@ class OpenAIClient:
         try:
             async with asyncio.timeout(timeout_seconds):
                 response = await self._client.responses.create(
-                    **config.model_params,
-                    model=config.model,
-                    input=response_input(request),
-                    tools=config.tool_schemas,
+                    **parameters,
+                    model=request.model if request.model is not None else config.model,
+                    input=request.explicit_input
+                    if request.explicit_input is not None
+                    else response_input(request),
+                    tools=request.tool_schemas
+                    if request.tool_schemas is not None
+                    else config.tool_schemas,
                     stream=False,
                     background=False,
                     store=False,

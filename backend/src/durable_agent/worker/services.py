@@ -68,6 +68,9 @@ class ServiceClient:
         body = await self._post(
             f"{self._tools}/tools/execute",
             ToolExecuteRequest(
+                definition=assignment.config.tool_definitions.get(request.call.name),
+                run_id=assignment.run_id,
+                attempt_id=assignment.attempt_id,
                 operation_id=assignment.operation_id,
                 input_version_id=request.input_version_id,
                 name=request.call.name,
