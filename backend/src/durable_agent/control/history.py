@@ -61,6 +61,15 @@ def branch_checkpoints(run: Run, operations: list[Operation]) -> dict[UUID, Bran
         if operation.completed_at is None:
             break
         accepted.append(operation)
+    config = AgentConfig.model_validate(run.config)
+    if config.agent is not None and config.agent.name != "builtin":
+        version = config.initial_workspace_version_id
+        checkpoints = {}
+        for operation in accepted:
+            if operation.kind == "tool":
+                version = UUID(operation.result["workspace_version_id"])
+            checkpoints[operation.id] = BranchCheckpoint(workspace_version_id=version)
+        return checkpoints
     rounds = closed_rounds(restore_state(run, accepted))
     return {
         accepted[index].id: BranchCheckpoint(workspace_version_id=version)

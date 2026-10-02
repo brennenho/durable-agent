@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+from durable_agent.contracts import ToolRequest
 from durable_agent.control.views import tool_summary
 from durable_agent.db.models import Operation
 from fastapi.testclient import TestClient
@@ -125,10 +126,9 @@ def test_pending_tool_has_bounded_summary_and_complete_input(client, name, argum
     assert response.json() == {
         "operation": {
             "kind": "tool",
-            "request": {
-                "call": call,
-                "input_version_id": model["config"]["initial_workspace_version_id"],
-            },
+            "request": ToolRequest(
+                call=call, input_version_id=model["config"]["initial_workspace_version_id"]
+            ).model_dump(mode="json"),
         },
         "config": model["config"],
     }

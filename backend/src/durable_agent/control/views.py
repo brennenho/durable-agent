@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from durable_agent.contracts import (
+    AgentConfig,
     AttemptView,
     ChildRunSummary,
     DelegateArguments,
@@ -18,6 +19,7 @@ from durable_agent.contracts import (
     RunSummary,
     ToolRequest,
 )
+from durable_agent.control.agent_state import restore_context
 from durable_agent.control.errors import ControlError
 from durable_agent.control.history import (
     branch_checkpoints,
@@ -31,6 +33,8 @@ from durable_agent.db.models import Attempt, Operation, Run
 def summary(run: Run, last_progress: datetime | None) -> RunSummary:
     return RunSummary(
         id=run.id,
+        conversation_id=run.conversation_id,
+        agent=run.config.get("agent"),
         prompt=run.prompt,
         model=run.config["model"],
         status=run.status,
@@ -163,19 +167,31 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
         by_operation[attempt.operation_id].append(
             AttemptView.model_validate(attempt, from_attributes=True)
         )
-    state = restore_state(run, operations)
+    config = AgentConfig.model_validate(run.config)
+    if config.agent is not None:
+        version = restore_context(run, operations).workspace_version_id
+        output = run.output
+        final_answer = output if run.status == "succeeded" and isinstance(output, str) else None
+    else:
+        state = restore_state(run, operations)
+        version = workspace_version(state)
+        final = state.history[-1] if state.history else None
+        final_answer = (
+            final.output.text
+            if run.status == "succeeded" and isinstance(final, ModelResult)
+            else None
+        )
+        output = final_answer
     checkpoints = branch_checkpoints(run, operations)
-    final = state.history[-1] if state.history else None
     progress = max((op.completed_at for op in operations if op.completed_at), default=None)
     return RunDetail(
         **summary(run, progress).model_dump(),
         parent=await parent_reference(session, run),
         children=await child_summaries(session, operations),
-        final_answer=final.output.text
-        if run.status == "succeeded" and isinstance(final, ModelResult)
-        else None,
-        workspace_version_id=workspace_version(state),
-        max_attempts=state.config.max_attempts,
+        final_answer=final_answer,
+        output=output,
+        workspace_version_id=version,
+        max_attempts=config.max_attempts,
         operations=[
             OperationView(
                 id=op.id,
