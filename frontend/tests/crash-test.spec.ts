@@ -31,6 +31,38 @@ export function crashSnapshot(): CrashSnapshot {
   };
 }
 
+test("scenario selection supports the keyboard and validates an existing run", async ({ page }) => {
+  const snapshot = crashSnapshot();
+  snapshot.scenarios.push({ name: "baseline", hook: "none", description: "Observe a normal run." });
+  const requests: unknown[] = [];
+  await page.route("**/crash-api/**", (route) => {
+    if (route.request().method() === "POST") requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: snapshot });
+  });
+  await page.goto("/crash-test");
+  const select = page.getByRole("combobox", { name: "Scenario", exact: true });
+  await expect(select).toBeEnabled();
+  await select.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("option", { name: "baseline", exact: true })).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("option", { name: "baseline", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(select).toHaveText("baseline");
+  await expect(select).toBeFocused();
+  await expect(page.getByText("Observe a normal run.", { exact: true })).toBeVisible();
+  await page.getByText("Use an existing run", { exact: true }).click();
+  const input = page.getByRole("textbox", { name: "Run ID", exact: true });
+  await input.fill("invalid-run");
+  await page.getByRole("button", { name: "Arm scenario" }).click();
+  await expect(input).toBeFocused();
+  expect(requests).toHaveLength(0);
+  const runId = "11111111-1111-4111-8111-111111111111";
+  await input.fill(runId);
+  await page.getByRole("button", { name: "Arm scenario" }).click();
+  await expect.poll(() => requests).toEqual([{ scenario: "baseline", run_id: runId }]);
+});
+
 test("manual controls preserve target identity and expose failed actions", async ({ page }) => {
   const snapshot = crashSnapshot();
   let fail = false;
