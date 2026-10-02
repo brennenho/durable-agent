@@ -7,6 +7,7 @@ import { MarkdownAnswer } from "./markdown-answer";
 import { OperationOutput } from "./operation-output";
 import { ToolArguments } from "./inspection-json";
 import { Button } from "./ui/button";
+import { SdkInheritedHistory } from "./sdk-inherited-history";
 
 type PreviousTurn = components["schemas"]["PreviousTurn"];
 type Inspection = components["schemas"]["OperationInspection"];
@@ -60,7 +61,17 @@ function InheritedTurn({ turn }: { turn: PreviousTurn }) {
   );
 }
 
-export function InheritedHistory({ run }: { run: RunDetail }) {
+export function InheritedHistory({
+  run,
+  origin,
+}: {
+  run: RunDetail;
+  origin: components["schemas"]["ForkOrigin"];
+}) {
+  return run.agent ? <SdkInheritedHistory origin={origin} /> : <LegacyInheritedHistory run={run} />;
+}
+
+function LegacyInheritedHistory({ run }: { run: RunDetail }) {
   const runId = run.id;
   const operationId = run.operations[0]?.id;
   const [turns, setTurns] = useState<PreviousTurn[] | null>(null);

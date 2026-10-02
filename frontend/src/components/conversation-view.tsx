@@ -106,7 +106,11 @@ export function ConversationView({ conversationId }: { conversationId: string })
       <div className="space-y-12">
         {conversation?.forked_from && (
           <div className="space-y-8">
-            <InheritedHistory key={conversation.runs[0].id} run={conversation.runs[0]} />
+            <InheritedHistory
+              key={conversation.runs[0].id}
+              run={conversation.runs[0]}
+              origin={conversation.forked_from}
+            />
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Branched here</span>
               <Link
