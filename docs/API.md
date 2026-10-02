@@ -72,6 +72,7 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 | GET | `/api/runs` | → `RunSummary[]`, newest first |
 | GET | `/api/runs/{run_id}` | → `RunDetail` |
 | GET | `/api/runs/{run_id}/operations/{operation_id}` | → `OperationInspection` |
+| GET | `/api/runs/{run_id}/operations/{operation_id}/checkpoint` | → `ToolCheckpoint` or `null` |
 | GET | `/api/runs/{run_id}/files` | → `{workspace_version_id, entries: FileEntry[]}` |
 | GET | `/api/runs/{run_id}/file?version_id=…&path=…` | → stored bytes for that version/path |
 
@@ -92,6 +93,14 @@ with its exit code and logs: the command ran, and the model can inspect the fail
   operation or an operation belonging to another run returns `404`.
 - `FileEntry`: `path`, `kind` (file or directory), and `size_bytes?` for files.
   File listings cover the saved workspace recursively, sorted by path.
+
+`ToolCheckpoint` contains `completed_at` (Tools' saved publication timestamp) and
+`workspace_version_id`. It describes the result and complete workspace saved together,
+independently of Control acceptance. `null` means no saved completion was observed
+(also returned for model operations); unavailable Tools returns an error, never `null`.
+Control validates that the operation belongs to the run before querying Tools, outside
+the database transaction. This read does not advance the run or authorize file downloads.
+The timestamp is recorded within the publication transaction, not the exact commit instant.
 
 Submission returns `200` for a new run or matching resubmission; a changed prompt
 under the same key returns `409`. Reuse the original frozen configuration on a retry.
@@ -203,6 +212,7 @@ Additional tool-service reads:
 
 | Method | Path | Response |
 | --- | --- | --- |
+| GET | `/tools/operations/{operation_id}/checkpoint` | `ToolCheckpoint` or `null` when no completion is saved |
 | GET | `/tools/workspace/initial` | `{workspace_version_id}`; available after the startup import |
 | GET | `/tools/workspace-versions/{version_id}/files` | `{entries: FileEntry[]}`; recursive listing |
 | GET | `/tools/workspace-versions/{version_id}/file?path=…` | bytes with content type and safe download filename |

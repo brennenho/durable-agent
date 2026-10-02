@@ -142,6 +142,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/operations/{operation_id}/checkpoint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect Tool Checkpoint */
+        get: operations["inspect_tool_checkpoint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -717,6 +734,19 @@ export interface components {
             call_id: string;
             /** Name */
             name: string;
+        };
+        /** ToolCheckpoint */
+        ToolCheckpoint: {
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /**
+             * Workspace Version Id
+             * Format: uuid
+             */
+            workspace_version_id: string;
         };
         /** ToolError */
         ToolError: {
@@ -1321,6 +1351,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationInspection"];
+                };
+            };
+            /** @description Operation not found in this run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspect_tool_checkpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCheckpoint"] | null;
                 };
             };
             /** @description Operation not found in this run */

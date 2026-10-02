@@ -1323,6 +1323,27 @@
         "title": "ToolCall",
         "type": "object"
       },
+      "ToolCheckpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "workspace_version_id": {
+            "format": "uuid",
+            "title": "Workspace Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed_at",
+          "workspace_version_id"
+        ],
+        "title": "ToolCheckpoint",
+        "type": "object"
+      },
       "ToolError": {
         "additionalProperties": false,
         "properties": {
@@ -2193,6 +2214,94 @@
           }
         },
         "summary": "Get Operation"
+      }
+    },
+    "/api/runs/{run_id}/operations/{operation_id}/checkpoint": {
+      "get": {
+        "operationId": "inspect_tool_checkpoint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCheckpoint"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Inspect Tool Checkpoint"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Operation not found in this run"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Handler not implemented"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "summary": "Inspect Tool Checkpoint"
       }
     },
     "/health/live": {

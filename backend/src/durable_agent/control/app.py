@@ -8,7 +8,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import text
 
 from durable_agent.contracts import (
@@ -29,6 +29,7 @@ from durable_agent.contracts import (
     RunSummary,
     SubmitFollowUpRequest,
     SubmitRunRequest,
+    ToolCheckpoint,
 )
 from durable_agent.control.continuations import create_continuation
 from durable_agent.control.conversations import conversation_detail, list_conversations
@@ -161,6 +162,32 @@ async def get_run(run_id: UUID, request: Request) -> RunDetail:
 async def get_operation(run_id: UUID, operation_id: UUID, request: Request) -> OperationInspection:
     async with get_runtime(request).db.session() as session:
         return await inspect_operation(session, run_id, operation_id)
+
+
+@routes.get(
+    "/api/runs/{run_id}/operations/{operation_id}/checkpoint",
+    response_model=ToolCheckpoint | None,
+    operation_id="inspect_tool_checkpoint",
+    responses={404: {"model": ErrorResponse, "description": "Operation not found in this run"}},
+)
+async def inspect_tool_checkpoint(
+    run_id: UUID, operation_id: UUID, request: Request
+) -> ToolCheckpoint | None:
+    runtime = get_runtime(request)
+    async with runtime.db.session() as session:
+        inspection = await inspect_operation(session, run_id, operation_id)
+    if inspection.operation.kind != "tool":
+        return None
+    response = await runtime.tools_get(f"/tools/operations/{operation_id}/checkpoint")
+    try:
+        return TypeAdapter(ToolCheckpoint | None).validate_json(response.content)
+    except ValidationError as exc:
+        raise ControlError(
+            503,
+            "invalid_tool_response",
+            "Tool service returned an invalid checkpoint",
+            retryable=True,
+        ) from exc
 
 
 @routes.get(

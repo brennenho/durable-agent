@@ -142,6 +142,27 @@
         "title": "SandboxConfig",
         "type": "object"
       },
+      "ToolCheckpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "workspace_version_id": {
+            "format": "uuid",
+            "title": "Workspace Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed_at",
+          "workspace_version_id"
+        ],
+        "title": "ToolCheckpoint",
+        "type": "object"
+      },
       "ToolError": {
         "additionalProperties": false,
         "properties": {
@@ -453,6 +474,74 @@
           }
         },
         "summary": "Execute Tool"
+      }
+    },
+    "/tools/operations/{operation_id}/checkpoint": {
+      "get": {
+        "operationId": "get_tool_checkpoint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ToolCheckpoint"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Tool Checkpoint"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Handler not implemented"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "summary": "Get Tool Checkpoint"
       }
     },
     "/tools/workspace-versions/{version_id}/file": {

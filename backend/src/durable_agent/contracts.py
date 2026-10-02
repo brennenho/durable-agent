@@ -280,6 +280,11 @@ class ToolExecuteResponse(Contract):
     workspace_version_id: UUID
 
 
+class ToolCheckpoint(Contract):
+    completed_at: UtcDatetime
+    workspace_version_id: UUID
+
+
 # Tool calls stay generic above so the harness can classify invalid calls as
 # execution errors. The harness and tools use these types to validate arguments.
 class ListFilesArguments(Contract):
