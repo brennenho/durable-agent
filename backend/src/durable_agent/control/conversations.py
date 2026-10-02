@@ -39,6 +39,7 @@ async def list_conversations(session: AsyncSession) -> list[ConversationSummary]
             first.prompt,
             latest.id.label("run_id"),
             latest.status,
+            latest.pause_requested,
             updated.label("updated_at"),
         )
         .join(latest, latest.conversation_id == Conversation.id)
@@ -53,6 +54,7 @@ async def list_conversations(session: AsyncSession) -> list[ConversationSummary]
             created_at=row.created_at,
             updated_at=row.updated_at,
             status=row.status,
+            pause_requested=row.pause_requested,
             latest_run_id=row.run_id,
         )
         for row in rows
@@ -98,6 +100,7 @@ async def conversation_detail(session: AsyncSession, conversation_id: UUID) -> C
             if value is not None
         ),
         status=latest.status,
+        pause_requested=latest.pause_requested,
         latest_run_id=latest.id,
         runs=runs,
         forked_from=origin,

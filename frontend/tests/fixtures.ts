@@ -10,6 +10,7 @@ export const run: RunSummary = {
   prompt: "Write a Python function and tests.",
   model: "test-model",
   status: "queued",
+  pause_requested: false,
   created_at: "2026-10-01T12:00:00Z",
   finished_at: null,
   next_attempt_at: "2026-10-01T12:00:00Z",
@@ -31,6 +32,7 @@ export const conversation: ConversationSummary = {
   created_at: run.created_at,
   updated_at: run.created_at,
   status: run.status,
+  pause_requested: false,
   latest_run_id: run.id,
 };
 

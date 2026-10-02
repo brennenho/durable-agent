@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -90,6 +91,7 @@ class Run(Base):
     prompt: Mapped[str] = mapped_column(Text)
     config: Mapped[JsonObject] = mapped_column(JSONB(none_as_null=True))
     status: Mapped[RunStatus] = mapped_column(Text)
+    pause_requested: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lease_owner: Mapped[UUID | None] = mapped_column(Uuid)
     lease_generation: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))

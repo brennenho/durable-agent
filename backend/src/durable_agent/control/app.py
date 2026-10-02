@@ -38,6 +38,7 @@ from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
 from durable_agent.control.forks import create_fork
 from durable_agent.control.leases import claim, heartbeat
+from durable_agent.control.pause import set_pause
 from durable_agent.control.reports import accept_report, report_scope
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.control.runtime import DATABASE_UNAVAILABLE, Runtime, Settings, open_runtime
@@ -173,6 +174,33 @@ async def list_runs(request: Request) -> list[RunSummary]:
 async def get_run(run_id: UUID, request: Request) -> RunDetail:
     async with get_runtime(request).db.session() as session:
         return await detail(session, run_id)
+
+
+async def change_pause(run_id: UUID, request: Request, paused: bool) -> RunSummary:
+    async with get_runtime(request).db.session() as session:
+        await set_pause(session, run_id, paused)
+        await session.commit()
+        return await detail(session, run_id)
+
+
+@routes.post(
+    "/api/runs/{run_id}/pause",
+    response_model=RunSummary,
+    operation_id="pause_run",
+    responses={404: {"model": ErrorResponse, "description": "Run not found"}},
+)
+async def pause_run(run_id: UUID, request: Request) -> RunSummary:
+    return await change_pause(run_id, request, True)
+
+
+@routes.post(
+    "/api/runs/{run_id}/resume",
+    response_model=RunSummary,
+    operation_id="resume_run",
+    responses={404: {"model": ErrorResponse, "description": "Run not found"}},
+)
+async def resume_run(run_id: UUID, request: Request) -> RunSummary:
+    return await change_pause(run_id, request, False)
 
 
 @routes.get(
