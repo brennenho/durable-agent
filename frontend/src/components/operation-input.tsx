@@ -23,6 +23,8 @@ function checkedInput(data: Inspection, kind: "model" | "tool") {
     operation.kind === "model" &&
     (typeof operation.request.prompt !== "string" ||
       !Array.isArray(operation.request.history) ||
+      (operation.request.explicit_input != null &&
+        !Array.isArray(operation.request.explicit_input)) ||
       (operation.request.previous_turns !== undefined &&
         (!Array.isArray(operation.request.previous_turns) ||
           operation.request.previous_turns.some(
@@ -73,6 +75,13 @@ function InputContent({ data }: { data: Inspection }) {
     return (
       <ToolArguments tool={operation.request.call.name} value={operation.request.call.arguments} />
     );
+  if (operation.request.explicit_input != null)
+    return (
+      <>
+        <h4 className="my-2 text-xs font-medium">Saved model input</h4>
+        <InspectionJson value={operation.request.explicit_input} hideEncrypted />
+      </>
+    );
   const previous = operation.request.previous_turns ?? [];
   return (
     <>
@@ -96,6 +105,15 @@ function InputContent({ data }: { data: Inspection }) {
 
 function InputTechnical({ data }: { data: Inspection }) {
   const { operation, config } = data;
+  const request = operation.kind === "model" ? operation.request : null;
+  const modelConfig = request
+    ? {
+        ...config,
+        model: request.model ?? config.model,
+        model_params: request.model_params ?? config.model_params,
+        tool_schemas: request.tool_schemas ?? config.tool_schemas,
+      }
+    : config;
   return (
     <>
       {operation.kind === "tool" ? (
@@ -106,21 +124,25 @@ function InputTechnical({ data }: { data: Inspection }) {
         </p>
       ) : (
         <InspectionDisclosure title="Raw saved context">
-          <p className="text-xs text-muted-foreground">
-            Provider input is assembled from these saved results. Interrupted turns receive replay
-            adjustments.
-          </p>
+          {operation.request.explicit_input == null && (
+            <p className="text-xs text-muted-foreground">
+              Provider input is assembled from these saved results. Interrupted turns receive replay
+              adjustments.
+            </p>
+          )}
           <InspectionJson
-            value={{
-              previous_turns: operation.request.previous_turns ?? [],
-              history: operation.request.history,
-            }}
+            value={
+              operation.request.explicit_input ?? {
+                previous_turns: operation.request.previous_turns ?? [],
+                history: operation.request.history,
+              }
+            }
             hideEncrypted
           />
         </InspectionDisclosure>
       )}
       <InspectionDisclosure title="Configuration, tool schemas, and limits">
-        <InspectionJson value={config} />
+        <InspectionJson value={modelConfig} />
       </InspectionDisclosure>
     </>
   );
