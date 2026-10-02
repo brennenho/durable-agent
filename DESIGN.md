@@ -61,7 +61,24 @@ flowchart LR
     Model -->|Final response| Done
 ```
 
-Its interface is `start(config, prompt)` and `advance(state, result)`. Both return the next operation, a final answer, or an error. The harness validates tool calls and limits turns. It has no I/O; workers handle external calls.
+Developers register agents and workspace tools in an `AgentApp`. An agent implements
+`start(ctx)` and `advance(ctx, result)`, returning `Next(state, step)`, `Done(output)`,
+or `Fail(code, message)`. Steps are model calls, tool calls, or a child batch. Callbacks
+are synchronous and have no I/O. The built-in coding agent uses the same interface.
+
+`AgentContext` contains JSON input/state, accepted history, saved workspace ID, and
+limits. Runtime commits the new state and next operation with the accepted result.
+Recovery executes the saved operation; it does not replay the Python callback history.
+A callback may run again if its transaction did not commit, so it must have no effects.
+
+Tool functions are async and receive `ToolContext`: attempt identity, deadline, and
+workspace access. The runner owns isolation, retries, and checkpoint publication.
+Only workspace files persist; tool code must not write to external systems.
+
+The async `Client` submits and observes runs over HTTP. Disconnecting it does not
+stop execution. Agent definitions and tools are installed in the developer's deployment;
+the client sends an agent name and JSON input, never executable code. Freeze the agent
+version, application build, tool definitions, and sandbox image for each run.
 
 #### Tools and Workspaces
 
@@ -141,7 +158,10 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 | `turn_index` | `integer` | Zero-based order within the conversation. |
 | `submission_key` | `uuid` | Unique browser submission key. |
 | `prompt` | `text` | Initial prompt. |
-| `config` | `jsonb` | Frozen model/parameters, tool schemas, image digest, seed version ID, and limits. |
+| `config` | `jsonb` | Frozen agent/build, tool definitions, model settings, image digest, seed workspace, inherited history, and limits. |
+| `agent_input` | `jsonb?` | SDK input for this turn. |
+| `agent_state` | `jsonb?` | Current accepted SDK state. |
+| `output` | `jsonb?` | SDK final output; JSON null is a valid successful output. |
 | `status` | `text` | queued, running, retrying, waiting, succeeded, failed. |
 | `pause_requested` | `boolean` | Blocks new claims; defaults false and clears on completion/failure. |
 | `next_attempt_at` | `timestamptz?` | Next eligible claim time. |
@@ -163,6 +183,7 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 | `kind` | `text` | model or tool. |
 | `request` | `jsonb` | Immutable input; tools include name, arguments, call ID, and input version ID. |
 | `result` | `jsonb?` | Accepted output; model context or tool workspace version as applicable. |
+| `agent_state` | `jsonb?` | SDK state after accepting this operation; used when branching. |
 | `created_at` | `timestamptz` | Planning time. |
 | `completed_at` | `timestamptz?` | Acceptance time. |
 
@@ -211,7 +232,8 @@ and status from the latest run. Existing runs keep their IDs and become one-turn
 - At most one running or accepted attempt per operation, enforced by a partial unique index.
 - Operation result/completion fields are both set or both null. Tool result/output-version/completion fields are all set or all null. Accepted results and workspace archives are immutable.
 - Lock the run for claims, acceptance, and expiry recovery. Only running runs have a lease; only queued/retrying runs have a claim time; only terminal runs have a finished_at. Check status/kind values.
-- Index claim times and lease expiry. Derive transcript, current operation, workspace version, retry counts, and UI history from saved rows. No events table.
+- Index claim times and lease expiry. Derive transcript, current operation, workspace version, retry counts, and UI history from saved rows. SDK forks copy state at the selected operation, not the run’s latest state.
+  `completed_at` distinguishes an accepted null state from an unfinished operation. No events table.
 
 </details>
 
@@ -263,6 +285,8 @@ durable-agent/
 ├── backend/
 │   ├── src/durable_agent/
 │   │   ├── control/             # APIs, scheduling, runtime persistence
+│   │   ├── sdk/                 # Public authoring types, registration, workspace helpers
+│   │   ├── client/              # Async public HTTP client
 │   │   ├── harness/             # Pure agent transitions
 │   │   ├── worker/              # Execution, heartbeats, OpenAI adapter
 │   │   ├── tools/               # Tools, runner, workspace store

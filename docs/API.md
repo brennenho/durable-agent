@@ -1,11 +1,14 @@
 # API contracts
 
 These interfaces are defined in `contracts.py`, typed FastAPI routes, and
-`harness/contracts.py`. OpenAPI and frontend TypeScript are generated from the routes.
+`harness/contracts.py`. Public authoring types live in `sdk/types.py`.
+OpenAPI and frontend TypeScript are generated from the routes.
 
 IDs are UUIDs. Timestamps are UTC. Fields marked `?` are nullable. Reject unexpected
 request fields. The browser sends only a submission key and prompt; control freezes
-configuration for the run. No service sends API keys in these payloads.
+configuration for the run. SDK clients send `{submission_key, agent, input}` instead.
+Follow-ups and forks may omit `agent` to inherit it. Never send both `prompt` and SDK
+input. No service sends API keys in these payloads.
 
 Nullable run, operation, and attempt view fields are always present, using `null`
 when unknown. Retry delays, provider request IDs, usage, and file sizes may be omitted.
@@ -64,7 +67,37 @@ is immutable and travels with assignments; tool schemas come from the fixed regi
 Both are completed tool outputs. A command that exits nonzero uses `status: ok`
 with its exit code and logs: the command ran, and the model can inspect the failure.
 
-## Frontend → control
+## SDK execution
+
+`AgentApp` registers decorated agent classes and async workspace tools. Control loads
+`AGENT_APP=module:app` once, with a required `AGENT_BUILD_ID`. A run freezes
+`AgentIdentity {name, version, app_ref, build_id}` and its `ToolDefinition` manifest.
+Recovery requires compatible deployed code; changed definitions cannot silently resume.
+
+`start(AgentContext)` and `advance(AgentContext, StepResult)` return:
+
+| Decision | Meaning |
+| --- | --- |
+| `Next(state, step)` | Save JSON state and schedule one model/tool/child-batch step. |
+| `Done(output, state?)` | Finish with JSON output. Omitted state retains the current value; explicit null clears it. |
+| `Fail(code, message)` | Finish with a terminal agent error. |
+
+`AgentContext` has run/agent identity, input, state, accepted history, workspace ID,
+and limits. The new `StepResult` is passed separately to `advance`; it is not yet in
+`ctx.history`. Its value is a model response, tool value, or ordered child results.
+Business tool errors appear in `StepResult.error`; execution failures retry the saved
+operation without invoking `advance`. Callbacks cannot perform I/O or side effects.
+
+SDK state and the next operation commit with result acceptance. Follow-ups inherit the
+last accepted state/history/files. Forks inherit those at the selected operation.
+An immediate `Done`, including null output, needs no operation or worker lease.
+
+`ModelRequest` additionally accepts `explicit_input`, `model`, `model_params`,
+`tool_schemas`, and `timeout_seconds`. Null preserves the legacy configuration;
+explicit empty tool schemas mean no tools. `ToolRequest.timeout_seconds` is optional;
+without it, built-in command budgets retain their existing behavior.
+
+## Client → control
 
 | Method | Path | Request → response |
 | --- | --- | --- |
@@ -76,10 +109,12 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 | GET | `/api/runs/{run_id}/files?version_id=…` | → `{workspace_version_id, entries: FileEntry[]}` |
 | GET | `/api/runs/{run_id}/file?version_id=…&path=…` | → stored bytes for that version/path |
 
-- `RunSummary`: `id`, `prompt`, `model`, `status`, `created_at`, `finished_at?`,
+- `RunSummary`: `id`, `conversation_id`, `agent?`, `prompt`, `model`, `status`,
+  `created_at`, `finished_at?`,
   `next_attempt_at?`, `last_heartbeat_at?`, `last_progress_at?`, `terminal_error?`.
   Status is queued, running, retrying, waiting, succeeded, or failed.
-- `RunDetail`: summary plus `final_answer?`, `workspace_version_id`, `operations[]`,
+- `RunDetail`: summary plus `output` (SDK JSON result), `final_answer?` (legacy text),
+  `workspace_version_id`, `operations[]`,
   the frozen `max_attempts` limit, `parent?`, and ordered `children[]`.
   A parent reference contains `run_id`, `conversation_id`, `operation_id`, and task `name`.
   Each child summary adds `name`, `parent_operation_id`, and zero-based `child_index`.
@@ -89,7 +124,8 @@ with its exit code and logs: the command ran, and the model can inspect the fail
   `attempts[]`, `tool_name?`, `tool_target?` (path or command, at most 160 characters),
   and `checkpoint?`. A checkpoint contains `workspace_version_id` and appears only
   after a valid model response and all its requested tools have been accepted.
-  Incomplete responses and unfinished tool batches are not branch points.
+  Incomplete responses and unfinished tool batches are not built-in branch points.
+  Custom agents can branch after any accepted step, using its saved state.
   Attempt view: `id`, `attempt_no`, `status`, `started_at`, `finished_at?`, `error?`,
   `provider_request_id?`, and `usage?`. Null usage means unknown. Return both lists
   in execution order.
@@ -111,7 +147,7 @@ Control validates that the operation belongs to the run before querying Tools, o
 the database transaction. This read does not advance the run or authorize file downloads.
 The timestamp is recorded within the publication transaction, not the exact commit instant.
 
-Submission returns `200` for a new run or matching resubmission; a changed prompt
+Submission returns `200` for a new run or matching resubmission; changed input/agent
 under the same key returns `409`. Reuse the original frozen configuration on a retry.
 Unknown runs/files return `404`. File downloads require the version returned by the
 listing; control validates that it is the seed or an accepted version for this run.
@@ -222,8 +258,13 @@ request: {
 response: {output: ToolOutput, workspace_version_id}
 ```
 
-The runner compares name, arguments, input version, and sandbox configuration for
-matching operation IDs. Generation and deadline belong to an attempt and may change.
+Custom execution adds a frozen `ToolDefinition`, `run_id`, and `attempt_id` to the
+request. The definition contains name/version, importable entrypoint, argument schema,
+description, and whether to inject `ToolContext`. Tools run inside the private sandbox.
+`ToolContext` exposes only identity, deadline, and async workspace access.
+
+The runner compares name, arguments, input version, sandbox configuration, and custom
+definition/run identity for matching operation IDs. Attempt ID, generation, and deadline may change on retry.
 Return `200` only after the output and workspace version are saved together. A repeated
 completed request returns the same response. Changed input or a stale generation
 returns `409`. Overlapping matching calls may compute separately, but only the current
@@ -277,7 +318,9 @@ Model-facing errors are inside a `200` completed response. Failed checkpoint cap
 never returns an unsaved tool result as completed. Apply the DD's fixed deadlines and
 attempt budget; control owns backoff and provider retry delays.
 
-## Control → harness
+## Legacy control → harness
+
+Runs saved without an SDK identity retain this path.
 
 `start(config, prompt)` and `advance(state, result)` are pure functions. State contains
 `config`, `prompt`, `history`, `pending_tool_calls`, and `turn_count`, reconstructed from
