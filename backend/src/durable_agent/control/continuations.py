@@ -1,16 +1,46 @@
 """Create a conversation turn from accepted progress; callers own the transaction."""
 
+import json
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from durable_agent.contracts import PreviousTurn, SubmitFollowUpRequest
+from durable_agent.contracts import (
+    AgentConfig,
+    PreviousTurn,
+    SubmitFollowUpRequest,
+    SubmitRunRequest,
+)
+from durable_agent.control.agent_progress import start_agent
+from durable_agent.control.agent_state import restore_context
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.errors import ControlError
 from durable_agent.control.history import load_operations, restore_state, workspace_version
 from durable_agent.db.models import Conversation, Operation, Run
 from durable_agent.harness import start
+
+
+def compatible_agent(run: Run, body: SubmitRunRequest) -> bool:
+    name = (run.config.get("agent") or {}).get("name")
+    if name is None:
+        return not body.is_sdk_input
+    return body.agent in (None, name) and (body.is_sdk_input or name == "builtin")
+
+
+def input_value(body: SubmitRunRequest):
+    return body.input if body.is_sdk_input else body.prompt
+
+
+def same_input(run: Run, body: SubmitRunRequest) -> bool:
+    if not compatible_agent(run, body):
+        return False
+    if run.config.get("agent") is not None:
+        return json.dumps(run.agent_input, sort_keys=True) == json.dumps(
+            input_value(body), sort_keys=True
+        )
+    return run.prompt == body.prompt
 
 
 async def find_continuation(
@@ -26,7 +56,7 @@ async def find_continuation(
     )
     if (
         run.conversation_id != conversation_id
-        or run.prompt != body.prompt
+        or not same_input(run, body)
         or predecessor != body.after_run_id
     ):
         raise ControlError(409, "submission_conflict", "Submission key has different inputs")
@@ -34,7 +64,11 @@ async def find_continuation(
 
 
 async def create_continuation(
-    session: AsyncSession, conversation_id: UUID, body: SubmitFollowUpRequest
+    session: AsyncSession,
+    conversation_id: UUID,
+    body: SubmitFollowUpRequest,
+    *,
+    agents: AgentRuntime | None = None,
 ) -> Run:
     conversation = await session.scalar(
         select(Conversation.id).where(Conversation.id == conversation_id).with_for_update()
@@ -60,19 +94,37 @@ async def create_continuation(
     if previous.status not in ("succeeded", "failed"):
         raise ControlError(409, "conversation_busy", "The current turn is still running")
 
-    state = restore_state(previous, await load_operations(session, previous.id))
-    config = state.config.model_copy(
-        update={"initial_workspace_version_id": workspace_version(state)}
-    )
-    previous_turns = [
-        *state.previous_turns,
-        PreviousTurn(
-            prompt=previous.prompt, history=state.history, terminal_error=previous.terminal_error
-        ),
-    ]
-    transition = start(config, body.prompt, previous_turns=previous_turns)
-    if transition.status == "failed":
-        raise ControlError(400, transition.error.code, transition.error.message)
+    if not compatible_agent(previous, body):
+        raise ControlError(
+            409, "agent_mismatch", "Agent or input format differs from the source run"
+        )
+    operations = await load_operations(session, previous.id)
+    agent_state = None
+    if previous.config.get("agent") is not None:
+        context = restore_context(previous, operations)
+        config = AgentConfig.model_validate(previous.config).model_copy(
+            update={
+                "initial_workspace_version_id": context.workspace_version_id,
+                "agent_history": list(context.history),
+            }
+        )
+        agent_state = context.state
+    else:
+        state = restore_state(previous, operations)
+        config = state.config.model_copy(
+            update={"initial_workspace_version_id": workspace_version(state)}
+        )
+        previous_turns = [
+            *state.previous_turns,
+            PreviousTurn(
+                prompt=previous.prompt,
+                history=state.history,
+                terminal_error=previous.terminal_error,
+            ),
+        ]
+        transition = start(config, body.prompt, previous_turns=previous_turns)
+        if transition.status == "failed":
+            raise ControlError(400, transition.error.code, transition.error.message)
     run_id = await session.scalar(
         insert(Run)
         .values(
@@ -81,6 +133,8 @@ async def create_continuation(
             turn_index=previous.turn_index + 1,
             submission_key=body.submission_key,
             prompt=body.prompt,
+            agent_input=input_value(body) if config.agent is not None else None,
+            agent_state=agent_state,
             config=config.model_dump(mode="json"),
             status="queued",
             next_attempt_at=func.clock_timestamp(),
@@ -94,13 +148,19 @@ async def create_continuation(
         if existing is None:
             raise RuntimeError("Conflicting submission disappeared")
         return existing
-    session.add(
-        Operation(
-            run_id=run_id,
-            position=0,
-            kind="model",
-            request=transition.next.request.model_dump(mode="json"),
+    run = await session.get(Run, run_id)
+    if config.agent is not None:
+        await start_agent(
+            session, run, agents, await session.scalar(select(func.clock_timestamp()))
         )
-    )
+    else:
+        session.add(
+            Operation(
+                run_id=run_id,
+                position=0,
+                kind="model",
+                request=transition.next.request.model_dump(mode="json"),
+            )
+        )
     await session.flush()
-    return await session.get(Run, run_id)
+    return run
