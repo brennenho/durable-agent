@@ -11,6 +11,26 @@ record the original implementation sequence; use the ownership and review rules 
 ongoing changes. Start new independent work from current trunk and stack dependent
 changes on their owning PR.
 
+## SDK ownership
+
+SDK work uses the same service boundaries. Integration owns public/wire contracts,
+schema, exports, deployment, and combined recovery tests. Assign these narrow areas
+in separate worktrees before editing:
+
+| Area | Files | Review focus |
+| --- | --- | --- |
+| Authoring | `sdk/registration.py`, `sdk/loading.py` | Explicit registration and version checks. |
+| Client | `client/`, example, SDK guide | Async HTTP API; reconnect by run ID. |
+| Core runtime | SDK harness and Control helpers, submission/report/read paths | Accept result, state, and next operation atomically. |
+| Continuations | `control/continuations.py`, `control/forks.py` | Inherit accepted state; branch from historical state. |
+| Children | `control/delegation.py`, `control/coordinator.py` | Reuse ordinary runs and join structured results once. |
+| Tools | Workspace context, invocation, runner | Isolated effects and durable completion before acknowledgment. |
+| Frontend | Existing run views | Render SDK output and agent identity without changing controls. |
+
+Shared helpers must land before their consumers. Do not copy runtime logic into the
+SDK client, tools, continuations, or children. Component tests prove local behavior;
+Integration verifies the installed SDK through the real services and crash hooks.
+
 ## 1. Land the foundation first
 
 The foundation covers two areas:
