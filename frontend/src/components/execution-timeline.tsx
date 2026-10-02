@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 import { cn } from "../lib/utils";
 import { OperationInspection } from "./operation-inspection";
@@ -45,28 +44,19 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
       >
         <summary
           className={cn(
-            "flex list-none gap-2 border-l-2 border-transparent px-2 py-3 hover:bg-muted/50 [&::-webkit-details-marker]:hidden",
+            "@container list-none border-l-2 border-transparent px-2 py-3 hover:bg-muted/50 [&::-webkit-details-marker]:hidden",
             current && "border-l-primary",
             current && !failed && "bg-primary/5 hover:bg-primary/8",
             failed && "bg-destructive/5 hover:bg-destructive/10",
           )}
         >
-          <ChevronRight
-            aria-hidden="true"
-            className="mt-1 size-3.5 shrink-0 text-muted-foreground group-open/step:rotate-90"
-          />
-          <span className="min-w-0 flex-1">
-            <OperationSummary
-              operation={operation}
-              status={run.status}
-              pauseRequested={run.pause_requested}
-            />
-            {operation.checkpoint && (
-              <span className="mt-1 flex justify-end">
-                <BranchDialog run={run} operation={operation} />
-              </span>
-            )}
-          </span>
+          <OperationSummary
+            operation={operation}
+            status={run.status}
+            pauseRequested={run.pause_requested}
+          >
+            {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
+          </OperationSummary>
         </summary>
         {open && (
           // Span the clock column, dot, and gaps on narrow screens (3.75 + .5 + 1 rem).
