@@ -152,6 +152,16 @@ class ScenarioRun:
                                     if all(self.checks.values())
                                     else "failed"
                                 )
+                                if (
+                                    self.run.agent is not None
+                                    and self.run.status == "succeeded"
+                                    and not self.run.operations
+                                ):
+                                    self.status = "inconclusive"
+                                    self.error = (
+                                        "Run completed without operations; "
+                                        "no execution boundary was available to verify"
+                                    )
                             break
                     except httpx.HTTPError as exc:
                         self.error = str(exc)
