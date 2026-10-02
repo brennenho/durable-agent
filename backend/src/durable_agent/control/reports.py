@@ -22,6 +22,17 @@ from durable_agent.db.models import Attempt, Operation, Run
 from durable_agent.harness import advance
 
 
+async def report_scope(session: AsyncSession, attempt_id: UUID) -> dict:
+    row = (
+        await session.execute(
+            select(Operation.run_id, Attempt.operation_id)
+            .join(Operation, Operation.id == Attempt.operation_id)
+            .where(Attempt.id == attempt_id)
+        )
+    ).one()
+    return {"run_id": row.run_id, "operation_id": row.operation_id}
+
+
 def clear_lease(run: Run) -> None:
     run.lease_owner = run.lease_expires_at = None
 

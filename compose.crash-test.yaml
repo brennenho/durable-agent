@@ -1,0 +1,13 @@
+# Opt in with: docker compose -f compose.yaml -f compose.crash-test.yaml ...
+x-crash-test-environment: &crash-test-environment
+  CRASH_TEST_HOOK_URL: ${CRASH_TEST_HOOK_URL:?Set the Crash Test controller hook URL}
+  CRASH_TEST_HOOK_TOKEN: ${CRASH_TEST_HOOK_TOKEN:-}
+  CRASH_TEST_HOOK_TIMEOUT_SECONDS: ${CRASH_TEST_HOOK_TIMEOUT_SECONDS:-10}
+
+services:
+  control:
+    environment: *crash-test-environment
+  tools:
+    environment: *crash-test-environment
+  worker:
+    environment: *crash-test-environment

@@ -54,3 +54,26 @@ are observations, not a durable audit log, and can be missed when a process dies
 Sandbox interruption removes the container and private workspace before returning;
 a real service kill relies on the existing container deadlines and startup cleanup.
 With hooks disabled, the runner retains its normal attached execution path.
+
+## Worker and Control boundaries
+
+| Hook | Boundary | Interruption behavior |
+| --- | --- | --- |
+| `worker.after_claim` | Lease supervision started, before model or tool execution. | Report a retryable execution error. |
+| `worker.before_report` | Execution returned, before the first report delivery. | Abandon delivery; lease expiry allows recovery. |
+| `control.after_accept_commit` | A new successful report was accepted and its transaction closed, before acknowledgement. | Return retryable 503; replaying the report returns `already_recorded` without advancing twice. |
+
+These events include run, operation, attempt, worker IDs and lease generation.
+Worker heartbeats remain active during a held hook, within the original fixed deadline.
+The report hook also consumes the existing delivery budget. Control does not emit its
+acceptance hook for duplicate reports or recorded execution failures.
+
+For a disposable Compose project, set `CRASH_TEST_HOOK_URL` to the controller's URL
+reachable from the containers and use `-f compose.yaml -f compose.crash-test.yaml`
+with the existing startup configuration. The overlay opts Control, Tools, and Worker
+into hooks; ordinary Compose startup remains unchanged. Keep the controller outside
+the processes being killed. It can also kill frontend or Postgres in response to any
+chosen hook, retaining observations while those services are unavailable.
+
+The dashboard, rule API, scenario runner, and process-kill controller are separate
+consumers of this interface; they are not implemented by the hook client.

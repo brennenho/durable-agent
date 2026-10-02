@@ -102,7 +102,7 @@ def test_shutdown_closes_both_clients_and_propagates_cancellation(monkeypatch):
             closed.append(self)
 
     class CancelledWorker:
-        def __init__(self, *args):
+        def __init__(self, *args, **kwargs):
             pass
 
         async def run(self):

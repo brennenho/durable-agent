@@ -36,10 +36,11 @@ from durable_agent.control.conversations import conversation_detail, list_conver
 from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
 from durable_agent.control.leases import claim, heartbeat
-from durable_agent.control.reports import accept_report
+from durable_agent.control.reports import accept_report, report_scope
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.control.runtime import DATABASE_UNAVAILABLE, Runtime, Settings, open_runtime
 from durable_agent.control.views import detail, inspect_operation, list_summaries
+from durable_agent.crash_test import HookInterrupted
 
 health = APIRouter()
 routes = APIRouter(
@@ -274,10 +275,30 @@ async def heartbeat_attempt(
     responses={409: {"model": ErrorResponse, "description": "Stale attempt or conflicting report"}},
 )
 async def report_attempt(attempt_id: UUID, body: ReportRequest, request: Request) -> ReportResponse:
-    async with get_runtime(request).db.session() as session:
+    runtime = get_runtime(request)
+    scope = None
+    async with runtime.db.session() as session:
         response = await accept_report(session, attempt_id, body)
+        if (
+            runtime.hooks
+            and runtime.hooks.client
+            and response.status == "recorded"
+            and body.outcome.status == "succeeded"
+        ):
+            scope = await report_scope(session, attempt_id)
         await session.commit()
-        return response
+    if scope:
+        try:
+            await runtime.hooks.hit(
+                "control.after_accept_commit",
+                **scope,
+                attempt_id=attempt_id,
+                worker_id=body.worker_id,
+                lease_generation=body.lease_generation,
+            )
+        except HookInterrupted as exc:
+            raise ControlError(503, "crash_test_interrupted", str(exc), retryable=True) from exc
+    return response
 
 
 def get_runtime(request: Request) -> Runtime:

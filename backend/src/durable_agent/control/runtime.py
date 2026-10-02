@@ -16,6 +16,7 @@ from sqlalchemy.exc import TimeoutError as PoolTimeout
 from durable_agent.contracts import AgentConfig, WorkspaceVersion
 from durable_agent.control.errors import ControlError
 from durable_agent.control.recovery import recover_expired
+from durable_agent.crash_test import CrashTestHooks, open_hooks
 from durable_agent.db.session import Database
 from durable_agent.harness import ARGUMENTS
 
@@ -44,6 +45,7 @@ class Runtime:
     db: Database
     tools: httpx.AsyncClient
     settings: Settings
+    hooks: CrashTestHooks | None = None
 
     async def tools_get(self, path: str, *, params: dict[str, str] | None = None) -> httpx.Response:
         try:
@@ -112,16 +114,19 @@ async def open_runtime(
     try:
         async with db.session() as session:
             await session.execute(text("SELECT 1"))
-        async with httpx.AsyncClient(
-            base_url=settings.tools_url,
-            timeout=10,
-            transport=transport,
-            limits=httpx.Limits(max_connections=10),
-        ) as tools:
+        async with (
+            httpx.AsyncClient(
+                base_url=settings.tools_url,
+                timeout=10,
+                transport=transport,
+                limits=httpx.Limits(max_connections=10),
+            ) as tools,
+            open_hooks("control") as hooks,
+        ):
             async with asyncio.TaskGroup() as tasks:
                 recovery = tasks.create_task(recovery_loop(db))
                 try:
-                    yield Runtime(db, tools, settings)
+                    yield Runtime(db, tools, settings, hooks)
                 finally:
                     recovery.cancel()
     finally:

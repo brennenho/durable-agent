@@ -11,6 +11,7 @@ from durable_agent.contracts import (
     FailedOutcome,
     ReportRequest,
 )
+from durable_agent.crash_test import CrashTestHooks, HookInterrupted
 from durable_agent.worker.lease import Lease, LeaseLost
 from durable_agent.worker.openai_client import OpenAIClient
 from durable_agent.worker.services import ServiceClient, ServiceError
@@ -28,6 +29,7 @@ class Worker:
         heartbeat_interval: float = 5,
         report_retry_interval: float = 1,
         poll_interval: float = 1,
+        hooks: CrashTestHooks | None = None,
     ):
         self.services = services
         self.models = models
@@ -35,6 +37,17 @@ class Worker:
         self.heartbeat_interval = heartbeat_interval
         self.report_retry_interval = report_retry_interval
         self.poll_interval = poll_interval
+        self.hooks = hooks or CrashTestHooks("worker")
+
+    async def _hook(self, name: str, assignment: Assignment) -> None:
+        await self.hooks.hit(
+            name,
+            run_id=assignment.run_id,
+            operation_id=assignment.operation_id,
+            attempt_id=assignment.attempt_id,
+            worker_id=self.worker_id,
+            lease_generation=assignment.lease_generation,
+        )
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
@@ -75,11 +88,15 @@ class Worker:
             if remaining <= 0:
                 raise TimeoutError
             async with asyncio.timeout_at(lease.deadline):
+                await self._hook("worker.after_claim", assignment)
+                remaining = lease.deadline - asyncio.get_running_loop().time()
                 if assignment.operation.kind == "model":
                     return await self.models.execute(
                         assignment.config, assignment.operation.request, timeout_seconds=remaining
                     )
                 return await self.services.execute_tool(assignment, timeout_seconds=remaining)
+        except HookInterrupted as exc:
+            error = ExecutionError(code="crash_test_interrupted", message=str(exc), retryable=True)
         except TimeoutError:
             error = ExecutionError(
                 code="call_timeout", message="Call deadline exceeded", retryable=True
@@ -109,6 +126,7 @@ class Worker:
             raise LeaseLost("Lease expired before reporting")
         try:
             async with asyncio.timeout_at(report_until):
+                await self._hook("worker.before_report", lease.assignment)
                 while True:
                     delay = self.report_retry_interval
                     try:
@@ -128,5 +146,7 @@ class Worker:
                             "Invalid report acknowledgment for %s", lease.assignment.attempt_id
                         )
                     await asyncio.sleep(delay)
+        except HookInterrupted as exc:
+            raise LeaseLost("Crash Test interrupted result delivery") from exc
         except TimeoutError as exc:
             raise LeaseLost("Report delivery budget expired") from exc
