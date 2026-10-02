@@ -51,4 +51,4 @@ async def run_worker_pool(db: Database, project: str, maximum: int, hooks: Crash
         transport=httpx.AsyncHTTPTransport(uds="/var/run/docker.sock"),
         timeout=10,
     ) as client:
-        await scale_workers(db, DockerWorkers(client, project, maximum), hooks=hooks)
+        await scale_workers(db, DockerWorkers(client, project, maximum, hooks=hooks), hooks=hooks)

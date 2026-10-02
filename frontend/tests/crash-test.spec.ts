@@ -374,6 +374,64 @@ test("stopped sandboxes cannot be restarted and empty inventory stays explicit",
   await expect(page.getByText("No containers found.", { exact: true })).toBeVisible();
 });
 
+test("lifecycle observations appear without a scenario and are not duplicated by one", async ({
+  page,
+}) => {
+  const snapshot = crashSnapshot();
+  snapshot.controls = [
+    {
+      id: "kill",
+      kind: "kill_observed",
+      label: "Process stopped: worker",
+      at: "2026-10-01T12:00:00Z",
+    },
+    {
+      id: "worker",
+      kind: "lifecycle",
+      label: "Worker restarted",
+      at: "2026-10-01T12:00:01Z",
+      detail: "Worker 1 · container worker-123",
+      hook: { event_id: "worker-hook", service: "control" },
+    },
+    {
+      id: "sandbox",
+      kind: "lifecycle",
+      label: "Sandbox started",
+      at: "2026-10-01T12:00:02Z",
+      operation_id: "op",
+      detail: "Container sandbox-456 · operation op · lease generation 2",
+      hook: { event_id: "sandbox-hook", service: "tools" },
+    },
+  ];
+  await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
+  await page.goto("/");
+  const timeline = page.getByRole("region", { name: "Execution timeline" });
+  await expect(timeline.getByRole("listitem")).toHaveCount(3);
+  await expect(timeline.getByRole("listitem").nth(1)).toContainText("Control · Worker restarted");
+  await expect(timeline.getByRole("listitem").nth(1)).toContainText("worker-123");
+  await expect(timeline.getByRole("listitem").nth(2)).toContainText("Tools · Sandbox started");
+  await expect(timeline).toContainText("lease generation 2");
+  snapshot.current = {
+    id: "active",
+    scenario: "baseline",
+    status: "running",
+    run: null,
+    observed_at: null,
+    error: null,
+    checkpoints: {},
+    checks: {},
+    events: [
+      { ...snapshot.controls[2], id: "scenario-hook", kind: "hook", label: "sandbox.started" },
+    ],
+  };
+  await expect(page.getByRole("button", { name: "Cancel scenario" })).toBeEnabled();
+  await expect(timeline.getByRole("listitem")).toHaveCount(3);
+  const download = page.waitForEvent("download");
+  await timeline.getByRole("button", { name: "Export JSON" }).click();
+  const contents = JSON.parse(await readFile((await (await download).path())!, "utf8"));
+  expect(contents.controls[2].hook.event_id).toBe("sandbox-hook");
+});
+
 test("timeline combines saved state and observed crashes, filters and downloads evidence", async ({
   page,
 }) => {

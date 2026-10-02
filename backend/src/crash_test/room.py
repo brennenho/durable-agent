@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 
 import httpx
-from durable_agent.crash_test import HookReply
+from durable_agent.crash_test import HookEvent, HookReply
 from fastapi import HTTPException
 
 from crash_test.contracts import ContainerAction
@@ -23,9 +23,39 @@ class ControlRoom:
         self.container_lock = asyncio.Lock()
         self.inventory_lock = asyncio.Lock()
         self.services, self.services_at, self.services_error = [], None, None
-        self.journal = Journal(root / "controls.jsonl")
+        self.journal = Journal(root / "controls.jsonl", rolling=True)
         self.autoscaling_enabled = True
         self.autoscaling_checked_at: str | None = None
+
+    async def observe_lifecycle(self, event: HookEvent):
+        worker_labels = {
+            "control.worker_created": "Worker created",
+            "control.worker_started": "Worker started",
+            "control.worker_restarted": "Worker restarted",
+            "control.worker_removed": "Worker removed",
+        }
+        if event.service == "control" and event.name in worker_labels:
+            if not event.container_id or not event.worker_slot:
+                return
+            label = worker_labels[event.name]
+            detail = f"Worker {event.worker_slot} · container {event.container_id}"
+        elif event.service == "tools" and event.name == "sandbox.started" and event.sandbox_id:
+            label = "Sandbox started"
+            detail = f"Container {event.sandbox_id}"
+            if event.operation_id:
+                detail += f" · operation {event.operation_id}"
+            if event.lease_generation is not None:
+                detail += f" · lease generation {event.lease_generation}"
+        else:
+            return
+        await self.journal.record(
+            "lifecycle",
+            label,
+            at=event.observed_at.isoformat(),
+            operation_id=str(event.operation_id) if event.operation_id else None,
+            detail=detail,
+            hook=event.model_dump(mode="json"),
+        )
 
     async def set_autoscaling(self, enabled: bool):
         async with self.mutation:

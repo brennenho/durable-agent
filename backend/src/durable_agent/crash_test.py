@@ -30,6 +30,8 @@ class HookEvent(BaseModel):
     worker_id: UUID | None = None
     lease_generation: int | None = None
     sandbox_id: str | None = None
+    container_id: str | None = Field(default=None, max_length=128)
+    worker_slot: int | None = Field(default=None, ge=1)
     workspace_version_id: UUID | None = None
 
 

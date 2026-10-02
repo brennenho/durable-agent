@@ -1,9 +1,13 @@
 """Resize this Compose project's workers through the local Docker Engine."""
 
 import json
+import logging
 
 import httpx
 
+from durable_agent.crash_test import CrashTestHooks
+
+logger = logging.getLogger(__name__)
 PROJECT = "com.docker.compose.project"
 SERVICE = "com.docker.compose.service"
 NUMBER = "com.docker.compose.container-number"
@@ -16,10 +20,25 @@ class WorkerPoolError(RuntimeError):
 
 
 class DockerWorkers:
-    def __init__(self, client: httpx.AsyncClient, project: str, maximum: int):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        project: str,
+        maximum: int,
+        *,
+        hooks: CrashTestHooks | None = None,
+    ):
         if maximum < 2:
             raise ValueError("Worker maximum must be at least two")
         self.client, self.project, self.maximum = client, project, maximum
+        self.hooks = hooks
+
+    async def _observed(self, action: str, container_id: str, slot: int):
+        logger.info("Worker %s %s; container: %s", slot, action, container_id)
+        if self.hooks:
+            await self.hooks.hit(
+                f"control.worker_{action}", container_id=container_id, worker_slot=slot
+            )
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         response = await self.client.request(method, f"/v1.47{path}", **kwargs)
@@ -56,7 +75,10 @@ class DockerWorkers:
         # Repair stopped baseline capacity before retiring any surplus workers.
         for slot, worker in slots.items():
             if slot <= desired and worker["State"] in {"created", "exited"}:
-                await self._request("POST", f"/containers/{worker['Id']}/start")
+                response = await self._request("POST", f"/containers/{worker['Id']}/start")
+                if response.status_code == 204:
+                    action = "restarted" if worker["State"] == "exited" else "started"
+                    await self._observed(action, worker["Id"], slot)
         for slot, worker in sorted(slots.items(), reverse=True):
             if slot <= desired or worker["Labels"].get(MANAGED) != self.project:
                 continue
@@ -68,6 +90,7 @@ class DockerWorkers:
                     timeout=STOP_SECONDS + 5,
                 )
             await self._request("DELETE", f"/containers/{worker['Id']}")
+            await self._observed("removed", worker["Id"], slot)
             del slots[slot]
         for slot in range(1, desired + 1):
             if slot in slots:
@@ -108,5 +131,8 @@ class DockerWorkers:
             if response.is_error:
                 raise WorkerPoolError(f"Docker create returned {response.status_code}")
             container_id = response.json()["Id"]
-            await self._request("POST", f"/containers/{container_id}/start")
+            await self._observed("created", container_id, slot)
+            response = await self._request("POST", f"/containers/{container_id}/start")
+            if response.status_code == 204:
+                await self._observed("started", container_id, slot)
             slots[slot] = {"Id": container_id}
