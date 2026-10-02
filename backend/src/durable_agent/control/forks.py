@@ -6,7 +6,11 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from durable_agent.contracts import PreviousTurn, SubmitForkRequest
+from durable_agent.contracts import AgentConfig, PreviousTurn, SubmitForkRequest
+from durable_agent.control.agent_progress import start_agent
+from durable_agent.control.agent_state import restore_context
+from durable_agent.control.agents import AgentRuntime
+from durable_agent.control.continuations import compatible_agent, input_value, same_input
 from durable_agent.control.errors import ControlError
 from durable_agent.control.history import branch_checkpoints, load_operations, restore_state
 from durable_agent.db.models import Conversation, Operation, Run
@@ -28,7 +32,7 @@ async def find_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRequ
     run, origin, origin_run = row
     if (
         run.turn_index != 0
-        or run.prompt != body.prompt
+        or not same_input(run, body)
         or origin != body.after_operation_id
         or origin_run != source_id
     ):
@@ -36,7 +40,13 @@ async def find_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRequ
     return run
 
 
-async def create_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRequest) -> Run:
+async def create_fork(
+    session: AsyncSession,
+    source_id: UUID,
+    body: SubmitForkRequest,
+    *,
+    agents: AgentRuntime | None = None,
+) -> Run:
     if existing := await find_fork(session, source_id, body):
         return existing
     source = await session.scalar(
@@ -51,30 +61,45 @@ async def create_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRe
         raise ControlError(
             409, "child_run_read_only", "Control this subagent through its parent run"
         )
+    if not compatible_agent(source, body):
+        raise ControlError(
+            409, "agent_mismatch", "Agent or input format differs from the source run"
+        )
     operations = await load_operations(session, source_id)
     selected = next((op for op in operations if op.id == body.after_operation_id), None)
     if selected is None:
         raise ControlError(404, "operation_not_found", "Operation not found in this run")
     prefix = [op for op in operations if op.position <= selected.position]
-    checkpoint = branch_checkpoints(source, prefix).get(selected.id)
-    if checkpoint is None:
+    config = AgentConfig.model_validate(source.config)
+    custom = config.agent is not None and config.agent.name != "builtin"
+    checkpoint = None if custom else branch_checkpoints(source, prefix).get(selected.id)
+    if selected.completed_at is None or (not custom and checkpoint is None):
         raise ControlError(
             409, "checkpoint_not_available", "This operation is not a completed checkpoint"
         )
-    state = restore_state(source, prefix)
-    config = state.config.model_copy(
-        update={"initial_workspace_version_id": checkpoint.workspace_version_id}
-    )
-    transition = start(
-        config,
-        body.prompt,
-        previous_turns=[
-            *state.previous_turns,
-            PreviousTurn(prompt=source.prompt, history=state.history),
-        ],
-    )
-    if transition.status == "failed":
-        raise ControlError(400, transition.error.code, transition.error.message)
+    if config.agent is not None:
+        context = restore_context(source, prefix)
+        config = config.model_copy(
+            update={
+                "initial_workspace_version_id": context.workspace_version_id,
+                "agent_history": list(context.history),
+            }
+        )
+    else:
+        state = restore_state(source, prefix)
+        config = state.config.model_copy(
+            update={"initial_workspace_version_id": checkpoint.workspace_version_id}
+        )
+        transition = start(
+            config,
+            body.prompt,
+            previous_turns=[
+                *state.previous_turns,
+                PreviousTurn(prompt=source.prompt, history=state.history),
+            ],
+        )
+        if transition.status == "failed":
+            raise ControlError(400, transition.error.code, transition.error.message)
     proposed_id = uuid4()
     session.add(Conversation(id=proposed_id, forked_from_operation_id=selected.id))
     await session.flush()
@@ -85,6 +110,8 @@ async def create_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRe
             conversation_id=proposed_id,
             submission_key=body.submission_key,
             prompt=body.prompt,
+            agent_input=input_value(body) if config.agent is not None else None,
+            agent_state=selected.agent_state if config.agent is not None else None,
             config=config.model_dump(mode="json"),
             status="queued",
             next_attempt_at=func.clock_timestamp(),
@@ -98,13 +125,19 @@ async def create_fork(session: AsyncSession, source_id: UUID, body: SubmitForkRe
         if existing is None:
             raise RuntimeError("Conflicting submission disappeared")
         return existing
-    session.add(
-        Operation(
-            run_id=run_id,
-            position=0,
-            kind="model",
-            request=transition.next.request.model_dump(mode="json"),
+    run = await session.get(Run, run_id)
+    if config.agent is not None:
+        await start_agent(
+            session, run, agents, await session.scalar(select(func.clock_timestamp()))
         )
-    )
+    else:
+        session.add(
+            Operation(
+                run_id=run_id,
+                position=0,
+                kind="model",
+                request=transition.next.request.model_dump(mode="json"),
+            )
+        )
     await session.flush()
-    return await session.get(Run, run_id)
+    return run
