@@ -21,6 +21,18 @@ This builds the sandbox image, applies database migrations, and starts PostgreSQ
 Control, Tools, two workers, and the frontend. Open **http://localhost:3000**.
 Submitting a prompt makes real OpenAI calls using your key.
 
+Control checks demand every five seconds and grows the worker pool up to `WORKER_MAX`
+(default 4, minimum 2). After demand stays below capacity for 60 seconds, it drains
+extra workers. Existing calls finish before workers exit. Paused runs and retries
+waiting for backoff do not add demand. Calls within a run remain sequential.
+
+Control uses the local Docker socket to manage this Compose project's workers.
+Compose starts the baseline workers before Control and stops Control before workers;
+workers retry claims while Control starts. Restarting Control reuses existing containers.
+Use one Control replica. `WORKER_AUTOSCALE=false` disables scaling at startup.
+Crash Test hooks can interrupt a scaling pass without changing the current workers.
+Tools still executes at most four tool calls concurrently.
+
 Try: “Write a Python function that adds two numbers, create a pytest test, and run it.”
 Inspect the run's operations, attempts, final answer, and saved files in the UI.
 

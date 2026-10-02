@@ -8,12 +8,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import httpx
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 from durable_agent.contracts import AgentConfig, WorkspaceVersion
+from durable_agent.control.autoscaling import run_worker_pool
 from durable_agent.control.errors import ControlError
 from durable_agent.control.recovery import recover_expired
 from durable_agent.crash_test import CrashTestHooks, open_hooks
@@ -29,6 +30,15 @@ class Settings(BaseModel):
     tools_url: str
     model: str = Field(min_length=1)
     image_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    worker_autoscale: bool = False
+    worker_project: str = ""
+    worker_max: int = Field(default=4, ge=2)
+
+    @model_validator(mode="after")
+    def require_worker_project(self):
+        if self.worker_autoscale and not self.worker_project:
+            raise ValueError("WORKER_POOL_PROJECT is required when worker autoscaling is enabled")
+        return self
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -37,6 +47,9 @@ class Settings(BaseModel):
             tools_url=os.environ["TOOLS_URL"],
             model=os.environ["OPENAI_MODEL"],
             image_digest=os.environ["SANDBOX_IMAGE_DIGEST"],
+            worker_autoscale=os.environ.get("WORKER_AUTOSCALE", "false"),
+            worker_project=os.environ.get("WORKER_POOL_PROJECT", ""),
+            worker_max=os.environ.get("WORKER_MAX", "4"),
         )
 
 
@@ -125,9 +138,18 @@ async def open_runtime(
         ):
             async with asyncio.TaskGroup() as tasks:
                 recovery = tasks.create_task(recovery_loop(db))
+                scaling = (
+                    tasks.create_task(
+                        run_worker_pool(db, settings.worker_project, settings.worker_max, hooks)
+                    )
+                    if settings.worker_autoscale
+                    else None
+                )
                 try:
                     yield Runtime(db, tools, settings, hooks)
                 finally:
                     recovery.cancel()
+                    if scaling:
+                        scaling.cancel()
     finally:
         await db.close()

@@ -41,5 +41,5 @@ case "$endpoint" in
 esac
 export SANDBOX_IMAGE_DIGEST SANDBOX_WORKSPACE_ROOT DOCKER_SOCKET
 mkdir -p "$SANDBOX_WORKSPACE_ROOT"
-docker compose "$@" up --build --detach --scale worker=2 --wait
+docker compose "$@" up --build --detach --wait
 printf '\nOpen http://localhost:%s\n' "${FRONTEND_PORT:-3000}"

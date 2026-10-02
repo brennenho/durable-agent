@@ -132,3 +132,39 @@ def test_recovery_loop_retries_database_outage_and_propagates_cancellation(monke
                     await task
 
     asyncio.run(exercise())
+
+
+def test_runtime_owns_autoscaler_lifetime(postgres_engine, monkeypatch):
+    started, stopped = asyncio.Event(), asyncio.Event()
+
+    async def pool(db, project, maximum, hooks):
+        assert project == "test-project" and maximum == 4
+        assert hooks.service == "control"
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr("durable_agent.control.runtime.run_worker_pool", pool)
+
+    async def exercise():
+        configured = settings(postgres_engine)
+        configured.worker_autoscale, configured.worker_project = True, "test-project"
+        async with open_runtime(configured):
+            await asyncio.wait_for(started.wait(), 1)
+        assert stopped.is_set()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("extra", [{"worker_max": 1}, {"worker_autoscale": True}])
+def test_invalid_worker_pool_configuration_is_rejected(extra):
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="postgresql://localhost/test",
+            tools_url="http://tools",
+            model="test",
+            image_digest="sha256:" + "a" * 64,
+            **extra,
+        )

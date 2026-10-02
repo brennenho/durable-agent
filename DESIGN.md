@@ -30,6 +30,24 @@ flowchart LR
 
 Different runs can execute concurrently. Calls within a run execute in order.
 
+#### Worker Pool
+
+Compose starts two baseline workers. A background task in Control checks demand every
+five seconds and grows the pool up to `WORKER_MAX` (default 4). Demand is the number
+of ready assignments plus active leases; paused work and delayed retries are excluded.
+After demand stays below capacity for 60 seconds, extra workers finish their current
+assignment and exit. The pool never intentionally shrinks below two workers.
+
+Control uses a Docker adapter to create workers from the baseline worker's image,
+environment, mounts, and network. Fixed container names prevent duplicate creation;
+Control adopts existing workers after a restart. Database or Docker outages defer
+scaling without interrupting the runtime. No additional tables are needed.
+
+Run one Control replica. Compose starts workers before Control and shuts Control down
+first. Workers retry claims during startup. Control emits `control.before_scale` before
+each scaling pass; the Crash Test service can interrupt that pass. Tools retains its
+four-call concurrency limit.
+
 #### Agent Harness
 
 The harness lives inside control. It chooses the next operation from the saved conversation and tool results.
