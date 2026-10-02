@@ -5,6 +5,7 @@ from types import TracebackType
 from uuid import UUID
 
 import httpx
+from pydantic import JsonValue
 
 from durable_agent.contracts import (
     ChildRunSummary,
@@ -13,6 +14,7 @@ from durable_agent.contracts import (
     OperationView,
     RunDetail,
     RunSummary,
+    SubmitFollowUpRequest,
     SubmitForkRequest,
     SubmitRunRequest,
 )
@@ -85,6 +87,26 @@ class Client:
         return response
 
 
+class _Unset:
+    pass
+
+
+_UNSET = _Unset()
+
+
+def _input_fields(prompt: str | None, input: JsonValue | _Unset, agent: str | None = None) -> dict:
+    if prompt is not None and input is not _UNSET:
+        raise ValueError("Supply either prompt or input")
+    fields = {}
+    if prompt is not None:
+        fields["prompt"] = prompt
+    if input is not _UNSET:
+        fields["input"] = input
+    if agent is not None:
+        fields["agent"] = agent
+    return fields
+
+
 class Runs:
     def __init__(self, client: Client):
         self._client = client
@@ -93,9 +115,18 @@ class Runs:
         response = await self._client._request("GET", "/api/runs")
         return [RunSummary.model_validate(item) for item in response.json()]
 
-    async def start(self, *, prompt: str, submission_key: UUID) -> "RunHandle":
-        """Reuse submission_key after a lost response; changed input conflicts."""
-        request = SubmitRunRequest(prompt=prompt, submission_key=submission_key)
+    async def start(
+        self,
+        *,
+        submission_key: UUID,
+        agent: str | None = None,
+        input: JsonValue | _Unset = _UNSET,
+        prompt: str | None = None,
+    ) -> "RunHandle":
+        """Submit a named agent's JSON input, or a legacy prompt; never both."""
+        request = SubmitRunRequest(
+            submission_key=submission_key, **_input_fields(prompt, input, agent)
+        )
         response = await self._client._request(
             "POST", "/api/runs", json=request.model_dump(mode="json", exclude_unset=True)
         )
@@ -128,12 +159,37 @@ class RunHandle:
         response = await self._client._request("POST", f"/api/runs/{self.id}/resume")
         return RunSummary.model_validate(response.json())
 
+    async def follow_up(
+        self, *, submission_key: UUID, input: JsonValue | _Unset = _UNSET, prompt: str | None = None
+    ) -> "RunHandle":
+        """Continue after this run; an outdated predecessor remains a server conflict."""
+        request = SubmitFollowUpRequest(
+            submission_key=submission_key, after_run_id=self.id, **_input_fields(prompt, input)
+        )
+        conversation_id = (await self.status()).conversation_id
+        if conversation_id is None:
+            raise RuntimeError("Server must expose conversation_id to submit a follow-up")
+        response = await self._client._request(
+            "POST",
+            f"/api/conversations/{conversation_id}/runs",
+            json=request.model_dump(mode="json", exclude_unset=True),
+        )
+        summary = RunSummary.model_validate(response.json())
+        return RunHandle(self._client, summary.id)
+
     async def fork(
-        self, *, prompt: str, after_operation_id: UUID, submission_key: UUID
+        self,
+        *,
+        after_operation_id: UUID,
+        submission_key: UUID,
+        input: JsonValue | _Unset = _UNSET,
+        prompt: str | None = None,
     ) -> "RunHandle":
         """Start a new conversation from an operation with an accepted checkpoint."""
         request = SubmitForkRequest(
-            prompt=prompt, after_operation_id=after_operation_id, submission_key=submission_key
+            after_operation_id=after_operation_id,
+            submission_key=submission_key,
+            **_input_fields(prompt, input),
         )
         response = await self._client._request(
             "POST",
@@ -156,7 +212,7 @@ class RunHandle:
         )
         return OperationInspection.model_validate(response.json())
 
-    async def result(self, *, timeout: float | None = None, poll_interval: float = 1) -> str | None:
+    async def result(self, *, timeout: float | None = None, poll_interval: float = 1) -> JsonValue:
         """Wait locally; timeout or cancellation never stops the server's run."""
         if poll_interval <= 0:
             raise ValueError("poll_interval must be positive")
@@ -164,7 +220,7 @@ class RunHandle:
             while True:
                 run = await self.status()
                 if run.status == "succeeded":
-                    return run.final_answer
+                    return run.output if run.agent is not None else run.final_answer
                 if run.status == "failed":
                     raise RunFailed(run)
                 await asyncio.sleep(poll_interval)
