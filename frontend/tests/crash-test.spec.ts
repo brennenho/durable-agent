@@ -415,6 +415,7 @@ test("lifecycle observations appear without a scenario and are not duplicated by
     id: "active",
     scenario: "baseline",
     status: "running",
+    manual_intervention: false,
     run: null,
     observed_at: null,
     error: null,
