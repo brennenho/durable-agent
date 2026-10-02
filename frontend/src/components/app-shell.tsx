@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setOpen(false)}
                   title={conversation.title}
                   aria-current={pathname === href ? "page" : undefined}
-                  className="block truncate rounded-md border-l-2 border-transparent px-3 py-2.5 hover:bg-accent aria-[current=page]:border-l-primary aria-[current=page]:bg-primary/8"
+                  className="block truncate border-l-2 border-transparent px-3 py-2.5 hover:bg-accent aria-[current=page]:border-l-primary aria-[current=page]:bg-primary/8"
                 >
                   {conversation.title}
                 </Link>
