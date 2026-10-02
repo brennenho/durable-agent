@@ -36,9 +36,8 @@ const tool: RunDetail["operations"][number] = {
 };
 
 test.beforeEach(async ({ page }) => {
-  // Freeze before navigation so page load time cannot change elapsed-time assertions.
-  await page.clock.install({ time: new Date("2026-10-01T11:59:00Z") });
-  await page.clock.pauseAt(new Date("2026-10-01T12:00:12Z"));
+  // Let the initial response load before pausing at the test time.
+  await page.clock.install({ time: new Date("2026-10-01T11:00:00Z") });
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/runs/*/files?**", (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
@@ -50,6 +49,7 @@ test("shows the named tool and elapsed execution", async ({ page }) => {
   await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${runDetail.id}`);
   await expect(page.getByRole("status")).toHaveText("Queued");
+  await page.clock.pauseAt(new Date("2026-10-01T12:00:12Z"));
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByLabel("2. write_file", { exact: true })).toBeVisible();
@@ -139,6 +139,7 @@ test("explains retry eligibility and unknown outcomes without claiming a sandbox
   await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${runDetail.id}`);
   await expect(page.getByRole("status")).toContainText("Waiting to retry");
+  await page.clock.pauseAt(new Date("2026-10-01T12:00:12Z"));
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(
@@ -183,6 +184,7 @@ test("a failed command is a completed result and the next model call waits for a
   await page.route(`**/api/runs/${runDetail.id}`, (route) => route.fulfill({ json: current }));
   await page.goto(`/runs/${runDetail.id}`);
   await expect(page.getByRole("status")).toHaveText("Queued");
+  await page.clock.pauseAt(new Date("2026-10-01T12:00:12Z"));
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByText("Command exited with code 1.")).toBeVisible();
