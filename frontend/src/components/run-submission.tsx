@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError, requestJson, type ConversationSummary, type SubmitRunRequest } from "../lib/api";
 import { MessageComposer } from "./message-composer";
 
@@ -11,11 +11,12 @@ export function RunSubmission() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef<SubmitRunRequest | null>(null);
-  const submitting = useRef(false);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting.current) return;
+    if (controller.current) return;
     if (!prompt.trim()) {
       setError("Enter a task for the agent.");
       return;
@@ -23,7 +24,8 @@ export function RunSubmission() {
     if (pending.current?.prompt !== prompt) {
       pending.current = { submission_key: crypto.randomUUID(), prompt };
     }
-    submitting.current = true;
+    const requestController = new AbortController();
+    controller.current = requestController;
     setBusy(true);
     setError(null);
     try {
@@ -31,17 +33,19 @@ export function RunSubmission() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pending.current),
+        signal: requestController.signal,
       });
-      router.push(`/chats/${encodeURIComponent(saved.id)}`);
+      if (!requestController.signal.aborted) router.push(`/chats/${encodeURIComponent(saved.id)}`);
     } catch (cause) {
+      if (requestController.signal.aborted) return;
       setError(
         cause instanceof ApiError
           ? cause.message
           : "Could not confirm submission. Retry to check the same request.",
       );
     } finally {
-      submitting.current = false;
-      setBusy(false);
+      controller.current = null;
+      if (!requestController.signal.aborted) setBusy(false);
     }
   }
 
