@@ -7,6 +7,7 @@ import { ExecutionTimeline } from "./execution-timeline";
 import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
 import { RunControls } from "./run-controls";
+import { FailedAttemptsBadge } from "./failed-attempts-badge";
 
 export function ChatTurn({
   run,
@@ -39,7 +40,7 @@ export function ChatTurn({
             if (event.target === event.currentTarget) setActivityOpen(event.currentTarget.open);
           }}
         >
-          <summary className="flex w-fit list-none items-center gap-2 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
+          <summary className="flex w-fit list-none flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
             <ChevronRight
               aria-hidden="true"
               className="size-3.5 transition-transform group-open/activity:rotate-90"
@@ -50,6 +51,7 @@ export function ChatTurn({
                 · {steps} {steps === 1 ? "step" : "steps"}
               </span>
             )}
+            <FailedAttemptsBadge operations={run.operations} />
           </summary>
           {activityOpen && <ExecutionTimeline run={run} />}
         </details>
