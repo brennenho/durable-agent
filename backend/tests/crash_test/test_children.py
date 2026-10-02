@@ -3,6 +3,7 @@ from copy import deepcopy
 from uuid import UUID, uuid4
 
 import httpx
+import pytest
 from crash_test.controller import FaultController, Journal
 from crash_test.runner import ScenarioRun
 from crash_test.scenarios import evaluate
@@ -212,3 +213,61 @@ def test_joined_reports_match_saved_answers_errors_and_truncation(tmp_path):
     assert not report_saved()
     result.update(error=error, report="Invented answer")
     assert not report_saved()
+
+
+@pytest.mark.parametrize("preset", ["children-created", "children-joined"])
+def test_coordination_crash_verifies_children_before_injection_and_after_recovery(tmp_path, preset):
+    async def exercise():
+        root, child = family()
+        root_id = UUID(root["id"])
+
+        def response(request):
+            if request.url.path.endswith("/checkpoint"):
+                return httpx.Response(200, content=b"null")
+            return httpx.Response(200, json=child if child["id"] in request.url.path else root)
+
+        async with httpx.AsyncClient(
+            base_url="http://control", transport=httpx.MockTransport(response)
+        ) as client:
+            scenario = ScenarioRun(preset, Docker(), client, tmp_path, run_id=root_id)
+            scenario.armed = True
+            scenario.controller = FaultController(
+                scenario.docker, scenario.journal, root_id, scenario.hook
+            )
+            committed = HookEvent(
+                name=scenario.hook,
+                service="control",
+                instance="control",
+                pid=1,
+                run_id=root_id,
+                operation_id=root["operations"][1]["id"],
+            )
+            await scenario.observe_hook(
+                committed.model_copy(update={"operation_id": uuid4(), "event_id": uuid4()})
+            )
+            assert scenario.controller.trigger is None
+            await scenario.observe_hook(committed)
+            assert scenario.controller.killed
+            assert scenario.docker.containers["control"].running
+            assert scenario.controller.children_by_operation[committed.operation_id] == (
+                UUID(child["id"]),
+            )
+            await scenario.observe(root_id)
+            checks = evaluate(scenario.run, scenario.controller, list(scenario.child_runs.values()))
+            assert all(checks.values())
+
+            # Even a self-consistent replacement group must not hide duplicate creation.
+            replacement = deepcopy(child)
+            replacement["id"] = str(uuid4())
+            root["children"][0]["id"] = replacement["id"]
+            root["operations"][1]["result"]["output"]["value"]["children"][0]["run_id"] = (
+                replacement["id"]
+            )
+            checks = evaluate(
+                RunDetail.model_validate(root),
+                scenario.controller,
+                [RunDetail.model_validate(replacement)],
+            )
+            assert not checks["The committed delegation retained the same children after recovery"]
+
+    asyncio.run(exercise())

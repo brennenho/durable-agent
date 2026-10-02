@@ -9,7 +9,7 @@ from uuid import UUID
 from durable_agent.contracts import ExecutionError, OperationView, RunDetail
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
-from crash_test.controller import FaultController
+from crash_test.controller import COORDINATION_HOOKS, FaultController
 
 
 class ScenarioDefinition(BaseModel):
@@ -21,6 +21,8 @@ class ScenarioDefinition(BaseModel):
         "tools.before_publish",
         "worker.before_report",
         "control.after_accept_commit",
+        "control.after_children_commit",
+        "control.after_join_commit",
         "sandbox.started",
     ]
     description: str = Field(min_length=1)
@@ -138,6 +140,13 @@ def evaluate(
     checks["The faulted operation is present in the saved run"] = target is not None
     if target is None:
         return checks
+    if controller.hook in COORDINATION_HOOKS:
+        checks["The committed delegation retained the same children after recovery"] = (
+            target.tool_name == "delegate"
+            and controller.children_by_operation.get(target.id)
+            == tuple(child.id for child in run.children if child.parent_operation_id == target.id)
+            and _delegation_saved(run, target, children)
+        )
     if controller.hook == "tools.after_commit":
         result = target.result
         events = [e for e in controller.journal.events if e.get("operation_id") == str(target.id)]

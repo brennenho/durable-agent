@@ -55,6 +55,7 @@ class FaultController:
     ):
         self.docker, self.journal, self.run_id, self.hook = docker, journal, run_id, hook
         self.run_ids = {run_id}
+        self.children_by_operation: dict[UUID, tuple[UUID, ...]] = {}
         self.operations: dict[UUID, int] = {}
         self.seen: set[UUID] = set()
         self.trigger: HookEvent | None = None
@@ -106,6 +107,7 @@ class FaultController:
             return (
                 event.service == "control"
                 and event.run_id in self.run_ids
+                and event.operation_id in self.children_by_operation
                 and event.attempt_id is None
                 and event.lease_generation is None
             )

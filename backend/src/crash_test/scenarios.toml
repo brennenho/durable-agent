@@ -23,3 +23,11 @@ description = "Kill Control after acceptance; recover without accepting the oper
 [sandbox-lost]
 hook = "sandbox.started"
 description = "Kill a running sandbox; recover the interrupted tool."
+
+[children-created]
+hook = "control.after_children_commit"
+description = "Kill Control after child creation; recover the same child runs."
+
+[children-joined]
+hook = "control.after_join_commit"
+description = "Kill Control after joining children; continue from their saved reports."

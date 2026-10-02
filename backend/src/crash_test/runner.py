@@ -10,7 +10,7 @@ import httpx
 from durable_agent.contracts import RunDetail, ToolCheckpoint
 from durable_agent.crash_test import HookEvent, HookReply
 
-from crash_test.controller import FaultController, Journal, now
+from crash_test.controller import COORDINATION_HOOKS, FaultController, Journal, now
 from crash_test.docker import DockerControl, DockerError
 from crash_test.scenarios import SCENARIOS, evaluate
 
@@ -99,7 +99,9 @@ class ScenarioRun:
             self.selected.set()
         if self.controller:
             # A child's first claim can arrive before the next poll discovers it.
-            if event.run_id and event.run_id not in self.controller.run_ids:
+            if event.name in COORDINATION_HOOKS or (
+                event.run_id and event.run_id not in self.controller.run_ids
+            ):
                 try:
                     self._register_children(await self._read_run(self.run_id))
                 except httpx.HTTPError as exc:
@@ -181,6 +183,15 @@ class ScenarioRun:
     def _register_children(self, run: RunDetail):
         if self.controller:
             self.controller.run_ids.update(child.id for child in run.children)
+            for operation_id in {child.parent_operation_id for child in run.children}:
+                self.controller.children_by_operation.setdefault(
+                    operation_id,
+                    tuple(
+                        child.id
+                        for child in run.children
+                        if child.parent_operation_id == operation_id
+                    ),
+                )
 
     async def observe(self, run_id: UUID):
         self.run = await self._read_run(run_id)
