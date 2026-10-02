@@ -13,6 +13,8 @@ from durable_agent.sdk.tool_context import ToolContext
 @tool(name="save_note", version="1")
 async def save_note(ctx: ToolContext, content: str = "default", mode: str = "ok"):
     print("developer log")
+    if mode == "append":
+        content = await ctx.workspace.read_text("note.txt") + content
     await ctx.workspace.write_text("note.txt", content)
     if mode == "native":
         await native_logs()
