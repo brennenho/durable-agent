@@ -56,7 +56,7 @@ add `CRASH_TEST=1` and `CRASH_TEST_MODE=docker` there, then run the scripts with
 prefixes. Shell variables take precedence, so `CRASH_TEST_MODE=host ./scripts/crash-test.sh`
 still selects terminal mode.
 
-Open [Crashboard](http://127.0.0.1:3020/crash-test) to choose scenarios and control the
+Open [Crashboard](http://127.0.0.1:3020/) to choose scenarios and control the
 existing app containers. The controller and dashboard run in their own Compose
 project, sharing the app's database through its APIs. For live frontend development,
 omit `CRASH_TEST_MODE=docker` to run them in the terminal instead.

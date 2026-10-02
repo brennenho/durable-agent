@@ -166,7 +166,7 @@ containers and database. It does not create another app stack or database. The
 controller has the Docker socket; the dashboard only reads the shared token.
 Neither service appears among the containers you can kill in Crashboard.
 
-Open `http://127.0.0.1:3020/crash-test`. The launcher returns after both services are
+Open `http://127.0.0.1:3020/`. The launcher returns after both services are
 healthy. Stop the crash-test project from Docker Desktop; the application stays up.
 Reports remain in `.crash-test/reports`. Rerun the command after pulling changes to
 rebuild the controller and dashboard. Docker uses a production frontend build; live
@@ -189,9 +189,16 @@ saved run structure, not semantic correctness of an arbitrary task's output.
 ## Dashboard
 
 After enabling hooks with `CRASH_TEST=1 ./scripts/dev-up.sh`, start either mode above
-and open `http://127.0.0.1:3020/crash-test`. The app frontend can be killed independently.
+and open `http://127.0.0.1:3020/`. The app frontend can be killed independently.
 Use `CRASH_TEST_DASHBOARD_PORT`, `CRASH_TEST_PORT`, and `CRASH_TEST_APP_URL` for
 nondefault ports/links; the hook URL must use the controller's chosen port.
+
+Both launch modes serve Crashboard at `/`.
+The configured `CRASH_TEST_URL` selects the dashboard homepage at runtime. The
+application frontend keeps its normal homepage on port 3000.
+
+Run the dashboard browser checks with `pnpm --dir frontend test:crash`. The regular
+`test:e2e` command checks the application frontend.
 
 Choose a scenario in Crashboard and arm it before starting a task, or enter an
 existing run ID. Watch status and recovery in the dashboard; use its Cancel button
