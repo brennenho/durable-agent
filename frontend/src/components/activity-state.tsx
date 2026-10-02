@@ -148,8 +148,8 @@ export function ActivityStatus({ run }: { run: RunDetail }) {
       : run.status === "failed"
         ? "Stopped"
         : run.status === "queued"
-          ? "Waiting to start"
-          : "Working";
+          ? "Queued"
+          : "Running";
   if (active && operation) {
     const phase =
       run.status === "retrying"
@@ -158,19 +158,26 @@ export function ActivityStatus({ run }: { run: RunDetail }) {
           : "Waiting for a worker to retry"
         : attempt?.status === "running"
           ? operation.kind === "model"
-            ? "Waiting for model"
-            : "Running tool"
-          : "Waiting for a worker";
+            ? "Thinking"
+            : operationName(operation)
+          : "Queued";
     const elapsed =
       attempt?.status === "running"
-        ? ` · ${Math.max(0, Math.floor((now - Date.parse(attempt.started_at)) / 1000))}s elapsed`
+        ? ` · ${Math.max(0, Math.floor((now - Date.parse(attempt.started_at)) / 1000))}s`
         : "";
-    label = `${phase}${operation.kind === "tool" ? `: ${operationName(operation)}` : ""}${elapsed}`;
+    label = `${phase}${elapsed}`;
   }
-  if (active && run.pause_requested)
-    label = run.status === "running" ? "Pausing after this call…" : "Paused";
+  if (active && run.pause_requested) label = run.status === "running" ? "Pausing…" : "Paused";
   return (
-    <span role="status" aria-label="Execution status">
+    <span
+      role="status"
+      aria-label="Execution status"
+      title={
+        active && run.pause_requested && run.status === "running"
+          ? "Finishes the current call before pausing"
+          : undefined
+      }
+    >
       {label}
     </span>
   );

@@ -28,7 +28,10 @@ export function ChatTurn({
         {run.prompt}
       </div>
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
-        <h2 className="mb-3 text-sm font-medium">Applied Agent</h2>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <h2 className="m-0 shrink-0 py-1.5 text-sm font-medium">Applied Agent</h2>
+          {!finished && <RunControls run={run} onUpdate={onUpdate} />}
+        </div>
         <details
           aria-label="Activity"
           className="group/activity mb-5"
@@ -59,24 +62,15 @@ export function ChatTurn({
             {run.terminal_error.message}
           </p>
         )}
-        <section aria-label="Final output" className="m-0 border-0 bg-transparent p-0">
-          {run.final_answer !== null ? (
-            <MarkdownAnswer text={run.final_answer || "The agent returned an empty answer."} />
-          ) : (
-            <p className="text-muted-foreground">
-              {finished
-                ? "This task ended without a final answer."
-                : run.pause_requested
-                  ? run.status === "running"
-                    ? "The current call will finish before pausing."
-                    : "Your task is paused. Resume to continue."
-                  : run.status === "queued"
-                    ? "Your task is queued."
-                    : "Working on your task…"}
-            </p>
-          )}
-        </section>
-        {!finished && <RunControls run={run} onUpdate={onUpdate} />}
+        {(run.final_answer !== null || (finished && !run.terminal_error)) && (
+          <section aria-label="Final output" className="m-0 border-0 bg-transparent p-0">
+            {run.final_answer ? (
+              <MarkdownAnswer text={run.final_answer} />
+            ) : (
+              <p className="text-muted-foreground">No final answer.</p>
+            )}
+          </section>
+        )}
       </section>
     </article>
   );

@@ -86,16 +86,14 @@ export function FollowUp({
       error={error}
       disabled={disabled}
       readOnly={uncertain}
-      placeholder="Continue this conversation…"
+      placeholder={active ? "Reply when finished" : "Continue this conversation…"}
       hint={
         uncertain
           ? "Confirm this message before sending another."
           : blocked
             ? "Refreshing chat…"
             : active
-              ? conversation.pause_requested
-                ? "Resume the agent to finish before replying."
-                : "You can reply when the agent finishes."
+              ? ""
               : undefined
       }
     />
