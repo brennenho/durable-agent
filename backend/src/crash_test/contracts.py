@@ -31,6 +31,7 @@ class Session(Contract):
     scenario: str
     status: Literal["running", "passed", "failed", "inconclusive"]
     run: RunDetail | None
+    child_runs: list[RunDetail] = Field(default_factory=list)
     observed_at: str | None
     error: str | None
     checkpoints: dict[str, ToolCheckpoint]

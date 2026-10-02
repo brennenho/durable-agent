@@ -38,6 +38,7 @@ class ScenarioRun:
         self.ready = asyncio.Event()
         self.selected = asyncio.Event()
         self.run: RunDetail | None = None
+        self.child_runs: dict[UUID, RunDetail] = {}
         self.checkpoints: dict[str, dict] = {}
         self.observed_at: str | None = None
         self.error: str | None = None
@@ -50,6 +51,7 @@ class ScenarioRun:
             "scenario": self.scenario,
             "status": self.status,
             "run": self.run.model_dump(mode="json") if self.run else None,
+            "child_runs": [run.model_dump(mode="json") for run in self.child_runs.values()],
             "observed_at": self.observed_at,
             "error": self.error,
             "checkpoints": self.checkpoints.copy(),
@@ -96,6 +98,13 @@ class ScenarioRun:
             )
             self.selected.set()
         if self.controller:
+            # A child's first claim can arrive before the next poll discovers it.
+            if event.run_id and event.run_id not in self.controller.run_ids:
+                try:
+                    self._register_children(await self._read_run(self.run_id))
+                except httpx.HTTPError as exc:
+                    self.error = str(exc)
+                    return HookReply(action="continue")
             return await self.controller.observe(event)
         return HookReply(action="continue")
 
@@ -128,7 +137,9 @@ class ScenarioRun:
                         if self.run.status in {"succeeded", "failed"}:
                             await self.controller.close()
                             async with self.container_lock:
-                                self.checks = evaluate(self.run, self.controller)
+                                self.checks = evaluate(
+                                    self.run, self.controller, list(self.child_runs.values())
+                                )
                                 missed = self.hook and (
                                     not self.controller.killed or self.controller.error
                                 )
@@ -162,15 +173,33 @@ class ScenarioRun:
                 report = json.dumps(self.snapshot(), indent=2) + "\n"
                 await asyncio.to_thread(self.journal.path.with_suffix(".json").write_text, report)
 
-    async def observe(self, run_id: UUID):
+    async def _read_run(self, run_id: UUID) -> RunDetail:
         response = await self.client.get(f"/api/runs/{run_id}")
         response.raise_for_status()
-        self.run = RunDetail.model_validate(response.json())
+        return RunDetail.model_validate(response.json())
+
+    def _register_children(self, run: RunDetail):
+        if self.controller:
+            self.controller.run_ids.update(child.id for child in run.children)
+
+    async def observe(self, run_id: UUID):
+        self.run = await self._read_run(run_id)
+        self._register_children(self.run)
+        for child in self.run.children:
+            self.child_runs[child.id] = await self._read_run(child.id)
+        for run in [self.run, *self.child_runs.values()]:
+            await self._read_checkpoints(run)
         self.observed_at = now()
-        for operation in self.run.operations:
+
+    async def _read_checkpoints(self, run: RunDetail):
+        for operation in run.operations:
             key = str(operation.id)
-            if operation.kind == "tool" and key not in self.checkpoints:
-                response = await self.client.get(f"/api/runs/{run_id}/operations/{key}/checkpoint")
+            if (
+                operation.kind == "tool"
+                and operation.tool_name != "delegate"
+                and key not in self.checkpoints
+            ):
+                response = await self.client.get(f"/api/runs/{run.id}/operations/{key}/checkpoint")
                 response.raise_for_status()
                 if response.json() is not None:
                     self.checkpoints[key] = ToolCheckpoint.model_validate(
