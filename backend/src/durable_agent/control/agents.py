@@ -55,7 +55,7 @@ class AgentRuntime:
             deep=True,
         )
 
-    def instance(self, config: AgentConfig):
+    def check(self, config: AgentConfig) -> None:
         identity = config.agent
         if identity is None:
             raise ControlError(409, "agent_incompatible", "Run has no saved agent identity")
@@ -65,6 +65,9 @@ class AgentRuntime:
             expected = None
         if identity != expected or config.tool_definitions != dict(self.app.tools):
             raise ControlError(409, "agent_incompatible", "Saved agent deployment is not installed")
-        if identity.name == "builtin":
+
+    def instance(self, config: AgentConfig):
+        self.check(config)
+        if config.agent.name == "builtin":
             return BuiltinAgent(config)
-        return self.app.agents[identity.name].agent_type()
+        return self.app.agents[config.agent.name].agent_type()

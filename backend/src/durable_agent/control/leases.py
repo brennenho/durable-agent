@@ -15,6 +15,7 @@ from durable_agent.contracts import (
     RunCommandArguments,
 )
 from durable_agent.contracts import Operation as WireOperation
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.errors import ControlError
 from durable_agent.db.models import Attempt, Operation, Run
 
@@ -28,10 +29,13 @@ def _attempt_deadline(started_at: datetime, operation: Operation, run: Run) -> d
         arguments = RunCommandArguments.model_validate(operation.request["call"]["arguments"])
         # Reserve time for setup, cleanup, checkpoint publication, and reporting.
         seconds = arguments.timeout_seconds + 30
+    seconds = operation.request.get("timeout_seconds") or seconds
     return started_at + timedelta(seconds=seconds)
 
 
-async def claim(session: AsyncSession, worker_id: UUID) -> Assignment | None:
+async def claim(
+    session: AsyncSession, worker_id: UUID, *, agents: AgentRuntime | None = None
+) -> Assignment | None:
     run = await session.scalar(
         select(Run)
         .where(
@@ -51,6 +55,14 @@ async def claim(session: AsyncSession, worker_id: UUID) -> Assignment | None:
     if operation is None:
         raise ValueError("Claimable run has no pending operation")
     config = AgentConfig.model_validate(run.config)
+    if config.agent is not None:
+        try:
+            (agents or AgentRuntime()).check(config)
+        except ControlError as exc:
+            run.status, run.next_attempt_at, run.pause_requested = "failed", None, False
+            run.finished_at = await session.scalar(select(func.clock_timestamp()))
+            run.terminal_error = exc.error.model_dump(mode="json")
+            return None
     count = await session.scalar(
         select(func.count()).select_from(Attempt).where(Attempt.operation_id == operation.id)
     )

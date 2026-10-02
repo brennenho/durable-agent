@@ -54,7 +54,10 @@ def model_step(
 
 def validate_config(config: AgentConfig) -> FailedTransition | None:
     names = [schema.get("name") for schema in config.tool_schemas]
-    if any(not isinstance(name, str) or name not in ARGUMENTS for name in names):
+    registered = {name for name, tool in config.tool_definitions.items() if tool.name == name}
+    if any(
+        not isinstance(name, str) or name not in ARGUMENTS.keys() | registered for name in names
+    ):
         return fail("invalid_configuration", "Tool schemas must name supported tools")
     if len(names) != len(set(names)):
         return fail("invalid_configuration", "Tool schemas must have unique names")
@@ -106,10 +109,11 @@ def advance(state: AgentState, result: OperationResult) -> Transition:
                 return fail("invalid_tool_call", "Tool call IDs must be nonempty and unique")
             seen.add(call.call_id)
             arguments = ARGUMENTS.get(call.name)
-            if arguments is None or call.name not in enabled:
+            if call.name not in enabled:
                 return fail("invalid_tool_call", f"Tool is not enabled: {call.name}")
             try:
-                arguments.model_validate(call.arguments, strict=True)
+                if arguments is not None:
+                    arguments.model_validate(call.arguments, strict=True)
             except ValidationError:
                 return fail("invalid_tool_call", f"Invalid arguments for {call.name}")
         return ContinueTransition(
