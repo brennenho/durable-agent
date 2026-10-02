@@ -9,6 +9,7 @@ from durable_agent.contracts import ToolExecuteRequest, ToolExecuteResponse
 from durable_agent.crash_test import CrashTestHooks
 from durable_agent.db.session import Database
 from durable_agent.tools.commands import execute_command_tool
+from durable_agent.tools.custom import execute_custom_tool
 from durable_agent.tools.files import execute_file_tool
 from durable_agent.tools.publication import publish_tool, register_tool
 from durable_agent.tools.runner import DockerRunner, SandboxConfiguration
@@ -44,19 +45,29 @@ async def execute_operation(
             )
         return cached
     async with asyncio.timeout_at(deadline):
-        if request.name == "run_command":
+        if request.definition is not None or request.name == "run_command":
             if runner is None or workspace_root is None:
                 raise SandboxConfiguration("Sandbox is not configured")
             async with slots:
-                output, updated = await execute_command_tool(
-                    archive,
-                    request.arguments,
-                    request.sandbox,
-                    runner,
-                    workspace_root,
-                    deadline,
-                    on_started=sandbox_started if hooks and hooks.client else None,
-                )
+                if request.definition is not None:
+                    output, updated = await execute_custom_tool(
+                        archive,
+                        request,
+                        runner,
+                        workspace_root,
+                        deadline,
+                        on_started=sandbox_started if hooks and hooks.client else None,
+                    )
+                else:
+                    output, updated = await execute_command_tool(
+                        archive,
+                        request.arguments,
+                        request.sandbox,
+                        runner,
+                        workspace_root,
+                        deadline,
+                        on_started=sandbox_started if hooks and hooks.client else None,
+                    )
         else:
             await slots.acquire()
             job = asyncio.create_task(

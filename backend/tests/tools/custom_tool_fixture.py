@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import signal
 import sys
 
 from durable_agent.contracts import ToolError
@@ -15,6 +16,10 @@ async def save_note(ctx: ToolContext, content: str = "default", mode: str = "ok"
     await ctx.workspace.write_text("note.txt", content)
     if mode == "native":
         await native_logs()
+    if mode == "crash":
+        os.kill(os.getpid(), signal.SIGKILL)
+    if mode == "sleep":
+        await asyncio.sleep(120)
     if mode == "exception":
         raise RuntimeError("developer failure")
     if mode == "invalid":
