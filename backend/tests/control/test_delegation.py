@@ -1,6 +1,6 @@
 import asyncio
 
-from durable_agent.contracts import ModelResult
+from durable_agent.contracts import ModelRequest, ModelResult
 from durable_agent.control.delegation import create_children
 from durable_agent.control.views import detail
 from durable_agent.db.models import Operation, Run
@@ -87,11 +87,9 @@ def test_children_are_atomic_repeatable_isolated_runs(database, config):
                     first = await session.scalar(
                         select(Operation).where(Operation.run_id == child.id)
                     )
-                    assert first.request == {
-                        "prompt": child.prompt,
-                        "history": [],
-                        "previous_turns": [],
-                    }
+                    assert ModelRequest.model_validate(first.request) == ModelRequest(
+                        prompt=child.prompt, history=[], previous_turns=[]
+                    )
             first, second = await claimed(db), await claimed(db)
             assert {first.run_id, second.run_id} == {child.id for child in children}
             assert first.attempt_no == second.attempt_no == 1

@@ -7,14 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from durable_agent.contracts import DelegateArguments, ToolRequest, ToolResult
+from durable_agent.control.agents import AgentRuntime
 from durable_agent.control.delegation import create_children
+from durable_agent.control.errors import ControlError
 from durable_agent.control.progress import accept_result
 from durable_agent.db.models import Operation, Run
 
 REPORT_LIMIT = 16_384
 
 
-async def join_children(session: AsyncSession, parent: Run, operation: Operation) -> None:
+async def join_children(
+    session: AsyncSession, parent: Run, operation: Operation, *, agents: AgentRuntime | None = None
+) -> None:
     request = ToolRequest.model_validate(operation.request)
     tasks = DelegateArguments.model_validate(request.call.arguments).tasks
     children = list(
@@ -30,7 +34,10 @@ async def join_children(session: AsyncSession, parent: Run, operation: Operation
     reports = []
     for child, task in zip(children, tasks, strict=True):
         report = None
-        if child.status == "succeeded":
+        sdk_child = child.config.get("agent") is not None
+        if child.status == "succeeded" and sdk_child:
+            report = child.output if isinstance(child.output, str) else None
+        elif child.status == "succeeded":
             final = await session.scalar(
                 select(Operation.result)
                 .where(
@@ -50,25 +57,21 @@ async def join_children(session: AsyncSession, parent: Run, operation: Operation
                 "report": report[:REPORT_LIMIT] if report is not None else None,
                 "error": child.terminal_error,
                 "truncated": report is not None and len(report) > REPORT_LIMIT,
+                **({"output": child.output} if sdk_child else {}),
             }
         )
     now = await session.scalar(select(func.clock_timestamp()))
-    await accept_result(
-        session,
-        parent,
-        operation,
-        ToolResult(
-            kind="tool",
-            call_id=request.call.call_id,
-            output={"status": "ok", "value": {"children": reports}},
-            workspace_version_id=request.input_version_id,
-        ),
-        now,
+    result = ToolResult(
+        kind="tool",
+        call_id=request.call.call_id,
+        output={"status": "ok", "value": {"children": reports}},
+        workspace_version_id=request.input_version_id,
     )
+    await accept_result(session, parent, operation, result, now, agents=agents)
 
 
 async def advance_delegations(
-    session: AsyncSession, limit: int = 100
+    session: AsyncSession, limit: int = 100, *, agents: AgentRuntime | None = None
 ) -> list[tuple[str, UUID, UUID]]:
     child = aliased(Run)
     unfinished = (
@@ -96,10 +99,17 @@ async def advance_delegations(
     )
     events = []
     for parent, operation in rows:
-        if await create_children(session, parent, operation):
+        try:
+            created = await create_children(session, parent, operation, agents=agents)
+        except ControlError as exc:
+            parent.status, parent.next_attempt_at, parent.pause_requested = "failed", None, False
+            parent.finished_at = await session.scalar(select(func.clock_timestamp()))
+            parent.terminal_error = exc.error.model_dump(mode="json")
+            continue
+        if created:
             hook = "control.after_children_commit"
         else:
-            await join_children(session, parent, operation)
+            await join_children(session, parent, operation, agents=agents)
             hook = "control.after_join_commit"
         events.append((hook, parent.id, operation.id))
     await session.flush()
