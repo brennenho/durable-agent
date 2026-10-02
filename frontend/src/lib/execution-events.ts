@@ -1,4 +1,7 @@
 import type { RunDetail } from "./api";
+import type { components } from "./api.generated";
+
+export type ToolCheckpoint = components["schemas"]["ToolCheckpoint"];
 
 type Operation = RunDetail["operations"][number];
 
@@ -11,9 +14,13 @@ export type ExecutionEvent = {
   detail?: string;
   failed?: boolean;
   workspaceVersionId?: string;
+  workspaceLabel?: string;
 };
 
-export function operationEvents(operation: Operation): ExecutionEvent[] {
+export function operationEvents(
+  operation: Operation,
+  checkpoint?: ToolCheckpoint | null,
+): ExecutionEvent[] {
   const events: ExecutionEvent[] = [
     {
       id: `${operation.id}:planned`,
@@ -55,6 +62,22 @@ export function operationEvents(operation: Operation): ExecutionEvent[] {
       workspaceVersionId:
         operation.result?.kind === "tool" ? operation.result.workspace_version_id : undefined,
     });
+  }
+  if (checkpoint && operation.kind === "tool") {
+    const saved: ExecutionEvent = {
+      id: `${operation.id}:saved`,
+      operationId: operation.id,
+      at: checkpoint.completed_at,
+      label: "Result and workspace saved by Tools",
+      detail: "The result and complete workspace were saved together.",
+      workspaceVersionId: checkpoint.workspace_version_id,
+      workspaceLabel: "Saved workspace",
+    };
+    const next = events.findIndex(
+      (event) =>
+        event.id === `${operation.id}:accepted` || Date.parse(event.at) > Date.parse(saved.at),
+    );
+    events.splice(next < 0 ? events.length : next, 0, saved);
   }
   return events;
 }
