@@ -6,7 +6,16 @@ from uuid import UUID
 
 import httpx
 
-from durable_agent.contracts import RunDetail, RunSummary, SubmitRunRequest
+from durable_agent.contracts import (
+    ChildRunSummary,
+    OperationInspection,
+    OperationView,
+    RunDetail,
+    RunSummary,
+    SubmitRunRequest,
+)
+
+from .files import RunFiles
 
 
 class ApiError(Exception):
@@ -78,6 +87,10 @@ class Runs:
     def __init__(self, client: Client):
         self._client = client
 
+    async def list(self) -> list[RunSummary]:
+        response = await self._client._request("GET", "/api/runs")
+        return [RunSummary.model_validate(item) for item in response.json()]
+
     async def start(self, *, prompt: str, submission_key: UUID) -> "RunHandle":
         """Reuse submission_key after a lost response; changed input conflicts."""
         request = SubmitRunRequest(prompt=prompt, submission_key=submission_key)
@@ -97,10 +110,24 @@ class RunHandle:
     def __init__(self, client: Client, run_id: UUID):
         self._client = client
         self.id = run_id
+        self.files = RunFiles(client, run_id)
 
     async def status(self) -> RunDetail:
         response = await self._client._request("GET", f"/api/runs/{self.id}")
         return RunDetail.model_validate(response.json())
+
+    async def history(self) -> list[OperationView]:
+        """Accepted results and execution attempts in operation order."""
+        return (await self.status()).operations
+
+    async def children(self) -> list[ChildRunSummary]:
+        return (await self.status()).children
+
+    async def inspect(self, operation_id: UUID) -> OperationInspection:
+        response = await self._client._request(
+            "GET", f"/api/runs/{self.id}/operations/{UUID(str(operation_id))}"
+        )
+        return OperationInspection.model_validate(response.json())
 
     async def result(self, *, timeout: float | None = None, poll_interval: float = 1) -> str | None:
         """Wait locally; timeout or cancellation never stops the server's run."""
