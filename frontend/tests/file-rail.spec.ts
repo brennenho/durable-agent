@@ -33,7 +33,7 @@ test.beforeEach(async ({ page }) => {
         { path: longPath, kind: "file", size_bytes: 15 },
       ],
     };
-    await page.route(`**/api/runs/${run.id}/files`, (route) => route.fulfill({ json: files }));
+    await page.route(`**/api/runs/${run.id}/files?**`, (route) => route.fulfill({ json: files }));
     await page.route(`**/api/runs/${run.id}/file?**`, (route) =>
       route.fulfill({ contentType: "text/plain", body: run.final_answer }),
     );
@@ -103,7 +103,7 @@ test("keeps an earlier selection when a newer turn appears", async ({ page }) =>
   await version.click();
   await page.getByRole("option", { name: /^After message 1/ }).click();
   const third = { ...second, id: "00000000-0000-4000-8000-000000000005" };
-  await page.route(`**/api/runs/${third.id}/files`, (route) =>
+  await page.route(`**/api/runs/${third.id}/files?**`, (route) =>
     route.fulfill({
       json: {
         workspace_version_id: third.workspace_version_id,

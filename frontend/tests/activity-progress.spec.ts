@@ -38,7 +38,7 @@ const tool: RunDetail["operations"][number] = {
 test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-01T12:00:12Z") });
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/runs/*/files", (route) =>
+  await page.route("**/api/runs/*/files?**", (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
   );
 });

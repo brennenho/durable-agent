@@ -49,7 +49,7 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({ json: null }),
   );
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/runs/*/files", (route) =>
+  await page.route("**/api/runs/*/files?**", (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
   );
 });

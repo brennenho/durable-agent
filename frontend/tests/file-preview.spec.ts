@@ -15,13 +15,14 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         ...runDetail,
+        workspace_version_id: version,
         status: "succeeded",
         next_attempt_at: null,
         finished_at: "2026-10-01T12:01:00Z",
       },
     }),
   );
-  await page.route(`${endpoint}/files`, (route) => route.fulfill({ json: listing }));
+  await page.route(`${endpoint}/files?**`, (route) => route.fulfill({ json: listing }));
 });
 
 test("previews safe Markdown from the listed version, downloads, and restores focus", async ({
@@ -58,7 +59,7 @@ test("previews safe Markdown from the listed version, downloads, and restores fo
 });
 
 test("shows code as literal text rather than HTML", async ({ page }) => {
-  await page.route(`${endpoint}/files`, (route) =>
+  await page.route(`${endpoint}/files?**`, (route) =>
     route.fulfill({
       json: {
         ...listing,
@@ -111,7 +112,7 @@ for (const [name, body] of [
 
 test("does not fetch unsupported files for a preview", async ({ page }) => {
   let requested = false;
-  await page.route(`${endpoint}/files`, (route) =>
+  await page.route(`${endpoint}/files?**`, (route) =>
     route.fulfill({
       json: { ...listing, entries: [{ path: "image.png", kind: "file", size_bytes: 100 }] },
     }),
@@ -146,7 +147,7 @@ test("replaces a pending preview when the saved workspace version changes", asyn
       },
     }),
   );
-  await page.route(`${endpoint}/files`, (route) =>
+  await page.route(`${endpoint}/files?**`, (route) =>
     route.fulfill({ json: { ...listing, workspace_version_id: changed ? nextVersion : version } }),
   );
   await page.route(`${endpoint}/file?**`, async (route) => {

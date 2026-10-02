@@ -14,7 +14,7 @@ const url = `/chats/${completed.id}`;
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [completed] }));
-  await page.route("**/api/runs/*/files", (route) =>
+  await page.route("**/api/runs/*/files?**", (route) =>
     route.fulfill({
       json: { workspace_version_id: first.workspace_version_id, entries: [] },
     }),

@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.route(`**/api/conversations/${conversation.id}`, (route) =>
     route.fulfill({ json: conversationDetail }),
   );
-  await page.route(`**/api/runs/${run.id}/files`, (route) =>
+  await page.route(`**/api/runs/${run.id}/files?**`, (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
   );
 });
