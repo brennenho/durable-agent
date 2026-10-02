@@ -86,12 +86,8 @@ export function BranchDialog({ run, operation }: { run: RunDetail; operation: Op
   return (
     <Dialog.Root open={open} onOpenChange={changeOpen}>
       <Dialog.Trigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-mr-1.5 h-6 justify-self-end px-1.5 text-xs text-muted-foreground"
-        >
-          <GitBranch aria-hidden="true" /> Branch from here
+        <Button variant="outline" size="xs" className="justify-self-end">
+          <GitBranch aria-hidden="true" /> Branch
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
