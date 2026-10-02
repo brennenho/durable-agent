@@ -6,12 +6,15 @@ x-crash-test-environment: &crash-test-environment
 
 services:
   control:
+    extra_hosts: ["host.docker.internal:host-gateway"]
     labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
   tools:
+    extra_hosts: ["host.docker.internal:host-gateway"]
     labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
   worker:
+    extra_hosts: ["host.docker.internal:host-gateway"]
     labels: {durable-agent.crash-test: "true"}
     environment: *crash-test-environment
   db:

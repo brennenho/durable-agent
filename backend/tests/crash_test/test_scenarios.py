@@ -1,5 +1,5 @@
 import pytest
-from durable_agent.crash_testing.scenarios import parse_scenarios
+from crash_test.scenarios import parse_scenarios
 
 
 def test_catalog_accepts_custom_presets_and_explicit_no_fault():

@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
+from crash_test.app import app as crash_test
 from durable_agent.control.app import app as control
-from durable_agent.crash_testing.app import app as crash_test
 from durable_agent.tools.app import app as tools
 
 destination = Path(__file__).resolve().parents[1] / "contracts"

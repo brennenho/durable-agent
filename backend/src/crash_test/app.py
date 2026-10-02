@@ -6,13 +6,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
+from durable_agent.crash_test import HookEvent, HookReply
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from durable_agent.crash_test import HookEvent, HookReply
-from durable_agent.crash_testing.contracts import ContainerAction, Session, Snapshot, StartScenario
-from durable_agent.crash_testing.docker import Container, DockerControl, DockerError
-from durable_agent.crash_testing.room import ControlRoom
+from crash_test.contracts import ContainerAction, Session, Snapshot, StartScenario
+from crash_test.docker import Container, DockerControl, DockerError
+from crash_test.room import ControlRoom
 
 
 def create_app(room: ControlRoom | None = None, *, token: str | None = None):

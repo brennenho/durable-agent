@@ -4,9 +4,9 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from crash_test.controller import FaultController, Journal
+from crash_test.docker import Container, DockerError
 from durable_agent.crash_test import HookEvent
-from durable_agent.crash_testing.controller import FaultController, Journal
-from durable_agent.crash_testing.docker import Container, DockerError
 
 
 class Docker:
