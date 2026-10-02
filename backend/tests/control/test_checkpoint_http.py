@@ -59,3 +59,39 @@ def test_checkpoint_read_scopes_ids_and_keeps_tools_failure_distinct(postgres_en
         assert result.json()["error"]["retryable"] is True
         assert calls == [f"/tools/operations/{tool['operation_id']}/checkpoint"]
         assert client.get(f"/api/runs/{run}").status_code == 200
+
+
+def test_delegation_checkpoint_is_control_owned(postgres_engine):
+    calls = []
+
+    def tools(request):
+        calls.append(request.url.path)
+        return httpx.Response(200, json={"workspace_version_id": str(uuid4())})
+
+    app = create_app(settings(postgres_engine), transport=httpx.MockTransport(tools))
+    with TestClient(app) as client:
+        run = submit(client)
+        model, lease = claim(client)
+        report(
+            client,
+            model,
+            lease,
+            {
+                "status": "succeeded",
+                "result": model_result(
+                    "",
+                    [
+                        {
+                            "call_id": "delegate",
+                            "name": "delegate",
+                            "arguments": {"tasks": [{"name": "Review", "prompt": "Review files"}]},
+                        }
+                    ],
+                ),
+            },
+        )
+        operation = client.get(f"/api/runs/{run}").json()["operations"][-1]
+        calls.clear()
+        response = client.get(f"/api/runs/{run}/operations/{operation['id']}/checkpoint")
+        assert response.status_code == 200 and response.json() is None
+        assert calls == []

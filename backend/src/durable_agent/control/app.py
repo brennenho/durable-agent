@@ -226,7 +226,7 @@ async def inspect_tool_checkpoint(
     runtime = get_runtime(request)
     async with runtime.db.session() as session:
         inspection = await inspect_operation(session, run_id, operation_id)
-    if inspection.operation.kind != "tool":
+    if inspection.operation.kind != "tool" or inspection.operation.request.call.name == "delegate":
         return None
     response = await runtime.tools_get(f"/tools/operations/{operation_id}/checkpoint")
     try:

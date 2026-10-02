@@ -15,9 +15,10 @@ from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 from durable_agent.contracts import AgentConfig, WorkspaceVersion
 from durable_agent.control.autoscaling import run_worker_pool
+from durable_agent.control.coordinator import advance_delegations
 from durable_agent.control.errors import ControlError
 from durable_agent.control.recovery import recover_expired
-from durable_agent.crash_test import CrashTestHooks, open_hooks
+from durable_agent.crash_test import CrashTestHooks, HookInterrupted, open_hooks
 from durable_agent.db.session import Database
 from durable_agent.harness import ARGUMENTS
 
@@ -93,9 +94,17 @@ class Runtime:
                     "name": name,
                     "parameters": arguments.model_json_schema(),
                     "strict": False,
+                    **(
+                        {
+                            "description": "Delegate independent tasks to up to three subagents. "
+                            "They start from your saved files and return reports; their file edits "
+                            "do not change your workspace. Only one batch is allowed per run."
+                        }
+                        if name == "delegate"
+                        else {}
+                    ),
                 }
                 for name, arguments in ARGUMENTS.items()
-                if name != "delegate"
             ],
             initial_workspace_version_id=seed,
             sandbox={
@@ -117,6 +126,22 @@ async def recovery_loop(db: Database) -> None:
                 await session.commit()
         except DATABASE_UNAVAILABLE:
             logger.warning("Database unavailable during lease recovery", exc_info=True)
+        await asyncio.sleep(1)
+
+
+async def delegation_loop(db: Database, hooks: CrashTestHooks) -> None:
+    while True:
+        try:
+            async with db.session() as session:
+                events = await advance_delegations(session)
+                await session.commit()
+            for name, run_id, operation_id in events:
+                try:
+                    await hooks.hit(name, run_id=run_id, operation_id=operation_id)
+                except HookInterrupted:
+                    logger.info("Crash Test interrupted %s after commit", name)
+        except DATABASE_UNAVAILABLE:
+            logger.warning("Database unavailable during delegation recovery", exc_info=True)
         await asyncio.sleep(1)
 
 
@@ -146,11 +171,13 @@ async def open_runtime(
                     if settings.worker_autoscale
                     else None
                 )
+                delegation = tasks.create_task(delegation_loop(db, hooks))
                 try:
                     yield Runtime(db, tools, settings, hooks)
                 finally:
                     recovery.cancel()
                     if scaling:
                         scaling.cancel()
+                    delegation.cancel()
     finally:
         await db.close()
