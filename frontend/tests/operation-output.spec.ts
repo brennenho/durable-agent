@@ -48,6 +48,18 @@ const model: RunDetail["operations"][number] = {
 };
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/runs/*/operations/*", (route) =>
+    route.fulfill({
+      status: 503,
+      json: {
+        error: {
+          code: "inspection_unavailable",
+          message: "Inspection unavailable",
+          retryable: true,
+        },
+      },
+    }),
+  );
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/runs/*/files", (route) =>
     route.fulfill({ json: { workspace_version_id: runDetail.workspace_version_id, entries: [] } }),
@@ -85,7 +97,7 @@ test("separates saved model output from failed attempts and requested tool inten
     history.getByText("Requests only; execution appears as separate steps."),
   ).toBeVisible();
   await expect(history).not.toContainText("Next: execute");
-  await history.getByText("Technical details", { exact: true }).click();
+  await history.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(history.getByText("Accepted from attempt 2.")).toBeVisible();
   await expect(history.getByText("write_file · Call ID: call_write")).toBeVisible();
   await history.getByText("Raw provider output", { exact: true }).click();
@@ -143,7 +155,7 @@ test("shows completed command failure with readable logs and its saved workspace
     exact: false,
   });
   await expect(workspace).toBeHidden();
-  await history.getByText("Technical details", { exact: true }).click();
+  await history.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(workspace).toBeVisible();
   await expect(history).not.toContainText("Retry policy");
 });

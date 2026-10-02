@@ -3,6 +3,18 @@ import type { RunDetail } from "../src/lib/api";
 import { runDetail } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/runs/*/operations/*", (route) =>
+    route.fulfill({
+      status: 503,
+      json: {
+        error: {
+          code: "inspection_unavailable",
+          message: "Inspection unavailable",
+          retryable: true,
+        },
+      },
+    }),
+  );
   await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/runs/*/files", (route) =>
     route.fulfill({
@@ -77,7 +89,7 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
   await history.getByLabel("1. Tool call").locator(":scope > summary").click();
   await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
   await expect(history.getByText("sandbox_crash: The sandbox stopped.")).toBeHidden();
-  await history.getByText("Technical details", { exact: true }).click();
+  await history.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(history.locator(".attempt-list > li")).toHaveCount(3);
   await expect(history.locator(".attempt-list > li").nth(0)).toContainText(
     "sandbox_crash: The sandbox stopped.",
@@ -86,6 +98,10 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
     "No conclusive result was recorded.",
   );
   await expect(history.locator(".attempt-list > li").nth(2)).toContainText("Attempt 3 · accepted");
+  await expect(history.getByRole("alert", { name: "Input inspection error" })).toHaveText(
+    "Inspection unavailable",
+  );
+  await history.getByRole("tab", { name: "Output", exact: true }).click();
   await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toHaveText("Completed");
 });
