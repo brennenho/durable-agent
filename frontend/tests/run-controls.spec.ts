@@ -57,7 +57,7 @@ for (const width of [1440, 390]) {
     });
     await page.goto(chatUrl);
     await page.getByRole("button", { name: "Pause", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Pausing…" })).toBeDisabled();
     release();
     await expect(page.getByRole("status", { name: "Execution status" })).toHaveText("Paused");
     await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
@@ -92,10 +92,12 @@ test("can cancel a pending pause while the current call finishes", async ({ page
   });
   await page.goto(`/runs/${runDetail.id}`);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await expect(page.getByRole("status", { name: "Execution status" })).toHaveText(
-    "Pausing after this call…",
+  await expect(page.getByRole("status", { name: "Execution status" })).toHaveText("Pausing…");
+  await expect(page.getByRole("status", { name: "Execution status" })).toHaveAttribute(
+    "title",
+    "Finishes the current call before pausing",
   );
-  await expect(page.getByText("The current call will finish before pausing.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Final output" })).toHaveCount(0);
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(page.getByRole("status", { name: "Execution status" })).not.toContainText("Paus");
 });
@@ -114,7 +116,7 @@ for (const action of ["pause", "resume"] as const) {
       .getByRole("button", { name: action === "pause" ? "Pause" : "Resume", exact: true })
       .click();
     await expect(page.getByRole("alert", { name: "Run control error" })).toContainText(
-      `Retry ${action} to confirm.`,
+      `Could not confirm ${action}.`,
     );
     await page.clock.fastForward(2_000);
     const opposite = action === "pause" ? "Resume" : "Pause";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LoaderCircle, Pause, Play } from "lucide-react";
 import { ApiError, requestJson, type RunDetail, type RunSummary } from "../lib/api";
 import { Button } from "./ui/button";
 
@@ -40,9 +41,7 @@ export function RunControls({
       if (current.signal.aborted) return;
       // Keep an uncertain action fixed even if polling observes its effect.
       setRetryAction(action);
-      setError(
-        `${cause instanceof ApiError ? cause.message : "Could not confirm the change."} Retry ${action} to confirm.`,
-      );
+      setError(cause instanceof ApiError ? cause.message : `Could not confirm ${action}.`);
     } finally {
       controller.current = null;
       if (!current.signal.aborted) setBusy(false);
@@ -50,10 +49,25 @@ export function RunControls({
   }
 
   return (
-    <div className="mt-4 space-y-2" aria-label="Run controls">
-      <Button size="sm" variant="outline" disabled={busy} onClick={submit}>
+    <div className="flex min-w-0 flex-col items-end gap-2" aria-label="Run controls">
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={busy}
+        onClick={submit}
+        title={action === "pause" ? "Pause after the current call" : undefined}
+      >
+        {busy ? (
+          <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
+        ) : action === "pause" ? (
+          <Pause aria-hidden="true" />
+        ) : (
+          <Play aria-hidden="true" />
+        )}
         {busy
-          ? "Saving…"
+          ? action === "pause"
+            ? "Pausing…"
+            : "Resuming…"
           : retryAction
             ? `Retry ${action}`
             : action === "pause"
@@ -61,7 +75,11 @@ export function RunControls({
               : "Resume"}
       </Button>
       {error && (
-        <p role="alert" aria-label="Run control error" className="text-xs text-destructive">
+        <p
+          role="alert"
+          aria-label="Run control error"
+          className="m-0 max-w-sm text-right text-xs text-destructive"
+        >
           {error}
         </p>
       )}

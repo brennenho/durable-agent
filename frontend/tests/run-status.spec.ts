@@ -44,13 +44,13 @@ for (const status of [408, 429, 503]) {
       });
     });
     await page.goto(url);
-    await expect(page.getByRole("status")).toHaveText("Working");
+    await expect(page.getByRole("status")).toHaveText("Running");
     phase = "error";
     await page.clock.fastForward(2_000);
     await expect(page.getByRole("alert", { name: "Run update error" })).toContainText(
       "Database unavailable.",
     );
-    await expect(page.getByRole("status")).toHaveText("Working");
+    await expect(page.getByRole("status")).toHaveText("Running");
     phase = "succeeded";
     await page.clock.fastForward(2_000);
     await expect(page.getByRole("status")).toHaveText("Completed");
@@ -110,7 +110,7 @@ test("stops polling when navigating away", async ({ page }) => {
     return route.fulfill({ json: runDetail });
   });
   await page.goto(url);
-  await expect(page.getByRole("status")).toHaveText("Waiting to start");
+  await expect(page.getByRole("status")).toHaveText("Queued");
   await page.getByRole("link", { name: "New chat" }).click();
   await expect(page.getByRole("heading", { name: "What are we working on?" })).toBeVisible();
   const count = requests;
@@ -119,17 +119,21 @@ test("stops polling when navigating away", async ({ page }) => {
 });
 
 test("expands activity with the keyboard without hiding the answer", async ({ page }) => {
-  await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
+  await page.route(endpoint, (route) =>
+    route.fulfill({
+      json: { ...runDetail, status: "succeeded", final_answer: "Finished the task." },
+    }),
+  );
   await page.goto(url);
   const activity = page.getByLabel("Activity", { exact: true }).locator(":scope > summary");
   await expect(page.getByRole("region", { name: "Execution history" })).toBeHidden();
   await activity.focus();
   await activity.press("Enter");
   await expect(page.getByRole("region", { name: "Execution history" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Final output" })).toHaveText("Finished the task.");
   await activity.press("Enter");
   await expect(page.getByRole("region", { name: "Execution history" })).toBeHidden();
-  await expect(page.getByRole("region", { name: "Final output" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Final output" })).toHaveText("Finished the task.");
 });
 
 test("renders Markdown without executing HTML or loading remote images", async ({ page }) => {
