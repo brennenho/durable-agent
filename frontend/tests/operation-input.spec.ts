@@ -107,7 +107,7 @@ test("loads context lazily without repeating the current prompt or exposing prov
   expect(calls).toBe(1);
 });
 
-for (const failure of ["malformed", "unavailable"]) {
+for (const failure of ["malformed", "invalid explicit input", "unavailable"]) {
   test(`shows loading and ${failure} responses, and retries on demand`, async ({ page }) => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {
@@ -122,7 +122,17 @@ for (const failure of ["malformed", "unavailable"]) {
           ? { json: input }
           : failure === "malformed"
             ? { json: {} }
-            : { status: 503, json: { error: { message: "Inspection unavailable" } } },
+            : failure === "invalid explicit input"
+              ? {
+                  json: {
+                    ...input,
+                    operation: {
+                      kind: "model",
+                      request: { prompt: "", history: [], explicit_input: {} },
+                    },
+                  },
+                }
+              : { status: 503, json: { error: { message: "Inspection unavailable" } } },
       );
     });
     await page.goto(`/runs/${runDetail.id}`);
@@ -133,11 +143,127 @@ for (const failure of ["malformed", "unavailable"]) {
     await expect(page.getByText("Loading saved input…")).toBeVisible();
     release();
     await expect(page.getByRole("alert", { name: "Input inspection error" })).toContainText(
-      failure === "malformed" ? "The saved input response is invalid." : "Inspection unavailable",
+      failure === "malformed"
+        ? "The saved input response is invalid."
+        : failure === "invalid explicit input"
+          ? "The saved model input is invalid."
+          : "Inspection unavailable",
     );
     await page.getByRole("button", { name: "Retry inspection" }).click();
     await expect(page.getByText("Checking the calculator.", { exact: true })).toBeVisible();
     expect(calls).toBe(2);
+  });
+}
+
+for (const name of ["builtin", "reviewer"]) {
+  test(`inspects frozen ${name} model input and request overrides without legacy context`, async ({
+    page,
+  }) => {
+    const explicitInput = [
+      { role: "developer", content: `You are the ${name} agent.` },
+      { role: "user", content: "Fix the failing test." },
+      {
+        type: "function_call",
+        call_id: "read_1",
+        name: "read_file",
+        arguments: '{"path":"test.py"}',
+      },
+      { type: "function_call_output", call_id: "read_1", output: "Saved file contents" },
+    ];
+    const schemas = name === "builtin" ? [{ type: "function", name: "write_file" }] : [];
+    let calls = 0;
+    await page.route(endpoint, (route) => {
+      calls++;
+      return route.fulfill({
+        json: {
+          ...input,
+          config: {
+            ...input.config,
+            agent: { name, version: "1", app_ref: "example.app:app", build_id: "build-1" },
+          },
+          operation: {
+            kind: "model",
+            request: {
+              prompt: "",
+              history: [],
+              explicit_input: explicitInput,
+              model: "call-model",
+              model_params: { temperature: 0 },
+              tool_schemas: schemas,
+            },
+          },
+        },
+      });
+    });
+    await page.goto(`/runs/${runDetail.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    const step = page.getByLabel("1. Model call", { exact: true });
+    await step.locator(":scope > summary").click();
+    expect(calls).toBe(0);
+    await step.getByRole("tab", { name: "Context", exact: true }).click();
+    await expect(step.getByRole("heading", { name: "Saved model input" })).toBeVisible();
+    await expect(step.getByRole("tabpanel").locator("pre")).toHaveText(
+      JSON.stringify(explicitInput, null, 2),
+    );
+    await expect(step).not.toContainText("No earlier results.");
+    await step.getByRole("tab", { name: "Technical details", exact: true }).click();
+    await step.getByText("Raw saved context", { exact: true }).click();
+    await expect(
+      step.getByText("Raw saved context", { exact: true }).locator("..").locator("pre"),
+    ).toHaveText(JSON.stringify(explicitInput, null, 2));
+    await expect(step).not.toContainText("Provider input is assembled");
+    const config = step.getByText("Configuration, tool schemas, and limits", { exact: true });
+    await config.click();
+    const settings = JSON.parse((await config.locator("..").locator("pre").textContent())!);
+    expect(settings.model).toBe("call-model");
+    expect(settings.model_params).toEqual({ temperature: 0 });
+    expect(settings.tool_schemas).toEqual(schemas);
+    expect(settings.max_attempts).toBe(input.config.max_attempts);
+    expect(calls).toBe(1);
+  });
+}
+
+for (const empty of [true, false]) {
+  test(`${empty ? "empty" : "null"} model request fields ${empty ? "override" : "fall back to"} legacy values`, async ({
+    page,
+  }) => {
+    await page.route(endpoint, (route) =>
+      route.fulfill({
+        json: {
+          ...input,
+          operation: {
+            kind: "model",
+            request: {
+              ...input.operation.request,
+              explicit_input: empty ? [] : null,
+              model: null,
+              model_params: empty ? {} : null,
+              tool_schemas: empty ? [] : null,
+            },
+          },
+        },
+      }),
+    );
+    await page.goto(`/runs/${runDetail.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    const step = page.getByLabel("1. Model call", { exact: true });
+    await step.locator(":scope > summary").click();
+    await step.getByRole("tab", { name: "Context", exact: true }).click();
+    if (empty) {
+      await expect(step.getByRole("tabpanel").locator("pre")).toHaveText("[]");
+      await expect(step).not.toContainText("Checking the calculator.");
+    } else {
+      await expect(step.getByText("Checking the calculator.", { exact: true })).toBeVisible();
+      await expect(step.getByText("Earlier file contents", { exact: true })).toBeVisible();
+    }
+    await step.getByRole("tab", { name: "Technical details", exact: true }).click();
+    const config = step.getByText("Configuration, tool schemas, and limits", { exact: true });
+    await config.click();
+    expect(JSON.parse((await config.locator("..").locator("pre").textContent())!)).toEqual({
+      ...input.config,
+      model_params: empty ? {} : input.config.model_params,
+      tool_schemas: empty ? [] : input.config.tool_schemas,
+    });
   });
 }
 
