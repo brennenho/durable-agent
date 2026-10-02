@@ -4,6 +4,11 @@ export type CrashSnapshot = components["schemas"]["Snapshot"];
 export type CrashSession = components["schemas"]["Session"];
 export type Container = components["schemas"]["Container"];
 
+export function scenarioName(name: string) {
+  const label = name.replaceAll("-", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export async function crashRequest<T>(
   path: string,
   body?: unknown,

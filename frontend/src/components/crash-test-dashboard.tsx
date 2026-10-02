@@ -8,6 +8,7 @@ import { CrashTestTimeline } from "./crash-test-timeline";
 import { CrashTestScenario } from "./crash-test-scenario";
 import { CrashTestContainers } from "./crash-test-containers";
 import { Badge } from "./ui/badge";
+import { CrashTestResult } from "./crash-test-result";
 
 export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const [snapshot, setSnapshot] = useState<CrashSnapshot | null>(null);
@@ -88,63 +89,36 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
         </p>
       )}
       {actionError && <p role="alert">{actionError}</p>}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <CrashTestScenario
-          scenarios={snapshot?.scenarios ?? []}
-          blocked={!snapshot || blocked}
-          running={running}
-          cancelDisabled={pending || !!connectionError}
-          onArm={(scenario, runId) => void act("scenarios", { scenario, run_id: runId })}
-          onCancel={() => void act("scenarios/cancel", {})}
-        />
-        <CrashTestContainers
-          services={snapshot?.services}
-          blocked={blocked}
-          stale={unavailable}
-          running={running}
-          onAction={(target, action) =>
-            void act("containers/action", { id: target.id, started_at: target.started_at, action })
-          }
-        />
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-5 lg:col-start-2 lg:row-start-1">
+          <CrashTestScenario
+            scenarios={snapshot?.scenarios ?? []}
+            blocked={!snapshot || blocked}
+            running={running}
+            activeScenario={running ? current?.scenario : undefined}
+            cancelDisabled={pending || !!connectionError}
+            onArm={(scenario, runId) => void act("scenarios", { scenario, run_id: runId })}
+            onCancel={() => void act("scenarios/cancel", {})}
+          />
+          <CrashTestContainers
+            services={snapshot?.services}
+            blocked={blocked}
+            stale={unavailable}
+            running={running}
+            onAction={(target, action) =>
+              void act("containers/action", {
+                id: target.id,
+                started_at: target.started_at,
+                action,
+              })
+            }
+          />
+        </div>
+        <div className="min-w-0 space-y-5 lg:col-start-1 lg:row-start-1">
+          <CrashTestResult session={current} appUrl={appUrl} />
+          {snapshot && <CrashTestTimeline snapshot={snapshot} />}
+        </div>
       </div>
-      {current && (
-        <section aria-labelledby="result-heading">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="result-heading">{current.scenario.replaceAll("-", " ")}</h2>
-            <strong
-              role="status"
-              className={`rounded-full px-3 py-1 text-xs ${current.status === "passed" ? "bg-emerald-50 text-emerald-800" : current.status === "failed" ? "bg-red-50 text-red-800" : "bg-muted"}`}
-            >
-              {running ? (current.run ? "Watching recovery" : "Waiting for a run") : current.status}
-            </strong>
-          </div>
-          {running && !current.run && (
-            <p>
-              Start a task in the application. The scenario is waiting for a worker claim with hooks
-              enabled.
-            </p>
-          )}
-          {current.error && (
-            <p role="alert">{current.error}. Last observed run state is retained.</p>
-          )}
-          {current.observed_at && (
-            <p className="text-xs text-muted-foreground">
-              Run last observed:{" "}
-              <time dateTime={current.observed_at}>
-                {new Date(current.observed_at).toLocaleString()}
-              </time>
-            </p>
-          )}
-          <ul className="space-y-2 pl-0">
-            {Object.entries(current.checks).map(([label, passed]) => (
-              <li key={label} className="list-none text-sm">
-                {passed ? "✓" : "✕"} {label}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {snapshot && <CrashTestTimeline snapshot={snapshot} appUrl={appUrl} />}
     </main>
   );
 }

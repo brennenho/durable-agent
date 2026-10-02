@@ -42,13 +42,22 @@ test("scenario selection supports the keyboard and validates an existing run", a
   await page.goto("/crash-test");
   const select = page.getByRole("combobox", { name: "Scenario", exact: true });
   await expect(select).toBeEnabled();
+  await expect(select).toHaveText("Baseline");
   await select.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("option", { name: "baseline", exact: true })).toBeVisible();
-  await page.keyboard.press("End");
-  await expect(page.getByRole("option", { name: "baseline", exact: true })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(
+    page.getByRole("option", { name: "Saved response lost", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(select).toHaveText("baseline");
+  await expect(select).toHaveText("Saved response lost");
+  await expect(select).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("option", { name: "Baseline", exact: true })).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(page.getByRole("option", { name: "Baseline", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(select).toHaveText("Baseline");
   await expect(select).toBeFocused();
   await expect(page.getByText("Observe a normal run.", { exact: true })).toBeVisible();
   await page.getByText("Use an existing run", { exact: true }).click();
@@ -176,9 +185,10 @@ test("timeline combines saved state and observed crashes, filters and downloads 
     status: "inconclusive",
     observed_at: "2026-10-01T12:00:03Z",
     error: "Control unavailable",
-    checks: {},
+    checks: { "Run completed successfully": true, "Requested fault was observed": false },
     run: {
       ...runDetail,
+      status: "succeeded",
       operations: [
         {
           id: "op",
@@ -208,6 +218,16 @@ test("timeline combines saved state and observed crashes, filters and downloads 
   };
   await page.route("**/crash-api/snapshot", (route) => route.fulfill({ json: snapshot }));
   await page.goto("/crash-test");
+  await expect(page).toHaveTitle("Crashboard · Applied Agent");
+  const result = page.getByRole("region", { name: "Saved response lost", exact: true });
+  await expect(result.getByRole("status")).toHaveText("inconclusive");
+  await expect(result.getByRole("list", { name: "Recovery checks" })).toContainText(
+    "Failed: Requested fault was observed",
+  );
+  await expect(result.getByRole("link", { name: "Open run" })).toHaveAttribute(
+    "href",
+    `http://localhost:3000/runs/${runDetail.id}`,
+  );
   const timeline = page.getByRole("region", { name: "Execution timeline" });
   await expect(timeline.getByRole("listitem")).toHaveCount(3);
   await expect(timeline.getByRole("listitem").nth(1)).toContainText(
@@ -215,13 +235,17 @@ test("timeline combines saved state and observed crashes, filters and downloads 
   );
   await expect(timeline.getByRole("listitem").nth(2)).toContainText("Process stopped: tools");
   await expect(timeline).not.toContainText("Result accepted by Control");
-  await timeline.getByRole("button", { name: "Saved state", exact: true }).click();
+  await timeline.getByRole("tab", { name: "Saved state", exact: true }).click();
+  await expect(timeline.getByRole("tab", { name: "Saved state", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(timeline.getByRole("listitem")).toHaveCount(2);
   await expect(timeline).toContainText("saved-workspace");
-  await timeline.getByRole("button", { name: "Crash observations", exact: true }).click();
+  await timeline.getByRole("tab", { name: "Crash Test", exact: true }).click();
   await expect(timeline.getByRole("listitem")).toHaveCount(1);
   const download = page.waitForEvent("download");
-  await timeline.getByRole("button", { name: "Download observations" }).click();
+  await timeline.getByRole("button", { name: "Export JSON" }).click();
   const evidence = await download;
   expect(evidence.suggestedFilename()).toBe("crash-test-scenario.json");
   const contents = JSON.parse(await readFile((await evidence.path())!, "utf8"));
