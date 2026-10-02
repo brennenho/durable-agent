@@ -26,8 +26,10 @@ from durable_agent.contracts import (
     RunDetail,
     RunFileListing,
     RunSummary,
+    SubmitFollowUpRequest,
     SubmitRunRequest,
 )
+from durable_agent.control.continuations import create_continuation
 from durable_agent.control.conversations import conversation_detail, list_conversations
 from durable_agent.control.errors import ControlError
 from durable_agent.control.files import saved_version
@@ -109,6 +111,27 @@ async def get_conversations(request: Request) -> list[ConversationSummary]:
 async def get_conversation(conversation_id: UUID, request: Request) -> ConversationDetail:
     async with get_runtime(request).db.session() as session:
         return await conversation_detail(session, conversation_id)
+
+
+@routes.post(
+    "/api/conversations/{conversation_id}/runs",
+    response_model=RunSummary,
+    operation_id="submit_follow_up",
+    responses={
+        404: {"model": ErrorResponse, "description": "Conversation not found"},
+        409: {
+            "model": ErrorResponse,
+            "description": "Conflicting submission or conversation state",
+        },
+    },
+)
+async def submit_follow_up(
+    conversation_id: UUID, body: SubmitFollowUpRequest, request: Request
+) -> RunSummary:
+    async with get_runtime(request).db.session() as session:
+        run = await create_continuation(session, conversation_id, body)
+        await session.commit()
+        return await detail(session, run.id)
 
 
 @routes.get("/api/runs", response_model=list[RunSummary], operation_id="list_runs")

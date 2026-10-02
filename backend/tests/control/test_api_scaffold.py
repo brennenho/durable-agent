@@ -18,6 +18,11 @@ def client():
     "method,path,body",
     [
         ("POST", "/api/runs", {"submission_key": ID, "prompt": "Edit a file"}),
+        (
+            "POST",
+            f"/api/conversations/{ID}/runs",
+            {"submission_key": ID, "prompt": "Continue", "after_run_id": ID},
+        ),
         ("GET", "/api/runs", None),
         ("GET", f"/api/runs/{ID}", None),
         ("GET", f"/api/runs/{ID}/files", None),
