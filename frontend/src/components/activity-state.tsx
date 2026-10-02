@@ -87,8 +87,9 @@ export function OperationSummary({
         className="size-3.5 text-muted-foreground group-open/step:rotate-90"
       />
       <span className="min-w-0 @min-[20rem]:flex @min-[20rem]:items-baseline @min-[20rem]:gap-2">
-        <span className="text-xs font-medium wrap-anywhere @min-[12rem]:text-sm @min-[20rem]:shrink-0">
-          {operationName(operation)}
+        <span className="inline-flex max-w-full items-center gap-1.5 text-xs font-medium @min-[12rem]:text-sm @min-[20rem]:shrink-0">
+          <span className="wrap-anywhere">{operationName(operation)}</span>
+          <FailedAttemptsBadge operations={[operation]} compact />
         </span>
         {operation.tool_target && (
           <code
@@ -103,19 +104,17 @@ export function OperationSummary({
         <span>{label}</span>
         {children}
       </span>
-      <FailedAttemptsBadge operations={[operation]} className="col-start-2 col-span-2 mt-1" />
       {note && (
         <span className="col-start-2 col-span-2 mt-1 text-xs leading-relaxed text-muted-foreground">
           {note}{" "}
-          {paused
-            ? "Retry waits for Resume."
-            : retried
-              ? operation.completed_at
-                ? "Retried."
-                : "Retrying the same operation."
-              : status === "retrying"
-                ? "Waiting to retry."
-                : ""}
+          {!operation.completed_at &&
+            (paused
+              ? "Retry waits for Resume."
+              : retried
+                ? "Retrying the same operation."
+                : status === "retrying"
+                  ? "Waiting to retry."
+                  : "")}
         </span>
       )}
       {output?.status === "error" && (

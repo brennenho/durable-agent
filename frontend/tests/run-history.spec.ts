@@ -85,7 +85,7 @@ test("shows earlier failures, unknown outcomes, and accepted tool output", async
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
   await expect(history.getByLabel("1. Tool call", { exact: true })).toBeVisible();
-  await expect(history.getByText("Worker lease expired; outcome unknown. Retried.")).toBeVisible();
+  await expect(history.getByText("Worker lease expired; outcome unknown.")).toBeVisible();
   await history.getByLabel("1. Tool call").locator(":scope > summary").click();
   await expect(history.getByText("1 test failed", { exact: true })).toBeVisible();
   await expect(history.getByText("sandbox_crash: The sandbox stopped.")).toBeHidden();
@@ -275,6 +275,15 @@ for (const width of [320, 1440]) {
           ...original,
           id: "00000000-0000-4000-8000-000000000020",
           position: 1,
+          tool_name: "write_file",
+          tool_target: "calculator.py",
+          checkpoint: { workspace_version_id: detail.workspace_version_id },
+          result: {
+            kind: "tool",
+            call_id: "call_1",
+            workspace_version_id: detail.workspace_version_id,
+            output: { status: "ok", value: { bytes_written: 12 } },
+          },
           attempts: [
             { ...original.attempts[0], id: "00000000-0000-4000-8000-000000000021" },
             { ...original.attempts[0], id: "00000000-0000-4000-8000-000000000022", attempt_no: 2 },
@@ -287,10 +296,29 @@ for (const width of [320, 1440]) {
     await expect(heading.getByText("3 failed attempts", { exact: true })).toBeVisible();
     await expect(first.getByText("Completed", { exact: true })).toBeVisible();
     await expect(first.getByText("1 failed attempt", { exact: true })).toBeVisible();
-    const second = page.getByLabel("2. Tool call", { exact: true });
+    const second = page.getByLabel("2. write_file", { exact: true });
     await expect(second).not.toHaveAttribute("open");
     await expect(second.getByText("Completed", { exact: true })).toBeVisible();
     await expect(second.getByText("2 failed attempts", { exact: true })).toBeVisible();
+    for (const [step, name, count] of [
+      [first, "Model call", 1],
+      [second, "write_file", 2],
+    ] as const) {
+      const badge = step.getByTitle(`${count} failed ${count === 1 ? "attempt" : "attempts"}`);
+      const callBounds = (await step.getByText(name, { exact: true }).boundingBox())!;
+      const badgeBounds = (await badge.boundingBox())!;
+      expect(badgeBounds.x).toBeGreaterThanOrEqual(callBounds.x + callBounds.width);
+      expect(
+        Math.abs(callBounds.y + callBounds.height / 2 - badgeBounds.y - badgeBounds.height / 2),
+      ).toBeLessThan(2);
+      expect(badgeBounds.width).toBeLessThan(30);
+      await expect(badge).toMatchAriaSnapshot(
+        `- text: ${count} failed ${count === 1 ? "attempt" : "attempts"}`,
+      );
+    }
+    await expect(second.getByRole("button", { name: "Branch", exact: true })).toBeVisible();
+    await expect(second).toContainText("The sandbox stopped.");
+    await expect(second).not.toContainText("Retried.");
     expect(inspections).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     await page.screenshot({ path: test.info().outputPath("attempt-badges.png"), fullPage: true });
