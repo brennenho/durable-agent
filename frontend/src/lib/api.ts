@@ -1,5 +1,7 @@
 import type { components } from "./api.generated";
 
+export type ConversationSummary = components["schemas"]["ConversationSummary"];
+export type ConversationDetail = components["schemas"]["ConversationDetail"];
 export type RunFileListing = components["schemas"]["RunFileListing"];
 export type RunDetail = components["schemas"]["RunDetail"];
 export type RunSummary = components["schemas"]["RunSummary"];

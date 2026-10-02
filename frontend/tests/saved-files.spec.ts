@@ -14,7 +14,7 @@ const files: RunFileListing = {
 const endpoint = `**/api/runs/${runDetail.id}`;
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route(endpoint, (route) =>
     route.fulfill({
       json: {

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowUp, LoaderCircle } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
-import { ApiError, requestJson, type RunSummary, type SubmitRunRequest } from "../lib/api";
+import { ApiError, requestJson, type ConversationSummary, type SubmitRunRequest } from "../lib/api";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -29,12 +29,12 @@ export function RunSubmission() {
     setBusy(true);
     setError(null);
     try {
-      const saved = await requestJson<RunSummary>("/api/runs", {
+      const saved = await requestJson<ConversationSummary>("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(pending.current),
       });
-      router.push(`/runs/${encodeURIComponent(saved.id)}`);
+      router.push(`/chats/${encodeURIComponent(saved.id)}`);
     } catch (cause) {
       setError(
         cause instanceof ApiError
