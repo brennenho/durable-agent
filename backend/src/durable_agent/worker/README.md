@@ -10,6 +10,7 @@ polling and report retries default to one second; heartbeats run every five seco
 Only Control chooses operation retries. Workers never connect to PostgreSQL.
 
 - `responses.py`: pure output mapping and native context preservation.
+- `context.py`: replay ordered turns, closing interrupted calls only in new model input.
 - `openai_client.py`: one bounded model request, with SDK retries disabled.
 - `services.py`: typed Control/Tools HTTP calls.
 - `lease.py`: monotonic lease timing, renewal, and cancellation.
@@ -22,3 +23,8 @@ may require inference again. Tools can recover already committed results.
 
 SIGTERM and Ctrl-C cancel work and close the HTTP clients. Tests use saved response
 and HTTP fixtures: `uv run --project backend pytest backend/tests/worker -q`.
+
+Follow-ups preserve valid native context, including encrypted reasoning and call IDs.
+Failed turns close unanswered calls with explicit errors. An incomplete or malformed
+final response is replayed as a labeled text record of its partial text and tool intent;
+its native call/reasoning group is omitted. Saved results are never changed.
