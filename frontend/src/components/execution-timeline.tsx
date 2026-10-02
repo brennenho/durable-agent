@@ -8,6 +8,7 @@ import { operationName, OperationDuration, OperationSummary } from "./activity-s
 import { InspectionDisclosure } from "./inspection-json";
 import { BranchDialog } from "./branch-dialog";
 import { TimelineStamp } from "./timeline-stamp";
+import { SubagentList } from "./subagent-list";
 
 type Operation = RunDetail["operations"][number];
 
@@ -23,6 +24,9 @@ function OperationRow({
   const [open, setOpen] = useState(false);
   const current = !operation.completed_at && run.status !== "failed";
   const result = operation.result;
+  const children = (run.children ?? []).filter(
+    (child) => child.parent_operation_id === operation.id,
+  );
   const failed = result
     ? result.kind === "model"
       ? result.output.status === "incomplete"
@@ -64,7 +68,9 @@ function OperationRow({
             status={run.status}
             pauseRequested={run.pause_requested}
           >
-            {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
+            {operation.checkpoint && !run.parent && (
+              <BranchDialog run={run} operation={operation} />
+            )}
           </OperationSummary>
         </summary>
         {open && (
@@ -74,6 +80,11 @@ function OperationRow({
           </div>
         )}
       </details>
+      {children.length > 0 && (
+        <div className="col-start-3 min-w-0 pb-4">
+          <SubagentList runs={children} />
+        </div>
+      )}
     </li>
   );
 }

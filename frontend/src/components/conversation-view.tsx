@@ -93,7 +93,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
     <ChatWorkspace
       runs={conversation?.runs ?? []}
       composer={
-        conversation && (
+        conversation &&
+        !conversation.runs.some((run) => run.parent) && (
           <FollowUp
             conversation={conversation}
             blocked={awaitingRefresh || error !== null}
