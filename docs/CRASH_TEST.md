@@ -90,3 +90,12 @@ container start time, rejecting a target that stopped or restarted after selecti
 Killing uses SIGKILL with manual-stop semantics, verifies exit code 137, and leaves
 restart explicit. Sandbox containers cannot be restarted; Tools must restore the
 saved input into a replacement. Docker calls have bounded output and deadlines.
+
+`FaultController` consumes a matching hook once for its assigned run, using worker
+claims to correlate tool operation IDs and generations. Old, duplicate, foreign,
+or superseded hooks cannot trigger a fault. Use a hook wait of at least 10 seconds.
+A kill verified after that window is inconclusive. Each requested kill, observed
+exit, and restart is appended to a local JSONL journal independently of Postgres.
+An in-flight kill/recovery task survives cancellation of the hook HTTP request;
+closing the controller waits for it. A controller process crash can still interrupt
+recovery; the operator must inspect the journal and restore stopped services.
