@@ -13,6 +13,7 @@ export function MessageComposer({
   busy,
   error,
   disabled = false,
+  readOnly = false,
   placeholder = "Ask the agent to write, edit, or build something…",
   hint = "Enter to send · Shift + Enter for a new line",
 }: {
@@ -23,6 +24,7 @@ export function MessageComposer({
   busy: boolean;
   error: string | null;
   disabled?: boolean;
+  readOnly?: boolean;
   placeholder?: string;
   hint?: string;
 }) {
@@ -39,6 +41,7 @@ export function MessageComposer({
         rows={3}
         required
         disabled={busy || disabled}
+        readOnly={readOnly}
         value={prompt}
         onChange={(event) => onPromptChange(event.target.value)}
         onKeyDown={(event) => {

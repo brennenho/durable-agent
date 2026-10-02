@@ -1,12 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, requestJson, type ConversationDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
+import { FollowUp } from "./follow-up";
 
 export function ConversationView({ conversationId }: { conversationId: string }) {
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [revision, setRevision] = useState(0);
+  const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+  const latestTurn = useRef<HTMLDivElement | null>(null);
+  const scrollOnRefresh = useRef(false);
+
+  useEffect(() => {
+    if (conversation && scrollOnRefresh.current) {
+      latestTurn.current?.scrollIntoView({ block: "start" });
+      scrollOnRefresh.current = false;
+    }
+  }, [conversation]);
+
+  function requestRefresh() {
+    scrollOnRefresh.current = true;
+    setAwaitingRefresh(true);
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -24,6 +43,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         );
         if (controller.signal.aborted) return;
         setConversation(latest);
+        setAwaitingRefresh(false);
         setError(null);
         retry = latest.status !== "succeeded" && latest.status !== "failed";
       } catch (cause) {
@@ -49,19 +69,30 @@ export function ConversationView({ conversationId }: { conversationId: string })
       clearTimeout(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [conversationId]);
+  }, [conversationId, revision]);
 
   return (
-    <div className="space-y-12">
+    <div className="flex flex-1 flex-col gap-12">
       {error && (
         <p role="alert" aria-label="Chat update error">
           {error}
         </p>
       )}
       {!conversation && !error && <p role="status">Loading chat…</p>}
-      {conversation?.runs.map((run) => (
-        <ChatTurn key={run.id} run={run} />
+      {conversation?.runs.map((run, index) => (
+        <div key={run.id} ref={index === conversation.runs.length - 1 ? latestTurn : undefined}>
+          <ChatTurn run={run} />
+        </div>
       ))}
+      {conversation && (
+        <div className="sticky bottom-0 mt-auto bg-background pt-4 pb-4">
+          <FollowUp
+            conversation={conversation}
+            blocked={awaitingRefresh || error !== null}
+            refresh={requestRefresh}
+          />
+        </div>
+      )}
     </div>
   );
 }
