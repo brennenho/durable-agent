@@ -125,6 +125,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/forks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fork Run */
+        post: operations["fork_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/operations/{operation_id}": {
         parameters: {
             query?: never;
@@ -365,6 +382,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            forked_from?: components["schemas"]["ForkOrigin"] | null;
             /**
              * Id
              * Format: uuid
@@ -457,6 +475,26 @@ export interface components {
             path: string;
             /** Size Bytes */
             size_bytes?: number | null;
+        };
+        /** ForkOrigin */
+        ForkOrigin: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /** Position */
+            position: number;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -699,6 +737,21 @@ export interface components {
              * Format: uuid
              */
             after_run_id: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Submission Key
+             * Format: uuid
+             */
+            submission_key: string;
+        };
+        /** SubmitForkRequest */
+        SubmitForkRequest: {
+            /**
+             * After Operation Id
+             * Format: uuid
+             */
+            after_operation_id: string;
             /** Prompt */
             prompt: string;
             /**
@@ -1307,6 +1360,77 @@ export interface operations {
             };
             /** @description Run not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Handler not implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    fork_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitForkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Source run or operation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflicting submission or unavailable checkpoint */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

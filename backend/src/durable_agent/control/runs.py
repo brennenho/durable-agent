@@ -13,8 +13,17 @@ from durable_agent.harness import start
 
 
 async def find_submission(session: AsyncSession, body: SubmitRunRequest) -> Run | None:
-    run = await session.scalar(select(Run).where(Run.submission_key == body.submission_key))
-    if run is not None and (run.prompt != body.prompt or run.turn_index != 0):
+    row = (
+        await session.execute(
+            select(Run, Conversation.forked_from_operation_id)
+            .join(Conversation, Run.conversation_id == Conversation.id)
+            .where(Run.submission_key == body.submission_key)
+        )
+    ).one_or_none()
+    if row is None:
+        return None
+    run, origin = row
+    if run.prompt != body.prompt or run.turn_index != 0 or origin is not None:
         raise ControlError(409, "submission_conflict", "Submission key has different inputs")
     return run
 

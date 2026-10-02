@@ -130,6 +130,10 @@ class SubmitFollowUpRequest(SubmitRunRequest):
     after_run_id: UUID
 
 
+class SubmitForkRequest(SubmitRunRequest):
+    after_operation_id: UUID
+
+
 RunStatus = Literal["queued", "running", "retrying", "succeeded", "failed"]
 AttemptStatus = Literal["running", "accepted", "error", "unknown"]
 
@@ -196,8 +200,16 @@ class ConversationSummary(Contract):
     latest_run_id: UUID
 
 
+class ForkOrigin(Contract):
+    conversation_id: UUID
+    run_id: UUID
+    operation_id: UUID
+    position: NonNegativeInt
+
+
 class ConversationDetail(ConversationSummary):
     runs: list[RunDetail]
+    forked_from: ForkOrigin | None = None
 
 
 class FileEntry(Contract):

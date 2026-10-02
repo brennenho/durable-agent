@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from durable_agent.contracts import ConversationDetail, ConversationSummary
+from durable_agent.contracts import ConversationDetail, ConversationSummary, ForkOrigin
 from durable_agent.control.errors import ControlError
 from durable_agent.control.views import detail
 from durable_agent.db.models import Conversation, Operation, Run
@@ -73,6 +73,21 @@ async def conversation_detail(session: AsyncSession, conversation_id: UUID) -> C
     )
     runs = [await detail(session, run_id) for run_id in run_ids]
     latest = runs[-1]
+    origin = None
+    if conversation.forked_from_operation_id is not None:
+        row = (
+            await session.execute(
+                select(
+                    Run.conversation_id,
+                    Operation.run_id,
+                    Operation.id.label("operation_id"),
+                    Operation.position,
+                )
+                .join(Run, Run.id == Operation.run_id)
+                .where(Operation.id == conversation.forked_from_operation_id)
+            )
+        ).one()
+        origin = ForkOrigin(**row._mapping)
     return ConversationDetail(
         id=conversation.id,
         title=title(runs[0].prompt),
@@ -85,4 +100,5 @@ async def conversation_detail(session: AsyncSession, conversation_id: UUID) -> C
         status=latest.status,
         latest_run_id=latest.id,
         runs=runs,
+        forked_from=origin,
     )

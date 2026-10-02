@@ -32,6 +32,9 @@ class Conversation(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    forked_from_operation_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("operations.id", name="fk_conversations_forked_from_operation", use_alter=True)
+    )
 
 
 class Run(Base):

@@ -267,6 +267,16 @@
             "title": "Created At",
             "type": "string"
           },
+          "forked_from": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForkOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -479,6 +489,39 @@
           "kind"
         ],
         "title": "FileEntry",
+        "type": "object"
+      },
+      "ForkOrigin": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "format": "uuid",
+            "title": "Conversation Id",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "position": {
+            "minimum": 0.0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_id",
+          "run_id",
+          "operation_id",
+          "position"
+        ],
+        "title": "ForkOrigin",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1240,6 +1283,32 @@
           "after_run_id"
         ],
         "title": "SubmitFollowUpRequest",
+        "type": "object"
+      },
+      "SubmitForkRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "after_operation_id": {
+            "format": "uuid",
+            "title": "After Operation Id",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "submission_key": {
+            "format": "uuid",
+            "title": "Submission Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission_key",
+          "prompt",
+          "after_operation_id"
+        ],
+        "title": "SubmitForkRequest",
         "type": "object"
       },
       "SubmitRunRequest": {
@@ -2176,6 +2245,96 @@
           }
         },
         "summary": "List Run Files"
+      }
+    },
+    "/api/runs/{run_id}/forks": {
+      "post": {
+        "operationId": "fork_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitForkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Source run or operation not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflicting submission or unavailable checkpoint"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Handler not implemented"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "summary": "Fork Run"
       }
     },
     "/api/runs/{run_id}/operations/{operation_id}": {

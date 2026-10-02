@@ -34,7 +34,11 @@ def test_conversation_creation_replays_without_tools_and_preserves_run_urls(post
         assert len(calls) == 1
         assert client.get("/api/conversations").json() == [conversation]
         saved = client.get(f"/api/conversations/{run_id}").json()
-        assert saved == {**conversation, "runs": [client.get(f"/api/runs/{run_id}").json()]}
+        assert saved == {
+            **conversation,
+            "runs": [client.get(f"/api/runs/{run_id}").json()],
+            "forked_from": None,
+        }
         assert saved["runs"][0]["workspace_version_id"] == str(seed)
         assert (
             client.post("/api/conversations", json={**body, "prompt": "Changed"}).status_code == 409
@@ -103,7 +107,7 @@ def test_conversation_views_order_turns_and_sort_by_latest_progress(postgres_eng
         assert listing[0]["title"] == "Initial prompt"
         assert listing[0]["status"] == "queued"
         saved = client.get(f"/api/conversations/{first['id']}").json()
-        assert {k: v for k, v in saved.items() if k != "runs"} == listing[0]
+        assert {k: v for k, v in saved.items() if k not in ("runs", "forked_from")} == listing[0]
         assert [run["id"] for run in saved["runs"]] == [first["id"], str(followup_id)]
         assert saved["runs"][0]["final_answer"] == "First answer"
         assert saved["runs"][1]["workspace_version_id"] == config["initial_workspace_version_id"]

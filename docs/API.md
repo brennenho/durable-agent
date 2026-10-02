@@ -143,6 +143,22 @@ only in the next model input; saved history stays unchanged. Tool checkpoints th
 never accepted are excluded. Malformed final model output is retained as a labeled text
 record when its native tool calls cannot be replayed safely.
 
+### Checkpoint branches
+
+`POST /api/runs/{run_id}/forks` accepts `{submission_key, prompt, after_operation_id}`
+and returns a new `ConversationSummary`. The selected operation must have a non-null
+`checkpoint`. Unknown or cross-run operations return `404`; incomplete rounds return
+`409`. A matching submission key returns the same branch; different inputs conflict.
+
+The new run inherits the frozen configuration, previous turns, and accepted history
+through the selected operation. Its starting workspace is that checkpoint’s version;
+its execution limits start fresh. Later source work and errors are excluded. No old
+operations or attempts execute again. Creation commits the conversation, run, and
+first model operation together. The source may still be running.
+
+`ConversationDetail.forked_from` is null for ordinary conversations, or contains
+`{conversation_id, run_id, operation_id, position}` linking a branch to its source.
+
 ## Worker → control
 
 | Method | Path | Request → response |

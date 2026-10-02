@@ -81,6 +81,42 @@ def test_migration_matches_models_and_round_trips(postgres_engine, migration_con
         command.check(migration_config)
 
 
+def test_branch_origin_migration_preserves_existing_conversations(
+    postgres_engine, migration_config
+):
+    run_id, operation_id = add_operation(postgres_engine)
+    with postgres_engine.begin() as connection:
+        migration_config.attributes["connection"] = connection
+        command.downgrade(migration_config, "0002")
+        command.upgrade(migration_config, "head")
+        assert (
+            connection.scalar(
+                select(Conversation.forked_from_operation_id).where(Conversation.id == run_id)
+            )
+            is None
+        )
+    with pytest.raises(IntegrityError), postgres_engine.begin() as connection:
+        connection.execute(insert(Conversation).values(forked_from_operation_id=uuid4()))
+    branch_id = uuid4()
+    with postgres_engine.begin() as connection:
+        connection.execute(
+            insert(Conversation).values(id=branch_id, forked_from_operation_id=operation_id)
+        )
+        assert (
+            connection.scalar(
+                select(Conversation.forked_from_operation_id).where(Conversation.id == branch_id)
+            )
+            == operation_id
+        )
+        migration_config.attributes["connection"] = connection
+        command.downgrade(migration_config, "0002")
+        assert connection.scalar(select(Run.id).where(Run.id == run_id)) == run_id
+        assert (
+            connection.scalar(select(Conversation.id).where(Conversation.id == branch_id))
+            == branch_id
+        )
+
+
 def test_duplicate_submission_key_is_rejected(postgres_engine):
     key = uuid4()
     with postgres_engine.begin() as connection:
