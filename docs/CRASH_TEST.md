@@ -2,7 +2,7 @@
 
 Crash Test is the name for the fault-injection dashboard and scenario controller.
 The optional hook client is independent of application persistence: no new database,
-no event table, and no hook code in the pure harness. Service wiring follows separately.
+no event table, and no hook code in the pure harness.
 
 A service uses `async with open_hooks("tools") as hooks` for its process lifetime,
 then calls `await hooks.hit("tools.after_commit", operation_id=operation_id)` at an
@@ -37,3 +37,20 @@ acting. Unmatched hooks immediately continue. A delayed kill must recheck its ta
 and event against the still-armed rule; a client may have timed out or been cancelled.
 Rules, fault actions, and observations belong to the controller's disposable state/log;
 PostgreSQL remains authoritative for saved work and Control acceptance.
+
+## Tools and sandbox boundaries
+
+| Hook | Boundary | Context |
+| --- | --- | --- |
+| `sandbox.started` | Docker has started the named container; the command may already be running or finished. | operation ID, generation, sandbox container name |
+| `tools.before_publish` | Execution and workspace capture finished; the publication transaction has not started. | operation ID, generation |
+| `tools.after_commit` | The publication transaction committed and closed; the response has not been returned. | operation ID, generation, saved workspace ID |
+| `tools.result_reused` | A saved completion was loaded on a matching retry; execution was skipped. | operation ID, generation, saved workspace ID |
+
+Tools returns a retryable `503 crash_test_interrupted` when instructed to interrupt.
+Before publication, no completion is saved. After commit, the saved result survives;
+a matching retry can return it. Neither hook changes Control acceptance. Hook events
+are observations, not a durable audit log, and can be missed when a process dies.
+Sandbox interruption removes the container and private workspace before returning;
+a real service kill relies on the existing container deadlines and startup cleanup.
+With hooks disabled, the runner retains its normal attached execution path.

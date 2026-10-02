@@ -22,6 +22,7 @@ from durable_agent.contracts import (
     ToolExecuteResponse,
     WorkspaceVersion,
 )
+from durable_agent.crash_test import HookInterrupted, open_hooks
 from durable_agent.db.models import ToolRequest
 from durable_agent.db.session import Database
 from durable_agent.tools.archives import InvalidWorkspace
@@ -77,7 +78,9 @@ async def lifespan(app: FastAPI):
             await session.commit()
         app.state.database = db
         app.state.slots = asyncio.Semaphore(4)
-        yield
+        async with open_hooks("tools") as hooks:
+            app.state.hooks = hooks
+            yield
     finally:
         app.state.runner = None
         app.state.database = None
@@ -94,6 +97,7 @@ routes = APIRouter(
 
 
 ERRORS = {
+    HookInterrupted: (503, "crash_test_interrupted", True),
     InvalidWorkspace: (400, "invalid_workspace", False),
     InvalidToolCall: (400, "invalid_tool_call", False),
     InvalidCommand: (400, "invalid_tool_call", False),
@@ -155,6 +159,7 @@ async def execute_tool(body: ToolExecuteRequest, request: Request) -> ToolExecut
         request.app.state.slots,
         runner=request.app.state.runner,
         workspace_root=request.app.state.workspace_root,
+        hooks=request.app.state.hooks,
     )
 
 
