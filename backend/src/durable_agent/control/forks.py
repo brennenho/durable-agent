@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from durable_agent.contracts import PreviousTurn, SubmitForkRequest
 from durable_agent.control.errors import ControlError
-from durable_agent.control.views import branch_checkpoints, load_operations, restore_state
+from durable_agent.control.history import branch_checkpoints, load_operations, restore_state
 from durable_agent.db.models import Conversation, Operation, Run
 from durable_agent.harness import start
 

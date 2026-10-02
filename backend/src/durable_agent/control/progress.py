@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from durable_agent.contracts import OperationResult, ToolRequest
 from durable_agent.control.errors import ControlError
-from durable_agent.control.views import load_operations, restore_state, workspace_version
+from durable_agent.control.history import load_operations, restore_state, workspace_version
 from durable_agent.db.models import Operation, Run
 from durable_agent.harness import advance
 
