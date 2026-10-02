@@ -93,9 +93,21 @@ test("separates saved model output from failed attempts and requested tool inten
   await expect(history).toContainText("I started editing.");
   await expect(history.getByRole("heading", { name: "Requested tools (1)" })).toBeVisible();
   await expect(history.getByText("write_file · Call ID: call_write")).toBeHidden();
-  await expect(
-    history.getByText("Requests only; execution appears as separate steps."),
-  ).toBeVisible();
+  await expect(history.getByText("Requests only;", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  const requestedInfo = history.getByRole("button", { name: "About requested tools" });
+  await requestedInfo.hover();
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "Tools requested by the model. Execution appears as separate steps.",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await expect(history.getByText("File path", { exact: true })).toBeVisible();
+  await expect(history.getByText("File contents", { exact: true })).toBeVisible();
+  await history.getByRole("button", { name: "About file contents" }).focus();
+  await expect(page.getByRole("tooltip")).toContainText("Text passed to write_file.");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   await expect(history).not.toContainText("Next: execute");
   await history.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(history.getByText("Accepted from attempt 2.")).toBeVisible();
@@ -158,4 +170,28 @@ test("shows completed command failure with readable logs and its saved workspace
   await history.getByRole("tab", { name: "Technical details", exact: true }).click();
   await expect(workspace).toBeVisible();
   await expect(history).not.toContainText("Retry policy");
+});
+
+test.describe("touch hints", () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test("opens on tap and dismisses without collapsing the step", async ({ page }) => {
+    await page.route(`**/api/runs/${runDetail.id}`, (route) =>
+      route.fulfill({ json: { ...runDetail, operations: [model] } }),
+    );
+    await page.goto(`/runs/${runDetail.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").tap();
+    const step = page.getByLabel("1. Model call", { exact: true });
+    await step.locator(":scope > summary").tap();
+    const info = step.getByRole("button", { name: "About requested tools" });
+    await info.tap();
+    await expect(page.getByRole("tooltip")).toContainText("Execution appears as separate steps.");
+    await info.tap();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await info.tap();
+    await step.getByText("File path", { exact: true }).tap();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expect(step.getByText("Draft", { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  });
 });

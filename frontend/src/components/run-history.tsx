@@ -13,6 +13,13 @@ type Operation = RunDetail["operations"][number];
 function OperationRow({ run, operation }: { run: RunDetail; operation: Operation }) {
   const [open, setOpen] = useState(false);
   const current = !operation.completed_at && run.status !== "failed";
+  const result = operation.result;
+  const failed = result
+    ? result.kind === "model"
+      ? result.output.status === "incomplete"
+      : result.output.status === "error" ||
+        (typeof result.output.value.exit_code === "number" && result.output.value.exit_code !== 0)
+    : operation.attempts.at(-1)?.status === "error";
   return (
     <li aria-current={current ? "step" : undefined}>
       <details
@@ -26,6 +33,7 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
           className={cn(
             "flex list-none gap-2 border-l-2 border-transparent px-2 py-3 hover:bg-muted/50 [&::-webkit-details-marker]:hidden",
             current && "border-l-foreground bg-muted/50",
+            failed && "bg-destructive/5 hover:bg-destructive/10",
           )}
         >
           <ChevronRight
