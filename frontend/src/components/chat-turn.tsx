@@ -45,7 +45,9 @@ export function ChatTurn({
       </div>
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
         <div className="mb-2 flex items-start justify-between gap-3">
-          <h2 className="m-0 shrink-0 py-1.5 text-sm font-medium">Applied Agent</h2>
+          <h2 className="m-0 min-w-0 flex-1 py-1.5 text-sm font-medium wrap-anywhere">
+            {!run.agent || run.agent.name === "builtin" ? "Applied Agent" : run.agent.name}
+          </h2>
           {!finished && !run.parent && <RunControls run={run} onUpdate={onUpdate} />}
         </div>
         <details
