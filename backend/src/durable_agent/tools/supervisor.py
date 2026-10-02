@@ -16,9 +16,21 @@ def stop_children(pid: int) -> None:
         pass
 
 
-async def supervise(command: str, cwd: str, timeout: float, log_limit: int) -> dict:
+async def supervise(
+    command: str, cwd: str, timeout: float, log_limit: int, *, deadline: float
+) -> dict:
     if timeout <= 0 or log_limit <= 0:
         raise ValueError("Timeout and log limit must be positive")
+    remaining = deadline - time.time()
+    if remaining <= 0:
+        raise TimeoutError("Attempt deadline expired before command start")
+    # Keep the outer watchdog active during launch and cleanup as well as execution.
+    async with asyncio.timeout(remaining):
+        return await _run_command(command, cwd, timeout, log_limit)
+
+
+async def _run_command(command: str, cwd: str, timeout: float, log_limit: int) -> dict:
+    command_timer = asyncio.timeout(timeout)
     try:
         process = await asyncio.create_subprocess_exec(
             "/bin/sh",
@@ -49,13 +61,18 @@ async def supervise(command: str, cwd: str, timeout: float, log_limit: int) -> d
         asyncio.create_task(drain(process.stdout, buffers[0])),
         asyncio.create_task(drain(process.stderr, buffers[1])),
     ]
+    timed_out = False
     try:
-        async with asyncio.timeout(timeout):
+        async with command_timer:
             # Process.wait can wait for inherited pipes; observe shell exit separately.
             while process.returncode is None:
                 await asyncio.sleep(0.01)
             stop_children(process.pid)
             await asyncio.gather(*readers)
+    except TimeoutError:
+        if not command_timer.expired():
+            raise
+        timed_out = True
     finally:
         stop_children(process.pid)
         for reader in readers:
@@ -63,6 +80,17 @@ async def supervise(command: str, cwd: str, timeout: float, log_limit: int) -> d
         await asyncio.gather(*readers, return_exceptions=True)
         # Drain any buffered bytes after cancellation so pipe backpressure cannot block wait.
         await process.communicate()
+
+    if timed_out:
+        return {
+            "status": "error",
+            "code": "command_timeout",
+            "message": (
+                f"Command exceeded {timeout:g} seconds. Partial changes were discarded. "
+                "Split the work into smaller commands or reissue with a larger timeout_seconds "
+                "(maximum 900)."
+            ),
+        }
 
     logs = []
     remaining = log_limit
@@ -85,7 +113,9 @@ async def supervise(command: str, cwd: str, timeout: float, log_limit: int) -> d
 
 
 if __name__ == "__main__":
-    command, cwd, deadline, log_limit = sys.argv[1:]
+    command, cwd, deadline, log_limit, timeout = sys.argv[1:]
     # A supervisor failure emits no completed result and exits nonzero.
-    result = asyncio.run(supervise(command, cwd, float(deadline) - time.time(), int(log_limit)))
+    result = asyncio.run(
+        supervise(command, cwd, float(timeout), int(log_limit), deadline=float(deadline))
+    )
     print(json.dumps(result), flush=True)
