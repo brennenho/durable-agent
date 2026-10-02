@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "next typegen && tsc --noEmit",
-    "api:generate": "openapi-typescript ../contracts/control.openapi.json -o src/lib/api.generated.ts",
+    "api:generate": "openapi-typescript ../contracts/control.openapi.json -o src/lib/api.generated.ts && openapi-typescript ../contracts/crash-test.openapi.json -o src/lib/crash-test.generated.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

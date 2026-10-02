@@ -10,3 +10,5 @@ next-env.d.ts
 src/lib/api.generated.ts
 test-results/
 playwright-report/
+
+src/lib/crash-test.generated.ts
