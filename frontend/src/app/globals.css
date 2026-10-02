@@ -118,12 +118,8 @@
   .markdown-answer pre code {
     @apply bg-transparent p-0 text-inherit;
   }
-  .operation-list,
   .attempt-list {
     @apply list-none p-0;
-  }
-  .operation-list > li + li {
-    @apply mt-6 border-t pt-4;
   }
   .attempt-list > li {
     @apply my-4 border-l-2 pl-4;

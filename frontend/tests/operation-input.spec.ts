@@ -74,6 +74,7 @@ test("loads saved model input only on expansion and keeps context collapsed", as
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   await page.clock.fastForward(4000);
   expect(calls).toBe(0);
+  await page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary").click();
   await page.getByText("Saved model input", { exact: true }).click();
   await expect(page.getByText("Fix the failing test.", { exact: true })).toBeVisible();
   await expect(page.getByText("Requested model: test-model")).toBeVisible();
@@ -108,6 +109,7 @@ for (const failure of ["malformed", "unavailable"]) {
     });
     await page.goto(`/runs/${runDetail.id}`);
     await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    await page.getByLabel("1. Model call", { exact: true }).locator(":scope > summary").click();
     const trigger = page.getByText("Saved model input", { exact: true });
     await trigger.click();
     await expect(page.getByText("Loading saved input…")).toBeVisible();
@@ -165,6 +167,7 @@ test("shows full tool arguments without executing their contents", async ({ page
   );
   await page.goto(`/runs/${runDetail.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+  await page.getByLabel("1. write_file", { exact: true }).locator(":scope > summary").click();
   await page.getByText("Saved tool input", { exact: true }).click();
   await expect(page.getByRole("region", { name: "Execution history" })).toContainText(
     "<script>not executable</script>",

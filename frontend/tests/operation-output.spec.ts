@@ -75,7 +75,7 @@ test("separates saved model output from failed attempts and requested tool inten
   await page.goto(`/runs/${runDetail.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await history.getByText("Saved model output", { exact: true }).click();
+  await history.getByLabel("1. Model call").locator(":scope > summary").click();
   await expect(history).toContainText("Accepted from attempt 2.");
   await expect(history).toContainText("Response status: incomplete");
   await expect(history).toContainText("I started editing.");
@@ -86,6 +86,7 @@ test("separates saved model output from failed attempts and requested tool inten
   await history.getByText("Provider output items", { exact: true }).click();
   await expect(history).toContainText("Encrypted context present");
   await expect(history).not.toContainText("opaque-secret");
+  await history.getByText("Technical details", { exact: true }).click();
   const attempts = history.locator(".attempt-list > li");
   await attempts.nth(0).getByText("Attempt details", { exact: true }).click();
   await expect(attempts.nth(0)).toContainText("No saved model response for this attempt.");
@@ -131,7 +132,7 @@ test("shows completed command failure with readable logs and its saved workspace
   await page.goto(`/runs/${runDetail.id}`);
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const history = page.getByRole("region", { name: "Execution history" });
-  await history.getByText("Saved tool output", { exact: true }).click();
+  await history.getByLabel("1. run_command").locator(":scope > summary").click();
   await expect(history).toContainText("Exit code 1 · Command completed.");
   await expect(history.getByRole("heading", { name: "stdout", exact: true })).toBeVisible();
   await expect(history.locator("pre").first()).toHaveText("One test failed\nAssertionError");
