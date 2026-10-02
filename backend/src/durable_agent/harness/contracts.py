@@ -11,6 +11,7 @@ from durable_agent.contracts import (
     ModelOperation,
     NonNegativeInt,
     OperationResult,
+    PreviousTurn,
     ToolCall,
 )
 
@@ -19,6 +20,7 @@ class AgentState(Contract):
     config: AgentConfig
     prompt: str
     history: list[OperationResult]
+    previous_turns: list[PreviousTurn] = Field(default_factory=list)
     pending_tool_calls: list[ToolCall]
     turn_count: NonNegativeInt
 
