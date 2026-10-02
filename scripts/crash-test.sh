@@ -6,6 +6,13 @@ if [ "$#" -ne 0 ]; then
     exit 2
 fi
 cd "$(dirname "$0")/.."
+# uv parses dotenv values without executing them; exported shell values win.
+if [ -f .env ] && [ "${DURABLE_ENV_LOADED:-0}" != 1 ]; then
+    export DURABLE_ENV_LOADED=1
+    exec uv run --no-project --env-file .env -- ./scripts/crash-test.sh "$@"
+fi
+unset DURABLE_ENV_LOADED
+
 state=${CRASH_TEST_STATE_DIR:-"$(pwd -P)/.crash-test"}
 mkdir -p "$state"
 state=$(cd "$state" && pwd -P)

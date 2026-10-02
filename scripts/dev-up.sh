@@ -2,6 +2,13 @@
 set -eu
 cd "$(dirname "$0")/.."
 
+# uv parses dotenv values without executing them; exported shell values win.
+if [ -f .env ] && [ "${DURABLE_ENV_LOADED:-0}" != 1 ]; then
+    export DURABLE_ENV_LOADED=1
+    exec uv run --no-project --env-file .env -- ./scripts/dev-up.sh "$@"
+fi
+unset DURABLE_ENV_LOADED
+
 if ! command -v docker >/dev/null 2>&1; then
     if [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
         export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
