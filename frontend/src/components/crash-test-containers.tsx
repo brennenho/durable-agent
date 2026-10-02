@@ -1,19 +1,22 @@
-import { Circle, RotateCcw, Square } from "lucide-react";
+import { RotateCcw, Square } from "lucide-react";
 import { serviceName, type Container } from "../lib/crash-test";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { StatusDot } from "./ui/status-dot";
 
 export function CrashTestContainers({
   services,
   blocked,
   stale,
+  live,
   running,
   onAction,
 }: {
   services?: Container[];
   blocked: boolean;
   stale: boolean;
+  live: boolean;
   running: boolean;
   onAction: (target: Container, action: "kill" | "start") => void;
 }) {
@@ -49,10 +52,9 @@ export function CrashTestContainers({
                   </p>
                 </div>
                 <Badge variant="ghost" className="gap-1.5 px-0 font-normal text-muted-foreground">
-                  <Circle
-                    aria-hidden="true"
+                  <StatusDot
+                    live={live && !stale}
                     className={cn(
-                      "size-1.5 fill-current",
                       !stale &&
                         (stopped || status === "unhealthy"
                           ? "text-destructive"

@@ -11,7 +11,15 @@ import { TimelineStamp } from "./timeline-stamp";
 
 type Operation = RunDetail["operations"][number];
 
-function OperationRow({ run, operation }: { run: RunDetail; operation: Operation }) {
+function OperationRow({
+  run,
+  operation,
+  live,
+}: {
+  run: RunDetail;
+  operation: Operation;
+  live: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const current = !operation.completed_at && run.status !== "failed";
   const result = operation.result;
@@ -27,6 +35,7 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
         at={operation.created_at}
         label="Operation planned"
         active={current}
+        live={live && current}
         duration={
           <OperationDuration
             key={operation.attempts.at(-1)?.id}
@@ -78,7 +87,7 @@ function RunMarker({ label, at }: { label: string; at: string }) {
   );
 }
 
-export function ExecutionTimeline({ run }: { run: RunDetail }) {
+export function ExecutionTimeline({ run, live }: { run: RunDetail; live: boolean }) {
   return (
     <section aria-label="Execution history" className="mt-3 border-0 p-0">
       <h2 className="sr-only">Execution history</h2>
@@ -91,7 +100,7 @@ export function ExecutionTimeline({ run }: { run: RunDetail }) {
           <li className="col-start-3 py-2 text-muted-foreground">No operations recorded yet.</li>
         ) : (
           run.operations.map((operation) => (
-            <OperationRow key={operation.id} run={run} operation={operation} />
+            <OperationRow key={operation.id} run={run} operation={operation} live={live} />
           ))
         )}
         {run.finished_at && (run.status === "succeeded" || run.status === "failed") && (

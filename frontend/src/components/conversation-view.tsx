@@ -125,7 +125,7 @@ export function ConversationView({ conversationId }: { conversationId: string })
         {!conversation && !error && <p role="status">Loading chat…</p>}
         {conversation?.runs.map((run, index) => (
           <div key={run.id} ref={index === conversation.runs.length - 1 ? latestTurn : undefined}>
-            <ChatTurn run={run} onUpdate={updateRun} />
+            <ChatTurn run={run} onUpdate={updateRun} live={!error} />
           </div>
         ))}
       </div>
