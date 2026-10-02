@@ -13,14 +13,15 @@ from durable_agent.control.continuations import create_continuation
 from durable_agent.control.conversations import conversation_detail
 from durable_agent.control.errors import ControlError
 from durable_agent.control.forks import create_fork
+from durable_agent.control.history import load_operations
 from durable_agent.control.runs import create_run
-from durable_agent.control.views import detail, load_operations
+from durable_agent.control.views import detail
 from durable_agent.db.models import Conversation, Operation, Run
 from sqlalchemy import func, select
 
+from .test_history import model
 from .test_leases import claimed, queued
 from .test_reports import report, report_body
-from .test_views import model
 
 
 async def source_checkpoint(db, config):
