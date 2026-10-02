@@ -1,17 +1,20 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
+import { StatusDot } from "./ui/status-dot";
 
 export function TimelineStamp({
   at,
   label,
   active = false,
   failed = false,
+  live = false,
   duration,
 }: {
   at: string;
   label: string;
   active?: boolean;
   failed?: boolean;
+  live?: boolean;
   duration?: ReactNode;
 }) {
   const date = new Date(at);
@@ -30,9 +33,10 @@ export function TimelineStamp({
         {duration && <div className="mt-0.5 text-[11px]">{duration}</div>}
       </div>
       <span aria-hidden="true" className="relative col-start-2 row-start-1 mx-auto w-px bg-border">
-        <span
+        <StatusDot
+          live={live}
           className={cn(
-            "absolute top-[18px] left-1/2 size-2 -translate-x-1/2 rounded-full border bg-background",
+            "absolute top-[18px] left-1/2 size-2 -translate-x-1/2 border bg-background",
             active && "border-primary bg-primary",
             failed && "border-destructive bg-destructive",
           )}

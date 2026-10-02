@@ -9,6 +9,7 @@ import { CrashTestScenario } from "./crash-test-scenario";
 import { CrashTestContainers } from "./crash-test-containers";
 import { Badge } from "./ui/badge";
 import { CrashTestResult } from "./crash-test-result";
+import { StatusDot } from "./ui/status-dot";
 
 export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const [snapshot, setSnapshot] = useState<CrashSnapshot | null>(null);
@@ -60,6 +61,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
   const running = current?.status === "running";
   const unavailable = !!connectionError || !!snapshot?.services_error;
   const blocked = pending || running || unavailable;
+  const live = !!snapshot && !connectionError && !pending;
 
   return (
     <main className="max-w-6xl space-y-6 py-6 sm:py-8">
@@ -67,9 +69,15 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="text-2xl">Crashboard</h1>
           <Badge variant="outline" className="gap-2 font-normal text-muted-foreground">
-            <span
-              aria-hidden="true"
-              className={`size-1.5 rounded-full ${connectionError ? "bg-destructive" : snapshot ? "bg-emerald-600" : "bg-muted-foreground"}`}
+            <StatusDot
+              live={live}
+              className={
+                connectionError
+                  ? "text-destructive"
+                  : snapshot
+                    ? "text-emerald-600"
+                    : "text-muted-foreground"
+              }
             />
             {snapshot?.project ?? "Connecting…"}
           </Badge>
@@ -104,6 +112,7 @@ export function CrashTestDashboard({ appUrl }: { appUrl: string }) {
             services={snapshot?.services}
             blocked={blocked}
             stale={unavailable}
+            live={live}
             running={running}
             onAction={(target, action) =>
               void act("containers/action", {

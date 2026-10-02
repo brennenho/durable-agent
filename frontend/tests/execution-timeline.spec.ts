@@ -107,6 +107,51 @@ for (const width of [320, 390, 1440]) {
 }
 
 for (const view of ["run", "conversation"]) {
+  test(`current status dots follow live polling in the ${view} view`, async ({ page }) => {
+    await page.clock.install();
+    let offline = false;
+    let current: RunDetail = {
+      ...runDetail,
+      status: "running",
+      operations: [
+        {
+          ...operation,
+          result: null,
+          completed_at: null,
+          attempts: [{ ...operation.attempts[0], status: "running", finished_at: null }],
+        },
+      ],
+    };
+    const endpoint =
+      view === "run" ? `**/api/runs/${runDetail.id}` : `**/api/conversations/${conversation.id}`;
+    await page.route(endpoint, (route) =>
+      route.fulfill({
+        status: offline ? 503 : 200,
+        json: offline
+          ? { error: { code: "unavailable", message: "Unavailable", retryable: true } }
+          : view === "run"
+            ? current
+            : { ...conversationDetail, status: current.status, runs: [current] },
+      }),
+    );
+    await page.goto(view === "run" ? `/runs/${runDetail.id}` : `/chats/${conversation.id}`);
+    await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
+    const dots = page
+      .getByRole("list", { name: "Run timeline", exact: true })
+      .locator("[data-slot='status-dot']");
+    await expect(dots.nth(0)).toHaveCSS("animation-name", "none");
+    await expect(dots.nth(1)).toHaveCSS("animation-name", "pulse");
+    offline = true;
+    await page.clock.fastForward(2000);
+    await expect(dots.nth(1)).toHaveCSS("animation-name", "none");
+    offline = false;
+    await page.clock.fastForward(2000);
+    await expect(dots.nth(1)).toHaveCSS("animation-name", "pulse");
+    current = completed;
+    await page.clock.fastForward(2000);
+    await expect(dots.nth(1)).toHaveCSS("animation-name", "none");
+  });
+
   test(`shows persisted milestones in the ${view} view without loading inspection`, async ({
     page,
   }) => {

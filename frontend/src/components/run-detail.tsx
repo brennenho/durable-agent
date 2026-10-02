@@ -66,7 +66,7 @@ export function RunDetailView({ runId }: { runId: string }) {
           </p>
         )}
         {!run && !error && <p role="status">Loading chat…</p>}
-        {run && <ChatTurn run={run} onUpdate={updateRun} />}
+        {run && <ChatTurn run={run} onUpdate={updateRun} live={!error} />}
       </div>
     </ChatWorkspace>
   );

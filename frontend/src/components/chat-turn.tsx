@@ -12,9 +12,11 @@ import { FailedAttemptsBadge } from "./failed-attempts-badge";
 export function ChatTurn({
   run,
   onUpdate,
+  live,
 }: {
   run: RunDetail;
   onUpdate: (run: RunDetail) => void;
+  live: boolean;
 }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const finished = run.status === "succeeded" || run.status === "failed";
@@ -53,7 +55,7 @@ export function ChatTurn({
             )}
             <FailedAttemptsBadge operations={run.operations} />
           </summary>
-          {activityOpen && <ExecutionTimeline run={run} />}
+          {activityOpen && <ExecutionTimeline run={run} live={live && !finished} />}
         </details>
         {run.terminal_error && (
           <p

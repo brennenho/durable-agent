@@ -170,6 +170,55 @@ test("manual controls preserve target identity and expose failed actions", async
   await expect(page.getByText("stopped", { exact: true })).toBeVisible();
 });
 
+test("status dots pulse only while their data is live and motion is allowed", async ({ page }) => {
+  await page.clock.install();
+  const snapshot = crashSnapshot();
+  let offline = false;
+  let releaseAction!: () => void;
+  await page.route("**/crash-api/**", async (route) => {
+    if (offline) return route.fulfill({ status: 503, json: { detail: "Controller offline" } });
+    if (route.request().method() === "POST") {
+      await new Promise<void>((resolve) => {
+        releaseAction = resolve;
+      });
+      snapshot.services[0].running = false;
+    }
+    return route.fulfill({ json: snapshot });
+  });
+  await page.goto("/");
+  const connection = page.locator("header [data-slot='status-dot']");
+  const container = page
+    .getByRole("article", { name: "durable-agent-tools-1" })
+    .locator("[data-slot='status-dot']");
+  await expect(connection).toHaveCSS("animation-name", "pulse");
+  await expect(container).toHaveCSS("animation-name", "pulse");
+
+  await page.getByRole("button", { name: "Kill Tools", exact: true }).click();
+  await expect.poll(() => typeof releaseAction).toBe("function");
+  await expect(connection).toHaveCSS("animation-name", "none");
+  await expect(container).toHaveCSS("animation-name", "none");
+  releaseAction();
+  await expect(page.getByText("stopped", { exact: true })).toBeVisible();
+  await expect(container).toHaveCSS("animation-name", "pulse");
+
+  snapshot.services_error = "Docker unavailable";
+  await page.clock.fastForward(1500);
+  await expect(container).toHaveCSS("animation-name", "none");
+  await expect(connection).toHaveCSS("animation-name", "pulse");
+  offline = true;
+  await page.clock.fastForward(1500);
+  await expect(connection).toHaveCSS("animation-name", "none");
+  offline = false;
+  snapshot.services_error = null;
+  await page.clock.fastForward(1500);
+  await expect(container).toHaveCSS("animation-name", "pulse");
+  await expect(connection).toHaveCSS("animation-name", "pulse");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(connection).toHaveCSS("animation-name", "none");
+  await expect(container).toHaveCSS("animation-name", "none");
+});
+
 test("scenarios lock manual controls, cancel, and retain observations offline on mobile", async ({
   page,
 }) => {
