@@ -30,9 +30,9 @@ class Lease:
         self.assignment = assignment
         self.worker_id = worker_id
         self.heartbeat_interval = heartbeat_interval
-        self.deadline = claimed_at + min(
-            (assignment.deadline_at - assignment.server_time).total_seconds(),
-            assignment.config.call_timeout_seconds,
+        # Control sets the operation budget; anchor it before the claim round trip.
+        self.deadline = (
+            claimed_at + (assignment.deadline_at - assignment.server_time).total_seconds()
         )
         self.expires = (
             claimed_at + (assignment.lease_expires_at - assignment.server_time).total_seconds()
