@@ -2,7 +2,7 @@ import asyncio
 from uuid import uuid4
 
 import pytest
-from durable_agent.contracts import SubmitRunRequest
+from durable_agent.contracts import ModelRequest, SubmitRunRequest
 from durable_agent.control.errors import ControlError
 from durable_agent.control.runs import create_run, find_submission
 from durable_agent.db.models import Conversation, Operation, Run
@@ -31,11 +31,9 @@ def test_submission_persists_first_operation_and_freezes_config(database, config
                 operation = await session.scalar(select(Operation))
                 assert operation.run_id == run_id
                 assert operation.kind == "model"
-                assert operation.request == {
-                    "prompt": body.prompt,
-                    "history": [],
-                    "previous_turns": [],
-                }
+                assert operation.request == ModelRequest(prompt=body.prompt, history=[]).model_dump(
+                    mode="json"
+                )
                 assert operation.position == 0
                 assert duplicate.status == "queued"
                 changed = body.model_copy(update={"prompt": "Different"})
