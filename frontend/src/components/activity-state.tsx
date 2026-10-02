@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
 
 type Operation = RunDetail["operations"][number];
@@ -49,10 +50,12 @@ export function OperationSummary({
   operation,
   status,
   pauseRequested,
+  children,
 }: {
   operation: Operation;
   status: RunDetail["status"];
   pauseRequested?: boolean;
+  children?: ReactNode;
 }) {
   const attempt = operation.attempts.at(-1);
   const running = !operation.completed_at && status !== "failed" && attempt?.status === "running";
@@ -77,23 +80,30 @@ export function OperationSummary({
   const retried = failure && attempt && attempt.attempt_no > failure.attempt_no;
   const output = operation.result?.kind === "tool" ? operation.result.output : null;
   return (
-    <span className="@container block min-w-0 flex-1">
-      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3">
-        <span className="col-span-2 min-w-0 @min-[16rem]:col-span-1 @min-[16rem]:flex @min-[16rem]:items-baseline @min-[16rem]:gap-2">
-          <span className="shrink-0 font-medium">{operationName(operation)}</span>
-          {operation.tool_target && (
-            <code
-              className="block truncate text-xs text-muted-foreground"
-              title={operation.tool_target}
-            >
-              {operation.tool_target}
-            </code>
-          )}
+    <span className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1 @min-[12rem]:gap-x-2">
+      <ChevronRight
+        aria-hidden="true"
+        className="size-3.5 text-muted-foreground group-open/step:rotate-90"
+      />
+      <span className="min-w-0 @min-[20rem]:flex @min-[20rem]:items-baseline @min-[20rem]:gap-2">
+        <span className="text-xs font-medium wrap-anywhere @min-[12rem]:text-sm @min-[20rem]:shrink-0">
+          {operationName(operation)}
         </span>
-        <span className="text-xs leading-5 @min-[16rem]:text-right">{label}</span>
+        {operation.tool_target && (
+          <code
+            className="block truncate text-xs text-muted-foreground"
+            title={operation.tool_target}
+          >
+            {operation.tool_target}
+          </code>
+        )}
+      </span>
+      <span className="flex flex-col items-end gap-1 text-xs leading-5">
+        <span>{label}</span>
+        {children}
       </span>
       {note && (
-        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+        <span className="col-start-2 col-span-2 mt-1 text-xs leading-relaxed text-muted-foreground">
           {note}{" "}
           {paused
             ? "Retry waits for Resume."
@@ -107,12 +117,14 @@ export function OperationSummary({
         </span>
       )}
       {output?.status === "error" && (
-        <span className="mt-1 block text-xs text-destructive">{output.message}</span>
+        <span className="col-start-2 col-span-2 mt-1 text-xs text-destructive">
+          {output.message}
+        </span>
       )}
       {output?.status === "ok" &&
         typeof output.value.exit_code === "number" &&
         output.value.exit_code !== 0 && (
-          <span className="mt-1 block text-xs text-destructive">
+          <span className="col-start-2 col-span-2 mt-1 text-xs text-destructive">
             Command exited with code {output.value.exit_code}.
           </span>
         )}
