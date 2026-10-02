@@ -44,14 +44,21 @@ class Run(Base):
         UniqueConstraint("submission_key", name="uq_runs_submission_key"),
         UniqueConstraint("conversation_id", "turn_index", name="uq_runs_conversation_turn"),
         CheckConstraint("turn_index >= 0", name="ck_runs_turn_index"),
+        UniqueConstraint("parent_operation_id", "child_index", name="uq_runs_parent_child"),
+        CheckConstraint(
+            "(parent_operation_id IS NULL AND child_index IS NULL) OR "
+            "(parent_operation_id IS NOT NULL AND child_index IS NOT NULL "
+            "AND child_index BETWEEN 0 AND 2)",
+            name="ck_runs_child_identity",
+        ),
         Index(
             "uq_runs_one_active_per_conversation",
             "conversation_id",
             unique=True,
-            postgresql_where=text("status IN ('queued', 'running', 'retrying')"),
+            postgresql_where=text("status IN ('queued', 'running', 'retrying', 'waiting')"),
         ),
         CheckConstraint(
-            "status IN ('queued', 'running', 'retrying', 'succeeded', 'failed')",
+            "status IN ('queued', 'running', 'retrying', 'waiting', 'succeeded', 'failed')",
             name="ck_runs_status",
         ),
         CheckConstraint("lease_generation >= 0", name="ck_runs_generation"),
@@ -86,6 +93,10 @@ class Run(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"))
+    parent_operation_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("operations.id", name="fk_runs_parent_operation", use_alter=True)
+    )
+    child_index: Mapped[int | None] = mapped_column(Integer)
     turn_index: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     submission_key: Mapped[UUID] = mapped_column(Uuid)
     prompt: Mapped[str] = mapped_column(Text)

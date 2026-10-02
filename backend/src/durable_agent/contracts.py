@@ -4,7 +4,15 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    StringConstraints,
+)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -134,7 +142,7 @@ class SubmitForkRequest(SubmitRunRequest):
     after_operation_id: UUID
 
 
-RunStatus = Literal["queued", "running", "retrying", "succeeded", "failed"]
+RunStatus = Literal["queued", "running", "retrying", "waiting", "succeeded", "failed"]
 AttemptStatus = Literal["running", "accepted", "error", "unknown"]
 
 
@@ -185,7 +193,22 @@ class OperationInspection(Contract):
     config: AgentConfig
 
 
+class RunParent(Contract):
+    run_id: UUID
+    conversation_id: UUID
+    operation_id: UUID
+    name: str
+
+
+class ChildRunSummary(RunSummary):
+    name: str
+    parent_operation_id: UUID
+    child_index: NonNegativeInt
+
+
 class RunDetail(RunSummary):
+    parent: RunParent | None = None
+    children: list[ChildRunSummary] = Field(default_factory=list)
     final_answer: str | None
     workspace_version_id: UUID
     operations: list[OperationView]
@@ -349,3 +372,12 @@ class RunCommandOutput(Contract):
     stdout: str
     stderr: str
     truncated: bool
+
+
+class DelegateTask(Contract):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+    prompt: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
+
+
+class DelegateArguments(Contract):
+    tasks: Annotated[list[DelegateTask], Field(min_length=1, max_length=3)]

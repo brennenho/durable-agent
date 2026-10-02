@@ -20,6 +20,7 @@ export const run: RunSummary = {
 };
 
 export const runDetail: RunDetail = {
+  children: [],
   ...run,
   operations: [],
   final_answer: null,

@@ -401,6 +401,51 @@ export interface components {
              */
             workspace_version_id: string;
         };
+        /** ChildRunSummary */
+        ChildRunSummary: {
+            /** Child Index */
+            child_index: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Heartbeat At */
+            last_heartbeat_at: string | null;
+            /** Last Progress At */
+            last_progress_at: string | null;
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /**
+             * Parent Operation Id
+             * Format: uuid
+             */
+            parent_operation_id: string;
+            /**
+             * Pause Requested
+             * @default false
+             */
+            pause_requested: boolean;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "retrying" | "waiting" | "succeeded" | "failed";
+            terminal_error: components["schemas"]["ExecutionError"] | null;
+        };
         /** ClaimRequest */
         ClaimRequest: {
             /**
@@ -438,7 +483,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            status: "queued" | "running" | "retrying" | "waiting" | "succeeded" | "failed";
             /** Title */
             title: string;
             /**
@@ -473,7 +518,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            status: "queued" | "running" | "retrying" | "waiting" | "succeeded" | "failed";
             /** Title */
             title: string;
             /**
@@ -684,6 +729,8 @@ export interface components {
         };
         /** RunDetail */
         RunDetail: {
+            /** Children */
+            children?: components["schemas"]["ChildRunSummary"][];
             /**
              * Created At
              * Format: date-time
@@ -710,6 +757,7 @@ export interface components {
             next_attempt_at: string | null;
             /** Operations */
             operations: components["schemas"]["OperationView"][];
+            parent?: components["schemas"]["RunParent"] | null;
             /**
              * Pause Requested
              * @default false
@@ -721,7 +769,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            status: "queued" | "running" | "retrying" | "waiting" | "succeeded" | "failed";
             terminal_error: components["schemas"]["ExecutionError"] | null;
             /**
              * Workspace Version Id
@@ -738,6 +786,26 @@ export interface components {
              * Format: uuid
              */
             workspace_version_id: string;
+        };
+        /** RunParent */
+        RunParent: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
         };
         /** RunSummary */
         RunSummary: {
@@ -772,7 +840,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "retrying" | "succeeded" | "failed";
+            status: "queued" | "running" | "retrying" | "waiting" | "succeeded" | "failed";
             terminal_error: components["schemas"]["ExecutionError"] | null;
         };
         /** SandboxConfig */

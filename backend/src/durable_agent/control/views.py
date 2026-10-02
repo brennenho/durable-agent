@@ -120,7 +120,7 @@ async def inspect_operation(
     row = (
         await session.execute(
             select(Operation.kind, Operation.request, Run.config)
-            .join(Run)
+            .join(Run, Run.id == Operation.run_id)
             .where(Operation.run_id == run_id, Operation.id == operation_id)
         )
     ).one_or_none()
