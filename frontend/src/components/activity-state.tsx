@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
+import { FailedAttemptsBadge } from "./failed-attempts-badge";
 
 type Operation = RunDetail["operations"][number];
 
@@ -102,6 +103,7 @@ export function OperationSummary({
         <span>{label}</span>
         {children}
       </span>
+      <FailedAttemptsBadge operations={[operation]} className="col-start-2 col-span-2 mt-1" />
       {note && (
         <span className="col-start-2 col-span-2 mt-1 text-xs leading-relaxed text-muted-foreground">
           {note}{" "}

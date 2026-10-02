@@ -224,3 +224,98 @@ test("tints failed results and attempts without treating unknown or recovered ou
     expect(redTint).toBe(tinted);
   }
 });
+
+for (const width of [320, 1440]) {
+  test(`shows failed-attempt counts before inspection and keeps them after recovery at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.clock.install();
+    const original = detail.operations[0];
+    const model: RunDetail["operations"][number] = {
+      ...original,
+      kind: "model",
+      result: null,
+      completed_at: null,
+      // Status remains authoritative when an error payload is unavailable.
+      attempts: [{ ...original.attempts[0], error: null }, original.attempts[1]],
+    };
+    let current: RunDetail = { ...runDetail, status: "retrying", operations: [model] };
+    let inspections = 0;
+    await page.route("**/api/runs/*/operations/*", (route) => {
+      inspections++;
+      return route.abort();
+    });
+    await page.route(`**/api/runs/${detail.id}`, (route) => route.fulfill({ json: current }));
+    await page.goto(`/runs/${detail.id}`);
+    const activity = page.getByLabel("Activity", { exact: true });
+    const heading = activity.locator(":scope > summary");
+    await expect(activity).not.toHaveAttribute("open");
+    await expect(heading.getByText("1 failed attempt", { exact: true })).toBeVisible();
+    await heading.click();
+    const first = page.getByLabel("1. Model call", { exact: true });
+    await expect(first).not.toHaveAttribute("open");
+    await expect(first.getByText("1 failed attempt", { exact: true })).toBeVisible();
+    await expect(first).toContainText("outcome unknown");
+
+    current = {
+      ...detail,
+      operations: [
+        {
+          ...model,
+          completed_at: finished,
+          attempts: [...model.attempts, original.attempts[2]],
+          result: {
+            kind: "model",
+            native_context: [],
+            output: { status: "completed", text: "", tool_calls: [] },
+          },
+        },
+        {
+          ...original,
+          id: "00000000-0000-4000-8000-000000000020",
+          position: 1,
+          attempts: [
+            { ...original.attempts[0], id: "00000000-0000-4000-8000-000000000021" },
+            { ...original.attempts[0], id: "00000000-0000-4000-8000-000000000022", attempt_no: 2 },
+            { ...original.attempts[2], id: "00000000-0000-4000-8000-000000000023" },
+          ],
+        },
+      ],
+    };
+    await page.clock.fastForward(2_000);
+    await expect(heading.getByText("3 failed attempts", { exact: true })).toBeVisible();
+    await expect(first.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(first.getByText("1 failed attempt", { exact: true })).toBeVisible();
+    const second = page.getByLabel("2. Tool call", { exact: true });
+    await expect(second).not.toHaveAttribute("open");
+    await expect(second.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(second.getByText("2 failed attempts", { exact: true })).toBeVisible();
+    expect(inspections).toBe(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    await page.screenshot({ path: test.info().outputPath("attempt-badges.png"), fullPage: true });
+  });
+}
+
+test("does not count unknown outcomes or failed tests as failed execution attempts", async ({
+  page,
+}) => {
+  const original = detail.operations[0];
+  await page.route(`**/api/runs/${detail.id}`, (route) =>
+    route.fulfill({
+      json: {
+        ...detail,
+        operations: [{ ...original, attempts: original.attempts.slice(1) }],
+      },
+    }),
+  );
+  await page.goto(`/runs/${detail.id}`);
+  const activity = page.getByLabel("Activity", { exact: true });
+  await expect(activity.locator(":scope > summary").getByText(/failed attempts?/)).toHaveCount(0);
+  await activity.locator(":scope > summary").click();
+  const step = page.getByLabel("1. Tool call", { exact: true });
+  await expect(step.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(step).toContainText("outcome unknown");
+  await expect(step).toContainText("Command exited with code 1.");
+  await expect(step.getByText(/failed attempts?/)).toHaveCount(0);
+});
