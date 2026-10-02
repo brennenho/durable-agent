@@ -11,7 +11,7 @@ from durable_agent.contracts import (
     ToolResult,
     ToolSuccess,
 )
-from durable_agent.worker.context import InvalidModelInput, response_input
+from durable_agent.harness.model_input import InvalidModelInput, response_input
 from durable_agent.worker.responses import map_response
 from openai.types.responses import Response
 
