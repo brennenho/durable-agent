@@ -32,6 +32,7 @@ class ModelCall(Value):
 
 class ToolCall(Value):
     kind: Literal["tool"] = "tool"
+    call_id: str | None = Field(default=None, min_length=1)
     name: Name
     arguments: JsonObject = Field(default_factory=dict)
     timeout_seconds: Seconds | None = None
