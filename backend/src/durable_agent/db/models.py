@@ -3,6 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from pydantic import JsonValue
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -100,6 +101,9 @@ class Run(Base):
     turn_index: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     submission_key: Mapped[UUID] = mapped_column(Uuid)
     prompt: Mapped[str] = mapped_column(Text)
+    agent_input: Mapped[JsonValue | None] = mapped_column(JSONB(none_as_null=True))
+    agent_state: Mapped[JsonValue | None] = mapped_column(JSONB(none_as_null=True))
+    output: Mapped[JsonValue | None] = mapped_column(JSONB(none_as_null=True))
     config: Mapped[JsonObject] = mapped_column(JSONB(none_as_null=True))
     status: Mapped[RunStatus] = mapped_column(Text)
     pause_requested: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
@@ -129,6 +133,7 @@ class Operation(Base):
     position: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(Text)
     request: Mapped[JsonObject] = mapped_column(JSONB(none_as_null=True))
+    agent_state: Mapped[JsonValue | None] = mapped_column(JSONB(none_as_null=True))
     result: Mapped[JsonObject | None] = mapped_column(JSONB(none_as_null=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
