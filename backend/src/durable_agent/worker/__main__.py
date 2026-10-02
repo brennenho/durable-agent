@@ -37,8 +37,7 @@ async def main() -> None:
         hooks = await cleanup.enter_async_context(open_hooks("worker"))
         worker = Worker(services, models, uuid4(), hooks=hooks)
         loop = asyncio.get_running_loop()
-        task = asyncio.current_task()
-        loop.add_signal_handler(signal.SIGTERM, task.cancel)
+        loop.add_signal_handler(signal.SIGTERM, worker.stop)
         try:
             await worker.run()
         finally:
@@ -50,4 +49,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, asyncio.CancelledError):
-        pass  # Signals cancel work and close clients before the process exits.
+        pass  # Ctrl-C cancels work; SIGTERM drains the current assignment.

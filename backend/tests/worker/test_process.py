@@ -108,6 +108,9 @@ def test_shutdown_closes_both_clients_and_propagates_cancellation(monkeypatch):
         async def run(self):
             raise asyncio.CancelledError
 
+        def stop(self):
+            pass
+
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("CONTROL_URL", "http://control")
     monkeypatch.setenv("TOOLS_URL", "http://tools")
