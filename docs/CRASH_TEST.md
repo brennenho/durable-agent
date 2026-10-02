@@ -7,8 +7,7 @@ no event table, and no hook code in the pure harness.
 A service uses `async with open_hooks("tools") as hooks` for its process lifetime,
 then calls `await hooks.hit("tools.after_commit", operation_id=operation_id)` at an
 execution boundary. With `CRASH_TEST_HOOK_URL` unset this performs no network I/O.
-The client posts to that exact URL when enabled. Configure it only in the disposable
-Crash Test environment. Optional `CRASH_TEST_HOOK_TOKEN` sends a bearer token;
+The client posts to that exact URL when enabled. Enable it on the existing development Compose project. Optional `CRASH_TEST_HOOK_TOKEN` sends a bearer token;
 `CRASH_TEST_HOOK_TIMEOUT_SECONDS` sets a positive wait up to 30 seconds (default 10).
 
 The controller receives a `HookEvent`: unique event ID, name, service, process hostname
@@ -68,7 +67,7 @@ Worker heartbeats remain active during a held hook, within the original fixed de
 The report hook also consumes the existing delivery budget. Control does not emit its
 acceptance hook for duplicate reports or recorded execution failures.
 
-For a disposable Compose project, set `CRASH_TEST_HOOK_URL` to the controller's URL
+For the existing Compose project, set `CRASH_TEST_HOOK_URL` to the controller's URL
 reachable from the containers and use `-f compose.yaml -f compose.crash-test.yaml`
 with the existing startup configuration. The overlay opts Control, Tools, and Worker
 into hooks; ordinary Compose startup remains unchanged. Keep the controller outside
@@ -77,3 +76,17 @@ chosen hook, retaining observations while those services are unavailable.
 
 The dashboard, rule API, scenario runner, and process-kill controller are separate
 consumers of this interface; they are not implemented by the hook client.
+
+## Container control
+
+`crash_testing.docker.DockerControl` targets the selected existing Compose project.
+The controller must bind it to the repository directory: both Compose working-directory
+and config-file labels must match, in addition to the project and allowed service.
+This works with existing containers without adding labels or creating another stack.
+Automated tests may instead use explicitly labelled `crash-test-*` projects.
+Sandboxes are identified by Tools' existing owner label matching that project.
+Inventory excludes other projects. Every action revalidates ownership and the
+container start time, rejecting a target that stopped or restarted after selection.
+Killing uses SIGKILL with manual-stop semantics, verifies exit code 137, and leaves
+restart explicit. Sandbox containers cannot be restarted; Tools must restore the
+saved input into a replacement. Docker calls have bounded output and deadlines.
