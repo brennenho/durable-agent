@@ -50,9 +50,9 @@ export function OperationSummary({
   const retried = failure && attempt && attempt.attempt_no > failure.attempt_no;
   const output = operation.result?.kind === "tool" ? operation.result.output : null;
   return (
-    <span className="min-w-0 flex-1">
-      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[minmax(0,1fr)_auto_3rem]">
-        <span className="row-span-2 min-w-0 sm:row-span-1 sm:flex sm:items-baseline sm:gap-2">
+    <span className="@container block min-w-0 flex-1">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 @min-[16rem]:grid-cols-[minmax(0,1fr)_auto_3rem]">
+        <span className="col-span-2 min-w-0 @min-[16rem]:col-span-1 @min-[16rem]:flex @min-[16rem]:items-baseline @min-[16rem]:gap-2">
           <span className="shrink-0 font-medium">{operationName(operation)}</span>
           {operation.tool_target && (
             <code
@@ -63,7 +63,7 @@ export function OperationSummary({
             </code>
           )}
         </span>
-        <span className="text-right text-xs leading-5">{label}</span>
+        <span className="text-xs leading-5 @min-[16rem]:text-right">{label}</span>
         <span
           className="text-right text-xs leading-5 text-muted-foreground tabular-nums"
           title="Latest attempt duration"
