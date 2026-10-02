@@ -915,6 +915,9 @@
             "title": "Id",
             "type": "string"
           },
+          "input": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
           "last_heartbeat_at": {
             "anyOf": [
               {

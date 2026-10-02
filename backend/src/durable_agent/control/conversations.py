@@ -13,8 +13,9 @@ from durable_agent.control.views import detail
 from durable_agent.db.models import Conversation, Operation, Run
 
 
-def title(prompt: str) -> str:
-    return " ".join(prompt.split())[:80] or "New chat"
+def title(prompt: str, agent_name: str | None = None) -> str:
+    fallback = agent_name if agent_name and agent_name != "builtin" else "New chat"
+    return " ".join(prompt.split())[:80] or fallback
 
 
 async def list_conversations(session: AsyncSession) -> list[ConversationSummary]:
@@ -37,6 +38,7 @@ async def list_conversations(session: AsyncSession) -> list[ConversationSummary]
             Conversation.id,
             Conversation.created_at,
             first.prompt,
+            first.config["agent"]["name"].as_string().label("agent_name"),
             latest.id.label("run_id"),
             latest.status,
             latest.pause_requested,
@@ -51,7 +53,7 @@ async def list_conversations(session: AsyncSession) -> list[ConversationSummary]
     return [
         ConversationSummary(
             id=row.id,
-            title=title(row.prompt),
+            title=title(row.prompt, row.agent_name),
             created_at=row.created_at,
             updated_at=row.updated_at,
             status=row.status,
@@ -93,7 +95,7 @@ async def conversation_detail(session: AsyncSession, conversation_id: UUID) -> C
         origin = ForkOrigin(**row._mapping)
     return ConversationDetail(
         id=conversation.id,
-        title=title(runs[0].prompt),
+        title=title(runs[0].prompt, runs[0].agent.name if runs[0].agent else None),
         created_at=conversation.created_at,
         updated_at=max(
             value
