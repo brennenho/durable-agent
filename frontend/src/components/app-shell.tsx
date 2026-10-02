@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (pathname === "/crash-test") return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     let refreshing = false;
@@ -65,6 +66,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", refresh);
     };
   }, [pathname, retry]);
+
+  if (pathname === "/crash-test") return children;
 
   const navigation = (
     <nav aria-label="Previous chats" className="flex h-full min-h-0 flex-col gap-6 p-3">
