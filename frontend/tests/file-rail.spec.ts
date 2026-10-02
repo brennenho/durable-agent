@@ -62,7 +62,8 @@ test("shows a vertical rail beside chat and previews/downloads the selected turn
   await preview.click();
   await expect(page.getByRole("dialog")).toContainText(second.final_answer);
   await page.getByRole("button", { name: "Close preview" }).click();
-  await rail.getByRole("combobox", { name: "File version" }).selectOption(first.id);
+  await rail.getByRole("combobox", { name: "File version" }).click();
+  await page.getByRole("option", { name: /^After message 1/ }).click();
   const requested = page.waitForRequest((request) =>
     request.url().includes(`/api/runs/${first.id}/file?`),
   );
@@ -99,7 +100,8 @@ test("stacks files above the reply input on mobile without horizontal overflow",
 test("keeps an earlier selection when a newer turn appears", async ({ page }) => {
   await page.goto(`/chats/${detail.id}`);
   const version = page.getByRole("combobox", { name: "File version" });
-  await version.selectOption(first.id);
+  await version.click();
+  await page.getByRole("option", { name: /^After message 1/ }).click();
   const third = { ...second, id: "00000000-0000-4000-8000-000000000005" };
   await page.route(`**/api/runs/${third.id}/files`, (route) =>
     route.fulfill({
@@ -114,8 +116,60 @@ test("keeps an earlier selection when a newer turn appears", async ({ page }) =>
   );
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("article", { name: "Chat turn" })).toHaveCount(3);
-  await expect(version).toHaveValue(first.id);
+  await expect(version).toHaveText("After message 1");
   await expect(page.getByRole("button", { name: "Preview latest.txt" })).toHaveCount(0);
-  await version.selectOption("");
+  await version.click();
+  await page.getByRole("option", { name: "Latest files", exact: true }).click();
   await expect(page.getByRole("button", { name: "Preview latest.txt" })).toBeVisible();
+});
+
+for (const width of [1024, 2048]) {
+  test(`docks files to the viewport edge at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/chats/${detail.id}`);
+    const panel = page.getByRole("complementary", { name: "Chat files" });
+    await expect(panel.getByRole("heading", { name: "Files", exact: true })).toBeVisible();
+    const box = await panel.boundingBox();
+    expect(box!.x + box!.width).toBe(width);
+    expect(box!.y).toBe(0);
+    expect(box!.height).toBe(900);
+    const chat = await page.getByRole("article", { name: "Chat turn" }).first().boundingBox();
+    expect(chat!.x + chat!.width).toBeLessThan(box!.x);
+    expect(chat!.width).toBeLessThanOrEqual(704);
+  });
+}
+
+test("keeps long dropdown options within the panel and supports keyboard selection and Escape", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route(`**/api/conversations/${detail.id}`, (route) =>
+    route.fulfill({
+      json: {
+        ...detail,
+        runs: [{ ...first, prompt: "A very long task description. ".repeat(40) }, second],
+      },
+    }),
+  );
+  await page.goto(`/chats/${detail.id}`);
+  const trigger = page.getByRole("combobox", { name: "File version" });
+  const triggerBox = await trigger.boundingBox();
+  await trigger.focus();
+  await trigger.press("Space");
+  const menu = page.getByRole("listbox");
+  await expect(menu).toBeVisible();
+  const menuBox = await menu.boundingBox();
+  expect(menuBox!.width).toBeCloseTo(triggerBox!.width, 0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(1440);
+  await expect(page.getByRole("option", { name: "Latest files", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: /^After message 1/ })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(trigger).toHaveText("After message 1");
+  await expect(trigger).toBeFocused();
+  await trigger.press("Space");
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
 });
