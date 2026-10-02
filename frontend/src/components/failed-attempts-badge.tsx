@@ -4,10 +4,10 @@ import { Badge } from "./ui/badge";
 
 export function FailedAttemptsBadge({
   operations,
-  className,
+  compact = false,
 }: {
   operations: RunDetail["operations"];
-  className?: string;
+  compact?: boolean;
 }) {
   const count = operations.reduce(
     (total, operation) =>
@@ -15,12 +15,18 @@ export function FailedAttemptsBadge({
     0,
   );
   if (count === 0) return null;
+  const description = `failed ${count === 1 ? "attempt" : "attempts"}`;
   return (
     <Badge
       variant="outline"
-      className={cn("border-destructive/20 bg-destructive/5 text-destructive", className)}
+      title={`${count} ${description}`}
+      className={cn(
+        "border-destructive/20 bg-destructive/5 text-destructive",
+        compact && "h-5 min-w-5 gap-0 px-1 py-0 tabular-nums",
+      )}
     >
-      {count} failed {count === 1 ? "attempt" : "attempts"}
+      {count}
+      <span className={compact ? "sr-only" : undefined}> {description}</span>
     </Badge>
   );
 }
