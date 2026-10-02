@@ -1,20 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 import type { CrashSnapshot } from "../lib/crash-test";
 import { operationEvents, type ExecutionEvent } from "../lib/execution-events";
 import { ExecutionEvents } from "./execution-events";
 import { Button } from "./ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 type Source = "all" | "app" | "controller";
 
-export function CrashTestTimeline({
-  snapshot,
-  appUrl,
-}: {
-  snapshot: CrashSnapshot;
-  appUrl: string;
-}) {
+export function CrashTestTimeline({ snapshot }: { snapshot: CrashSnapshot }) {
   const [source, setSource] = useState<Source>("all");
   const session = snapshot.current;
   const hook = snapshot.scenarios.find((item) => item.name === session?.scenario)?.hook;
@@ -66,50 +62,41 @@ export function CrashTestTimeline({
   }
 
   return (
-    <section aria-labelledby="crash-timeline-heading">
+    <section aria-labelledby="crash-timeline-heading" className="mt-0 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="crash-timeline-heading">Execution timeline</h2>
-        <div className="flex flex-wrap gap-2">
-          {session?.run && (
-            <Button asChild variant="outline" size="sm">
-              <a href={`${appUrl}/runs/${session.run.id}`} target="_blank" rel="noreferrer">
-                Inspect run in app
-              </a>
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={download}>
-            Download observations
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={download}>
+          <Download aria-hidden="true" />
+          Export JSON
+        </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        App milestones come from saved state. Crash Test entries are controller observations,
-        ordered by timestamp.
+      <p className="mt-1 mb-4 text-xs text-muted-foreground">
+        Saved app state and controller observations, in time order.
       </p>
-      <div role="group" aria-label="Timeline source" className="mb-4 flex flex-wrap gap-2">
-        {(
-          [
-            ["all", "All events"],
-            ["app", "Saved state"],
-            ["controller", "Crash observations"],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            variant={source === value ? "secondary" : "ghost"}
-            size="sm"
-            aria-pressed={source === value}
-            onClick={() => setSource(value)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-      {events.length ? (
-        <ExecutionEvents events={events} />
-      ) : (
-        <p className="text-sm text-muted-foreground">No events from this source yet.</p>
-      )}
+      <Tabs value={source} onValueChange={(value) => setSource(value as Source)}>
+        <TabsList aria-label="Timeline source">
+          <TabsTrigger value="all" className="text-xs">
+            All events
+          </TabsTrigger>
+          <TabsTrigger value="app" className="text-xs">
+            Saved state
+          </TabsTrigger>
+          <TabsTrigger value="controller" className="text-xs">
+            Crash Test
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value={source}>
+          {events.length ? (
+            <ExecutionEvents events={events} />
+          ) : (
+            <p className="my-10 text-center text-sm text-muted-foreground">
+              {source === "all"
+                ? "Events will appear when a scenario or manual action starts."
+                : "No events from this source."}
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

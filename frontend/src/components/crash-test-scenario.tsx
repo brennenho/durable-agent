@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Play, Square } from "lucide-react";
-import type { CrashSnapshot } from "../lib/crash-test";
+import { scenarioName, type CrashSnapshot } from "../lib/crash-test";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -11,6 +11,7 @@ export function CrashTestScenario({
   scenarios,
   blocked,
   running,
+  activeScenario,
   cancelDisabled,
   onArm,
   onCancel,
@@ -18,19 +19,22 @@ export function CrashTestScenario({
   scenarios: CrashSnapshot["scenarios"];
   blocked: boolean;
   running: boolean;
+  activeScenario?: string;
   cancelDisabled: boolean;
   onArm: (scenario: string, runId: string | null) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("saved-response-lost");
+  const [name, setName] = useState("baseline");
   const [runId, setRunId] = useState("");
-  const selected = scenarios.find((item) => item.name === name) ?? scenarios[0];
+  const selected = scenarios.find((item) => item.name === (activeScenario ?? name)) ?? scenarios[0];
 
   return (
     <section aria-labelledby="scenario-heading" className="mt-0 p-5">
       <h2 id="scenario-heading">Scenario</h2>
       <p className="mt-1 mb-5 text-xs text-muted-foreground">
-        Arm a scenario, then send a task in the app.
+        {running
+          ? "Services restart automatically during the scenario."
+          : "Arm a scenario, then send a task in the app."}
       </p>
       <form
         onSubmit={(event) => {
@@ -44,17 +48,22 @@ export function CrashTestScenario({
             Scenario
           </label>
           <Select
-            value={selected?.name ?? ""}
-            onValueChange={setName}
+            value={selected?.name ?? name}
+            onValueChange={(value) => {
+              // Radix's native form control can emit an empty value while options load.
+              if (value) setName(value);
+            }}
             disabled={blocked || !selected}
           >
             <SelectTrigger id="scenario" aria-describedby="scenario-description">
-              <SelectValue placeholder="Loading scenarios…" />
+              <SelectValue>
+                {selected ? scenarioName(selected.name) : "Loading scenarios…"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {scenarios.map((item) => (
                 <SelectItem key={item.name} value={item.name}>
-                  {item.name.replaceAll("-", " ")}
+                  {scenarioName(item.name)}
                 </SelectItem>
               ))}
             </SelectContent>
