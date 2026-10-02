@@ -76,7 +76,7 @@ class ToolSuccess(Contract):
 
 
 class ToolError(Contract):
-    status: Literal["error"]
+    status: Literal["error"] = "error"
     code: str
     message: str
 
