@@ -148,10 +148,11 @@ def test_followup_restores_accepted_context_and_files_after_restart(
                         assert (
                             str(assignment.config.initial_workspace_version_id) == initial_version
                         )
-                        assert (
-                            assignment.operation.request.previous_turns[0].prompt
-                            == "Write the first report"
-                        )
+                        assert [
+                            item["content"]
+                            for item in assignment.operation.request.explicit_input
+                            if item.get("role") == "user"
+                        ] == ["Write the first report", "Add a second line"]
                     await worker.run_assignment(assignment, claimed_at=claimed_at)
                 if phase == 0:
                     if first_status == "failed":
