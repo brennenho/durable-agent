@@ -21,7 +21,14 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
         (typeof result.output.value.exit_code === "number" && result.output.value.exit_code !== 0)
     : operation.attempts.at(-1)?.status === "error";
   return (
-    <li aria-current={current ? "step" : undefined}>
+    <li aria-current={current ? "step" : undefined} className="relative py-1">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute top-6 -left-[1.3rem] size-2 rounded-full border bg-background",
+          current && "border-foreground bg-foreground",
+        )}
+      />
       <details
         aria-label={`${operation.position + 1}. ${operationName(operation)}`}
         className="group/step"
@@ -40,11 +47,19 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
             aria-hidden="true"
             className="mt-1 size-3.5 shrink-0 text-muted-foreground group-open/step:rotate-90"
           />
-          <OperationSummary
-            key={operation.attempts.at(-1)?.id}
-            operation={operation}
-            status={run.status}
-          />
+          <span className="min-w-0 flex-1">
+            <OperationSummary
+              key={operation.attempts.at(-1)?.id}
+              operation={operation}
+              status={run.status}
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Planned{" "}
+              <time dateTime={operation.created_at}>
+                {new Date(operation.created_at).toLocaleString()}
+              </time>
+            </span>
+          </span>
         </summary>
         {open && <OperationInspection run={run} operation={operation} />}
       </details>
@@ -52,19 +67,41 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
   );
 }
 
-export function RunHistory({ run }: { run: RunDetail }) {
+function RunMarker({ label, at }: { label: string; at: string }) {
+  return (
+    <li className="relative flex flex-wrap justify-between gap-x-3 gap-y-1 py-3 text-xs">
+      <span
+        aria-hidden="true"
+        className="absolute top-4 -left-[1.3rem] size-2 rounded-full border bg-background"
+      />
+      <span className="font-medium">{label}</span>
+      <time dateTime={at} className="text-muted-foreground tabular-nums">
+        {new Date(at).toLocaleString()}
+      </time>
+    </li>
+  );
+}
+
+export function ExecutionTimeline({ run }: { run: RunDetail }) {
   return (
     <section aria-label="Execution history" className="mt-3 border-0 p-0">
       <h2 className="sr-only">Execution history</h2>
-      {run.operations.length === 0 ? (
-        <p className="text-muted-foreground">No operations recorded yet.</p>
-      ) : (
-        <ol className="m-0 list-none divide-y p-0">
-          {run.operations.map((operation) => (
+      <ol aria-label="Run timeline" className="m-0 ml-1 list-none border-l p-0 pl-4">
+        <RunMarker label="Run submitted" at={run.created_at} />
+        {run.operations.length === 0 ? (
+          <li className="py-2 text-muted-foreground">No operations recorded yet.</li>
+        ) : (
+          run.operations.map((operation) => (
             <OperationRow key={operation.id} run={run} operation={operation} />
-          ))}
-        </ol>
-      )}
+          ))
+        )}
+        {run.finished_at && (run.status === "succeeded" || run.status === "failed") && (
+          <RunMarker
+            label={run.status === "succeeded" ? "Run completed" : "Run failed"}
+            at={run.finished_at}
+          />
+        )}
+      </ol>
       <InspectionDisclosure title="Technical details · run">
         <p className="run-id">Run ID: {run.id}</p>
         <p className="text-xs text-muted-foreground">

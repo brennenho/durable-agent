@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import type { RunDetail } from "../lib/api";
-import { RunHistory } from "./run-history";
+import { ExecutionTimeline } from "./execution-timeline";
 import { ActivityStatus } from "./activity-state";
 import { MarkdownAnswer } from "./markdown-answer";
 
@@ -41,7 +41,7 @@ export function ChatTurn({ run }: { run: RunDetail }) {
               </span>
             )}
           </summary>
-          {activityOpen && <RunHistory run={run} />}
+          {activityOpen && <ExecutionTimeline run={run} />}
         </details>
         {run.terminal_error && (
           <p
