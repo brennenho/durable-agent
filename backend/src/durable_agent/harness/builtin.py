@@ -18,10 +18,8 @@ class BuiltinAgent:
         if ctx.state is not None:
             prior = self._restore(ctx)
             final = prior.history[-1] if prior.history else None
-            complete = (
-                isinstance(final, ModelResult)
-                and final.output.status == "completed"
-                and not final.output.tool_calls
+            interrupted = bool(prior.pending_tool_calls) or (
+                isinstance(final, ModelResult) and final.output.status != "completed"
             )
             previous = [
                 *prior.previous_turns,
@@ -29,7 +27,7 @@ class BuiltinAgent:
                     "prompt": prior.prompt,
                     "history": prior.history,
                     "terminal_error": None
-                    if complete
+                    if not interrupted
                     else {
                         "code": "interrupted",
                         "message": "Prior turn stopped before a final answer",
