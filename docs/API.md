@@ -71,16 +71,25 @@ with its exit code and logs: the command ran, and the model can inspect the fail
 | POST | `/api/runs` | `{submission_key, prompt}` → `RunSummary` |
 | GET | `/api/runs` | → `RunSummary[]`, newest first |
 | GET | `/api/runs/{run_id}` | → `RunDetail` |
+| GET | `/api/runs/{run_id}/operations/{operation_id}` | → `OperationInspection` |
 | GET | `/api/runs/{run_id}/files` | → `{workspace_version_id, entries: FileEntry[]}` |
 | GET | `/api/runs/{run_id}/file?version_id=…&path=…` | → stored bytes for that version/path |
 
 - `RunSummary`: `id`, `prompt`, `model`, `status`, `created_at`, `finished_at?`,
   `next_attempt_at?`, `last_heartbeat_at?`, `last_progress_at?`, `terminal_error?`.
   Status is queued, running, retrying, succeeded, or failed.
-- `RunDetail`: summary plus `final_answer?`, `workspace_version_id`, and `operations[]`.
+- `RunDetail`: summary plus `final_answer?`, `workspace_version_id`, `operations[]`,
+  and the frozen `max_attempts` limit.
 - Operation view: `id`, `position`, `kind`, `created_at`, `completed_at?`, `result?`,
-  and `attempts[]`. Attempt view: `id`, `attempt_no`, `status`, `started_at`,
-  `finished_at?`, `error?`. Return both lists in execution order.
+  `attempts[]`, `tool_name?`, and `tool_target?` (path or command, at most 160 characters).
+  Attempt view: `id`, `attempt_no`, `status`, `started_at`, `finished_at?`, `error?`,
+  `provider_request_id?`, and `usage?`. Null usage means unknown. Return both lists
+  in execution order.
+- `OperationInspection`: `operation: Operation` and `config: AgentConfig`. Fetch on
+  expansion to inspect the immutable logical input and frozen configuration. This
+  is not a capture of the outgoing HTTP request. Full inputs stay out of polled
+  run details; accepted outputs remain in each operation's `result`. A missing
+  operation or an operation belonging to another run returns `404`.
 - `FileEntry`: `path`, `kind` (file or directory), and `size_bytes?` for files.
   File listings cover the saved workspace recursively, sorted by path.
 

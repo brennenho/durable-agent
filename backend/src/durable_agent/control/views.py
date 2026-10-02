@@ -12,10 +12,12 @@ from durable_agent.contracts import (
     AttemptView,
     ModelRequest,
     ModelResult,
+    OperationInspection,
     OperationResult,
     OperationView,
     RunDetail,
     RunSummary,
+    ToolRequest,
 )
 from durable_agent.control.errors import ControlError
 from durable_agent.db.models import Attempt, Operation, Run
@@ -96,6 +98,40 @@ async def load_operations(session: AsyncSession, run_id: UUID) -> list[Operation
     )
 
 
+async def inspect_operation(
+    session: AsyncSession, run_id: UUID, operation_id: UUID
+) -> OperationInspection:
+    row = (
+        await session.execute(
+            select(Operation.kind, Operation.request, Run.config)
+            .join(Run)
+            .where(Operation.run_id == run_id, Operation.id == operation_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise ControlError(404, "operation_not_found", "Operation not found in this run")
+    return OperationInspection(
+        operation={"kind": row.kind, "request": row.request}, config=row.config
+    )
+
+
+def tool_summary(operation: Operation) -> dict[str, str | None]:
+    if operation.kind != "tool":
+        return {"tool_name": None, "tool_target": None}
+    call = ToolRequest.model_validate(operation.request).call
+    key = "command" if call.name == "run_command" else "path"
+    target = call.arguments.get(key, "." if call.name == "list_files" else None)
+    if isinstance(target, str):
+        target = " ".join(target.split())
+        target = target if len(target) <= 160 else target[:159] + "…"
+    else:
+        target = None
+    return {
+        "tool_name": call.name,
+        "tool_target": target,
+    }
+
+
 async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
     # All progress writers lock this row. SHARE keeps this multi-query view consistent.
     run = await session.scalar(
@@ -128,6 +164,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
         if run.status == "succeeded" and isinstance(final, ModelResult)
         else None,
         workspace_version_id=workspace_version(state),
+        max_attempts=state.config.max_attempts,
         operations=[
             OperationView(
                 id=op.id,
@@ -137,6 +174,7 @@ async def detail(session: AsyncSession, run_id: UUID) -> RunDetail:
                 completed_at=op.completed_at,
                 result=op.result,
                 attempts=by_operation[op.id],
+                **tool_summary(op),
             )
             for op in operations
         ],

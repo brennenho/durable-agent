@@ -154,6 +154,8 @@ class AttemptView(Contract):
     started_at: UtcDatetime
     finished_at: UtcDatetime | None
     error: ExecutionError | None
+    provider_request_id: str | None = None
+    usage: JsonObject | None = None
 
 
 class OperationView(Contract):
@@ -164,12 +166,20 @@ class OperationView(Contract):
     completed_at: UtcDatetime | None
     result: OperationResult | None
     attempts: list[AttemptView]
+    tool_name: str | None = None
+    tool_target: str | None = None
+
+
+class OperationInspection(Contract):
+    operation: Operation
+    config: AgentConfig
 
 
 class RunDetail(RunSummary):
     final_answer: str | None
     workspace_version_id: UUID
     operations: list[OperationView]
+    max_attempts: PositiveInt | None = None
 
 
 class ConversationSummary(Contract):

@@ -177,6 +177,17 @@
             "title": "Id",
             "type": "string"
           },
+          "provider_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Request Id"
+          },
           "started_at": {
             "format": "date-time",
             "title": "Started At",
@@ -191,6 +202,20 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage"
           }
         },
         "required": [
@@ -626,6 +651,38 @@
         "title": "ModelResult",
         "type": "object"
       },
+      "OperationInspection": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/AgentConfig"
+          },
+          "operation": {
+            "discriminator": {
+              "mapping": {
+                "model": "#/components/schemas/ModelOperation",
+                "tool": "#/components/schemas/ToolOperation"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ModelOperation"
+              },
+              {
+                "$ref": "#/components/schemas/ToolOperation"
+              }
+            ],
+            "title": "Operation"
+          }
+        },
+        "required": [
+          "operation",
+          "config"
+        ],
+        "title": "OperationInspection",
+        "type": "object"
+      },
       "OperationView": {
         "additionalProperties": false,
         "properties": {
@@ -695,6 +752,28 @@
               }
             ],
             "title": "Result"
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          },
+          "tool_target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Target"
           }
         },
         "required": [
@@ -872,6 +951,18 @@
               }
             ],
             "title": "Last Progress At"
+          },
+          "max_attempts": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Attempts"
           },
           "model": {
             "title": "Model",
@@ -2022,6 +2113,86 @@
           }
         },
         "summary": "List Run Files"
+      }
+    },
+    "/api/runs/{run_id}/operations/{operation_id}": {
+      "get": {
+        "operationId": "inspect_operation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationInspection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Operation not found in this run"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Handler not implemented"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service unavailable"
+          }
+        },
+        "summary": "Get Operation"
       }
     },
     "/health/live": {
