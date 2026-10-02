@@ -20,3 +20,5 @@ frontend/playwright-report/
 frontend/next-env.d.ts
 
 .sandbox-workspaces/
+
+.crash-test/

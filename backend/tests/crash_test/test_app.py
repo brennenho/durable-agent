@@ -1,8 +1,8 @@
 import asyncio
 
 import httpx
-from durable_agent.crash_testing.app import create_app
-from durable_agent.crash_testing.room import ControlRoom
+from crash_test.app import create_app
+from crash_test.room import ControlRoom
 
 from .test_runner import Docker
 

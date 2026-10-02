@@ -71,15 +71,16 @@ For the existing Compose project, set `CRASH_TEST_HOOK_URL` to the controller's 
 reachable from the containers and use `-f compose.yaml -f compose.crash-test.yaml`
 with the existing startup configuration. The overlay opts Control, Tools, and Worker
 into hooks; ordinary Compose startup remains unchanged. Keep the controller outside
-the processes being killed. It can also kill frontend or Postgres in response to any
-chosen hook, retaining observations while those services are unavailable.
+the processes being killed. Manual controls can also kill frontend or Postgres, retaining observations while
+those services are unavailable. The built-in hook scenarios target the emitting
+service or sandbox.
 
 The dashboard, rule API, scenario runner, and process-kill controller are separate
 consumers of this interface; they are not implemented by the hook client.
 
 ## Container control
 
-`crash_testing.docker.DockerControl` targets the selected existing Compose project.
+`crash_test.docker.DockerControl` targets the selected existing Compose project.
 The controller must bind it to the repository directory: both Compose working-directory
 and config-file labels must match, in addition to the project and allowed service.
 This works with existing containers without adding labels or creating another stack.
@@ -111,7 +112,7 @@ hook = "worker.before_report"
 description = "Kill a worker before reporting; recover after its lease expires."
 ```
 
-Edit this file to add or change presets, then restart the host controller and CLI.
+Edit this file to add or change presets, then restart Crashboard.
 The catalog is read once at process startup. Use `hook = "none"` explicitly for a
 baseline. Missing fields, unknown fields, unsupported hooks, duplicate names, and
 an empty catalog fail startup. Recovery checks stay in Python; a new hook boundary
@@ -127,3 +128,35 @@ checkpoint through outages, and writes a local JSON report. Missed or unverified
 kills are inconclusive. A passed scenario requires successful completion and one
 accepted attempt per operation. Saved-response recovery additionally requires the
 original workspace, observed cache reuse, and no observed execution after saving.
+
+## Host controller setup
+
+Crash Test lives in `backend/src/crash_test`, beside the application package. Only
+the small hook client remains in `durable_agent`. It shares the Python environment,
+uses the application's public APIs, and stores controller reports in `.crash-test`.
+
+Enable hooks from the checkout used to start the application:
+
+```sh
+CRASH_TEST=1 ./scripts/dev-up.sh
+```
+
+This enables hooks on the same Compose project and database. It may
+recreate service containers to apply their environment, like a normal development
+restart. Internal startup in `crash_test.host` discovers an existing Compose project
+whose directory belongs to this Git repository. It starts only the host controller;
+it never creates containers. Dashboard launch and controls are supplied by the
+following dashboard changes; there is no operator CLI.
+
+For another checkout or project, set `CRASH_TEST_COMPOSE_DIRECTORY` and
+`CRASH_TEST_PROJECT` on the launcher. For a nondefault Control port, set `CONTROL_URL`.
+
+The controller listens on port 9020 so Docker can reach the host. Every controller
+API requires the generated `.crash-test/token` bearer token; keep that file private.
+Use the same `CRASH_TEST_STATE_DIR` for development startup and Crashboard if overriding it.
+Keep the hook timeout at 30 seconds. Missing hooks produce inconclusive scenarios.
+
+Scenario cancellation and controller shutdown wait for in-flight service recovery.
+Killing the controller itself can require manual container restart. Reports remain
+on disk; live selection resets when the controller restarts. A baseline pass validates
+saved run structure, not semantic correctness of an arbitrary task's output.

@@ -6,11 +6,11 @@ from pathlib import Path
 import httpx
 from fastapi import HTTPException
 
-from durable_agent.crash_testing.contracts import ContainerAction
-from durable_agent.crash_testing.controller import Journal, now
-from durable_agent.crash_testing.docker import DockerControl, DockerError
-from durable_agent.crash_testing.runner import ScenarioRun
-from durable_agent.crash_testing.scenarios import SCENARIOS
+from crash_test.contracts import ContainerAction
+from crash_test.controller import Journal, now
+from crash_test.docker import DockerControl, DockerError
+from crash_test.runner import ScenarioRun
+from crash_test.scenarios import SCENARIOS
 
 
 class ControlRoom:

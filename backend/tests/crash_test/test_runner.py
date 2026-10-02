@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import httpx
-from durable_agent.crash_testing.controller import now
-from durable_agent.crash_testing.docker import Container
-from durable_agent.crash_testing.runner import ScenarioRun
+from crash_test.controller import now
+from crash_test.docker import Container
+from crash_test.runner import ScenarioRun
 
 
 def completed_run():
@@ -177,10 +177,10 @@ def test_outage_retains_state_and_deadline_ends_untriggered_rule(tmp_path):
 
 
 def test_verdict_requires_recovery_after_the_faulted_attempt(tmp_path):
+    from crash_test.controller import FaultController, Journal
+    from crash_test.scenarios import evaluate
     from durable_agent.contracts import RunDetail
     from durable_agent.crash_test import HookEvent
-    from durable_agent.crash_testing.controller import FaultController, Journal
-    from durable_agent.crash_testing.scenarios import evaluate
 
     run = RunDetail.model_validate(completed_run())
     target = run.operations[0]

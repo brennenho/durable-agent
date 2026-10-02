@@ -3,10 +3,10 @@
 from typing import Literal
 from uuid import UUID
 
+from durable_agent.contracts import Contract, JsonObject, RunDetail, ToolCheckpoint
 from pydantic import Field
 
-from durable_agent.contracts import Contract, JsonObject, RunDetail, ToolCheckpoint
-from durable_agent.crash_testing.docker import Container
+from crash_test.docker import Container
 
 
 class Scenario(Contract):

@@ -3,7 +3,7 @@ import os
 from uuid import uuid4
 
 import pytest
-from durable_agent.crash_testing.docker import DockerControl, DockerError
+from crash_test.docker import DockerControl, DockerError
 
 
 @pytest.mark.parametrize("project", ["", "durable-agent", "-project", "../project"])

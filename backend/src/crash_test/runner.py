@@ -7,12 +7,12 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx
-
 from durable_agent.contracts import RunDetail, ToolCheckpoint
 from durable_agent.crash_test import HookEvent, HookReply
-from durable_agent.crash_testing.controller import FaultController, Journal, now
-from durable_agent.crash_testing.docker import DockerControl, DockerError
-from durable_agent.crash_testing.scenarios import SCENARIOS, evaluate
+
+from crash_test.controller import FaultController, Journal, now
+from crash_test.docker import DockerControl, DockerError
+from crash_test.scenarios import SCENARIOS, evaluate
 
 
 class ScenarioRun:

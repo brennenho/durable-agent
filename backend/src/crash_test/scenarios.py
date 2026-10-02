@@ -5,10 +5,10 @@ from datetime import datetime
 from importlib.resources import files
 from typing import Annotated, Literal
 
+from durable_agent.contracts import RunDetail
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
-from durable_agent.contracts import RunDetail
-from durable_agent.crash_testing.controller import FaultController
+from crash_test.controller import FaultController
 
 
 class ScenarioDefinition(BaseModel):

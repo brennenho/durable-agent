@@ -7,7 +7,8 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from durable_agent.crash_test import HookEvent, HookReply
-from durable_agent.crash_testing.docker import DockerControl, DockerError
+
+from crash_test.docker import DockerControl, DockerError
 
 
 def now() -> str:
