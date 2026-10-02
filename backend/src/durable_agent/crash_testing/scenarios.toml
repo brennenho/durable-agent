@@ -1,0 +1,25 @@
+# Each table is a preset. "none" observes a run without injecting a fault.
+
+[baseline]
+hook = "none"
+description = "Observe a normal run through completion."
+
+[saved-response-lost]
+hook = "tools.after_commit"
+description = "Kill Tools after saving; reuse the saved workspace without executing the tool again."
+
+[unsaved-work-lost]
+hook = "tools.before_publish"
+description = "Kill Tools before saving; retry the interrupted operation."
+
+[worker-lost]
+hook = "worker.before_report"
+description = "Kill a worker before reporting; recover after its lease expires."
+
+[acceptance-ack-lost]
+hook = "control.after_accept_commit"
+description = "Kill Control after acceptance; recover without accepting the operation twice."
+
+[sandbox-lost]
+hook = "sandbox.started"
+description = "Kill a running sandbox; recover the interrupted tool."

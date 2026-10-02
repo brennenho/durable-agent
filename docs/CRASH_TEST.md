@@ -99,3 +99,31 @@ exit, and restart is appended to a local JSONL journal independently of Postgres
 An in-flight kill/recovery task survives cancellation of the hook HTTP request;
 closing the controller waits for it. A controller process crash can still interrupt
 recovery; the operator must inspect the journal and restore stopped services.
+
+## Scenario evidence
+
+Presets live in the packaged `scenarios.toml` beside `scenarios.py`. Each table names
+a preset and declares its hook and description:
+
+```toml
+[worker-lost]
+hook = "worker.before_report"
+description = "Kill a worker before reporting; recover after its lease expires."
+```
+
+Edit this file to add or change presets, then restart the host controller and CLI.
+The catalog is read once at process startup. Use `hook = "none"` explicitly for a
+baseline. Missing fields, unknown fields, unsupported hooks, duplicate names, and
+an empty catalog fail startup. Recovery checks stay in Python; a new hook boundary
+needs a corresponding verifier before a preset can select it.
+
+Arm a scenario for an existing run ID, or for the next worker claim. Then use the
+application normally. The runner never submits a prompt, swaps workers, or changes
+model configuration. A run can make real model calls as usual; the controller itself
+makes none. Rules expire after five minutes and only one scenario runs at a time.
+
+The runner reads public Control APIs, retaining the last observed run and saved
+checkpoint through outages, and writes a local JSON report. Missed or unverified
+kills are inconclusive. A passed scenario requires successful completion and one
+accepted attempt per operation. Saved-response recovery additionally requires the
+original workspace, observed cache reuse, and no observed execution after saving.
