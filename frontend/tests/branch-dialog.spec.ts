@@ -49,7 +49,7 @@ async function openBranch(page: Page) {
   await page.getByLabel("Activity", { exact: true }).locator(":scope > summary").click();
   const step = page.getByLabel("1. write_file", { exact: true });
   await expect(step).not.toHaveAttribute("open");
-  await step.getByRole("button", { name: "Branch from here" }).click();
+  await step.getByRole("button", { name: "Branch", exact: true }).click();
   return page.getByRole("dialog", { name: "Branch from step 1" });
 }
 
@@ -81,7 +81,7 @@ for (const width of [320, 390, 1440]) {
     await dialog.getByRole("textbox").fill("Do not submit this draft");
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     const step = page.getByLabel("1. write_file", { exact: true });
-    const trigger = step.getByRole("button", { name: "Branch from here" });
+    const trigger = step.getByRole("button", { name: "Branch", exact: true });
     await expect(trigger).toBeFocused();
     await expect(step).not.toHaveAttribute("open");
     const buttonBounds = await trigger.boundingBox();
@@ -101,7 +101,7 @@ for (const width of [320, 390, 1440]) {
     await expect(step).toHaveAttribute("open");
     expect(submissions).toBe(0);
     await page.getByLabel("2. write_file", { exact: true }).locator(":scope > summary").click();
-    await expect(page.getByRole("button", { name: "Branch from here" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Branch", exact: true })).toHaveCount(1);
   });
 }
 
@@ -166,7 +166,7 @@ test("retries the same creation after a lost response and uses a new key for an 
   await dialog.getByRole("button", { name: "Close branch dialog" }).click();
   await page
     .getByLabel("1. write_file", { exact: true })
-    .getByRole("button", { name: "Branch from here" })
+    .getByRole("button", { name: "Branch", exact: true })
     .click();
   await dialog.getByRole("button", { name: "Retry creation" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
@@ -177,7 +177,7 @@ test("retries the same creation after a lost response and uses a new key for an 
   expect(bodies[2].submission_key).not.toBe(bodies[0].submission_key);
   await dialog.getByRole("button", { name: "Close branch dialog" }).click();
   const second = page.getByLabel("2. write_file", { exact: true });
-  await second.getByRole("button", { name: "Branch from here" }).click();
+  await second.getByRole("button", { name: "Branch", exact: true }).click();
   const next = page.getByRole("dialog", { name: "Branch from step 2" });
   await next.getByRole("textbox").fill("Different approach");
   await next.getByRole("button", { name: "Create branch" }).click();
@@ -214,7 +214,7 @@ test("closing a pending creation cancels the request but preserves its retry key
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await cancelled;
   release();
-  await page.getByRole("button", { name: "Branch from here" }).click();
+  await page.getByRole("button", { name: "Branch", exact: true }).click();
   await dialog.getByRole("button", { name: "Retry creation" }).click();
   await expect(dialog.getByRole("alert")).toHaveText("Checkpoint unavailable.");
   expect(bodies[1]).toEqual(bodies[0]);
