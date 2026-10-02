@@ -17,6 +17,8 @@ export function ConversationView({ conversationId }: { conversationId: string })
   const latestTurn = useRef<HTMLDivElement | null>(null);
   const scrollOnRefresh = useRef(false);
   const polling = useRef<AbortController | null>(null);
+  const agent = conversation?.runs[0]?.agent;
+  const customAgent = agent && agent.name !== "builtin";
 
   function updateRun(saved: RunDetail) {
     // Prevent a read started before the action from replacing its confirmed state.
@@ -94,13 +96,18 @@ export function ConversationView({ conversationId }: { conversationId: string })
       runs={conversation?.runs ?? []}
       composer={
         conversation &&
-        !conversation.runs.some((run) => run.parent) && (
+        !conversation.runs.some((run) => run.parent) &&
+        (customAgent ? (
+          <p className="py-3 text-xs text-muted-foreground">
+            Continue or branch this agent through the SDK.
+          </p>
+        ) : (
           <FollowUp
             conversation={conversation}
             blocked={awaitingRefresh || error !== null}
             refresh={requestRefresh}
           />
-        )
+        ))
       }
     >
       <div className="space-y-12">

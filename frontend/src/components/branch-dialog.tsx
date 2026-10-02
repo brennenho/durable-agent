@@ -32,7 +32,7 @@ export function BranchDialog({ run, operation }: { run: RunDetail; operation: Op
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   const checkpoint = operation.checkpoint;
-  if (!checkpoint) return null;
+  if (!checkpoint || (run.agent && run.agent.name !== "builtin")) return null;
 
   function changeOpen(next: boolean) {
     if (!next && controller.current) {

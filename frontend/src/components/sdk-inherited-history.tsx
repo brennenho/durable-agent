@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { requestJson, type ConversationDetail, type RunDetail } from "../lib/api";
 import { OperationOutput } from "./operation-output";
 import { RunOutput } from "./run-output";
+import { RunInput } from "./run-input";
 import { Button } from "./ui/button";
 
 type Origin = NonNullable<ConversationDetail["forked_from"]>;
@@ -41,14 +42,7 @@ async function loadHistory(origin: Origin, signal: AbortSignal): Promise<Inherit
 function SavedTurn({ run, complete }: InheritedRun) {
   return (
     <article aria-label="Inherited chat turn" className="space-y-8">
-      {run.prompt && (
-        <div
-          aria-label="Earlier message"
-          className="ml-auto w-fit max-w-[90%] rounded-xl bg-muted px-4 py-3 whitespace-pre-wrap wrap-anywhere"
-        >
-          {run.prompt}
-        </div>
-      )}
+      <RunInput run={run} label="Earlier message" />
       <section
         aria-label="Earlier agent response"
         className="m-0 space-y-4 border-0 bg-transparent p-0"

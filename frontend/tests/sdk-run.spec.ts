@@ -93,14 +93,14 @@ test("keeps Applied Agent branding for built-in SDK runs without hiding their id
 test("waits for SDK success and stops polling after a JSON-null result", async ({ page }) => {
   let current: RunDetail = { ...sdkRun, status: "running", finished_at: null };
   let requests = 0;
-  await page.clock.install();
+  await page.clock.install({ time: new Date("2026-10-01T12:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-01T12:01:00Z"));
   await page.route(endpoint, (route) => {
     requests++;
     return route.fulfill({ json: current });
   });
   await page.goto(url);
   await expect(page.getByRole("status", { name: "Execution status" })).toHaveText("Running");
-  await page.clock.pauseAt(new Date());
   await expect(page.getByRole("region", { name: "Final output" })).toHaveCount(0);
   current = sdkRun;
   await page.clock.fastForward(2_000);

@@ -7,6 +7,7 @@ import type { RunDetail } from "../lib/api";
 import { ExecutionTimeline } from "./execution-timeline";
 import { ActivityStatus } from "./activity-state";
 import { RunOutput } from "./run-output";
+import { RunInput } from "./run-input";
 import { RunControls } from "./run-controls";
 import { FailedAttemptsBadge } from "./failed-attempts-badge";
 import { SubagentList } from "./subagent-list";
@@ -37,12 +38,7 @@ export function ChatTurn({
           <p className="m-0">{run.parent.name} · Managed by the parent agent</p>
         </div>
       )}
-      <div
-        aria-label="Your message"
-        className="ml-auto w-fit max-w-[90%] rounded-xl bg-muted px-4 py-3 whitespace-pre-wrap wrap-anywhere"
-      >
-        {run.prompt}
-      </div>
+      <RunInput run={run} />
       <section aria-label="Agent response" className="m-0 border-0 bg-transparent p-0">
         <div className="mb-2 flex items-start justify-between gap-3">
           <h2 className="m-0 min-w-0 flex-1 py-1.5 text-sm font-medium wrap-anywhere">
