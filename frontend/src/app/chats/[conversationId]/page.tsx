@@ -7,7 +7,7 @@ export default async function ChatPage({
 }) {
   const { conversationId } = await params;
   return (
-    <main className="w-full max-w-3xl pt-10 md:pt-20">
+    <main className="flex min-h-[calc(100dvh-3.5rem)] w-full max-w-3xl flex-col pt-10 pb-0 md:min-h-dvh md:pt-20">
       <h1 className="sr-only">Chat</h1>
       <ConversationView key={conversationId} conversationId={conversationId} />
     </main>

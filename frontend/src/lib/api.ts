@@ -5,6 +5,7 @@ export type ConversationDetail = components["schemas"]["ConversationDetail"];
 export type RunFileListing = components["schemas"]["RunFileListing"];
 export type RunDetail = components["schemas"]["RunDetail"];
 export type RunSummary = components["schemas"]["RunSummary"];
+export type SubmitFollowUpRequest = components["schemas"]["SubmitFollowUpRequest"];
 export type SubmitRunRequest = components["schemas"]["SubmitRunRequest"];
 
 export class ApiError extends Error {
