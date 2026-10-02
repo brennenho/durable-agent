@@ -247,6 +247,13 @@ state remains authoritative; controller journals can miss events and are not an
 application audit log. Restarting the controller resets its live selection, while
 previous JSON reports remain in `.crash-test/reports`.
 
+Arming a scenario selects **This scenario** and resets the timeline filters. This view
+includes its run, child runs, and related controller observations. **All activity**
+also includes background worker/sandbox events and earlier manual actions. JSON
+exports follow the selected view. Background history retains the latest 2,000
+controller observations until the controller restarts; starting a scenario does not
+erase it. A finished scenario remains selected until another is armed.
+
 ## Verify with real workers and OpenAI
 
 Use the existing application workers and configured OpenAI model for a live check.
