@@ -21,7 +21,10 @@ does not extend that delivery budget or the fixed call deadline. If reporting or
 the process fails, Control recovers after the lease expires; a lost model result
 may require inference again. Tools can recover already committed results.
 
-SIGTERM and Ctrl-C cancel work and close the HTTP clients. Tests use saved response
+SIGTERM stops new claims and finishes any in-flight claim, execution, and report before
+closing clients. Heartbeats and call deadlines still apply during shutdown. The container's
+stop grace period must allow that work to finish; a forced kill still uses lease recovery.
+Ctrl-C cancels work immediately. Tests use saved response
 and HTTP fixtures: `uv run --project backend pytest backend/tests/worker -q`.
 
 Follow-ups preserve valid native context, including encrypted reasoning and call IDs.

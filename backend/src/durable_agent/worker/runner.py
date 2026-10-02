@@ -38,6 +38,17 @@ class Worker:
         self.report_retry_interval = report_retry_interval
         self.poll_interval = poll_interval
         self.hooks = hooks or CrashTestHooks("worker")
+        self.stopping = asyncio.Event()
+
+    def stop(self) -> None:
+        """Finish any claimed assignment, then stop requesting work."""
+        self.stopping.set()
+
+    async def _wait_to_poll(self, delay: float) -> None:
+        try:
+            await asyncio.wait_for(self.stopping.wait(), timeout=delay)
+        except TimeoutError:
+            pass
 
     async def _hook(self, name: str, assignment: Assignment) -> None:
         await self.hooks.hit(
@@ -51,7 +62,7 @@ class Worker:
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
-        while True:
+        while not self.stopping.is_set():
             claimed_at = loop.time()
             try:
                 assignment = await self.services.claim(self.worker_id)
@@ -59,10 +70,12 @@ class Worker:
                 if not exc.error.retryable:
                     raise
                 logger.warning("Claim failed: %s", exc)
-                await asyncio.sleep(max(self.poll_interval, exc.error.retry_after_seconds or 0))
+                await self._wait_to_poll(
+                    max(self.poll_interval, exc.error.retry_after_seconds or 0)
+                )
                 continue
             if assignment is None:
-                await asyncio.sleep(self.poll_interval)
+                await self._wait_to_poll(self.poll_interval)
                 continue
             try:
                 await self.run_assignment(assignment, claimed_at=claimed_at)
