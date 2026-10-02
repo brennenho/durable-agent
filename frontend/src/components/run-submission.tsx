@@ -1,11 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowUp, LoaderCircle } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { ApiError, requestJson, type ConversationSummary, type SubmitRunRequest } from "../lib/api";
-import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
+import { MessageComposer } from "./message-composer";
 
 export function RunSubmission() {
   const router = useRouter();
@@ -48,50 +46,13 @@ export function RunSubmission() {
   }
 
   return (
-    <form onSubmit={submit} aria-busy={busy} aria-label="New chat" className="chat-composer">
-      <label htmlFor="prompt" className="sr-only">
-        Message
-      </label>
-      <Textarea
-        className="min-h-24 max-h-64 resize-y border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0 md:text-sm"
-        id="prompt"
-        name="prompt"
-        rows={3}
-        required
-        disabled={busy}
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            event.currentTarget.form?.requestSubmit();
-          }
-        }}
-        aria-describedby={error ? "submission-error" : "prompt-help"}
-        placeholder="Ask the agent to write, edit, or build something…"
-      />
-      {error && (
-        <p id="submission-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="mt-3 flex items-center justify-between gap-4">
-        <p id="prompt-help" className="m-0 text-xs text-muted-foreground">
-          Enter to send · Shift + Enter for a new line
-        </p>
-        <Button
-          type="submit"
-          size="icon-sm"
-          disabled={busy || !prompt.trim()}
-          aria-label={busy ? "Sending…" : error ? "Try again" : "Send message"}
-        >
-          {busy ? (
-            <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />
-          ) : (
-            <ArrowUp aria-hidden="true" />
-          )}
-        </Button>
-      </div>
-    </form>
+    <MessageComposer
+      label="New chat"
+      prompt={prompt}
+      onPromptChange={setPrompt}
+      onSubmit={submit}
+      busy={busy}
+      error={error}
+    />
   );
 }
