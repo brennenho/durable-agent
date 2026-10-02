@@ -110,6 +110,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AgentIdentity */
+        AgentIdentity: {
+            /** App Ref */
+            app_ref: string;
+            /** Build Id */
+            build_id: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: string;
+        };
         /** AttemptView */
         AttemptView: {
             /** Attempt No */
@@ -154,8 +165,11 @@ export interface components {
         };
         /** ChildRunSummary */
         ChildRunSummary: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
             /** Child Index */
             child_index: number;
+            /** Conversation Id */
+            conversation_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -373,8 +387,11 @@ export interface components {
         };
         /** RunDetail */
         RunDetail: {
+            agent?: components["schemas"]["AgentIdentity"] | null;
             /** Children */
             children?: components["schemas"]["ChildRunSummary"][];
+            /** Conversation Id */
+            conversation_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -401,6 +418,7 @@ export interface components {
             next_attempt_at: string | null;
             /** Operations */
             operations: components["schemas"]["OperationView"][];
+            output?: components["schemas"]["JsonValue"];
             parent?: components["schemas"]["RunParent"] | null;
             /**
              * Pause Requested

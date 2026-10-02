@@ -1,6 +1,40 @@
 {
   "components": {
     "schemas": {
+      "AgentIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "app_ref": {
+            "minLength": 1,
+            "title": "App Ref",
+            "type": "string"
+          },
+          "build_id": {
+            "minLength": 1,
+            "title": "Build Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "app_ref",
+          "build_id"
+        ],
+        "title": "AgentIdentity",
+        "type": "object"
+      },
       "AttemptView": {
         "additionalProperties": false,
         "properties": {
@@ -120,10 +154,32 @@
       "ChildRunSummary": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "child_index": {
             "minimum": 0.0,
             "title": "Child Index",
             "type": "integer"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "created_at": {
             "format": "date-time",
@@ -797,12 +853,34 @@
       "RunDetail": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "children": {
             "items": {
               "$ref": "#/components/schemas/ChildRunSummary"
             },
             "title": "Children",
             "type": "array"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "created_at": {
             "format": "date-time",
@@ -895,6 +973,9 @@
             },
             "title": "Operations",
             "type": "array"
+          },
+          "output": {
+            "$ref": "#/components/schemas/JsonValue"
           },
           "parent": {
             "anyOf": [

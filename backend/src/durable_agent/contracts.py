@@ -12,7 +12,10 @@ from pydantic import (
     Field,
     JsonValue,
     StringConstraints,
+    model_validator,
 )
+
+from durable_agent.sdk.types import AgentIdentity, Seconds, StepResult, ToolDefinition
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -47,6 +50,10 @@ class SandboxConfig(Contract):
 
 
 class AgentConfig(Contract):
+    agent: AgentIdentity | None = None
+    tool_definitions: dict[str, ToolDefinition] = Field(default_factory=dict)
+    agent_history: list[StepResult] = Field(default_factory=list)
+    max_steps: PositiveInt = 100
     model: str
     model_params: JsonObject
     tool_schemas: list[JsonObject]
@@ -106,12 +113,18 @@ class PreviousTurn(Contract):
 
 
 class ModelRequest(Contract):
+    explicit_input: list[JsonObject] | None = None
+    model: str | None = None
+    model_params: JsonObject | None = None
+    tool_schemas: list[JsonObject] | None = None
+    timeout_seconds: Seconds | None = None
     prompt: str
     history: list[OperationResult]
     previous_turns: list[PreviousTurn] = Field(default_factory=list)
 
 
 class ToolRequest(Contract):
+    timeout_seconds: Seconds | None = None
     call: ToolCall
     input_version_id: UUID
 
@@ -131,7 +144,25 @@ Operation = Annotated[ModelOperation | ToolOperation, Field(discriminator="kind"
 
 class SubmitRunRequest(Contract):
     submission_key: UUID
-    prompt: str
+    prompt: str = ""
+    agent: str | None = None
+    input: JsonValue = None
+
+    @model_validator(mode="after")
+    def one_input(self):
+        supplied = self.model_fields_set
+        if ("prompt" in supplied) == self.is_sdk_input:
+            raise ValueError("Supply either prompt or input")
+        if self.agent is not None and "input" not in supplied:
+            raise ValueError("Named agents require input")
+        return self
+
+    @property
+    def is_sdk_input(self) -> bool:
+        return self.agent is not None or (
+            "input" in self.model_fields_set
+            and (self.input is not None or "prompt" not in self.model_fields_set)
+        )
 
 
 class SubmitFollowUpRequest(SubmitRunRequest):
@@ -147,6 +178,8 @@ AttemptStatus = Literal["running", "accepted", "error", "unknown"]
 
 
 class RunSummary(Contract):
+    conversation_id: UUID | None = None
+    agent: AgentIdentity | None = None
     id: UUID
     prompt: str
     model: str
@@ -207,6 +240,7 @@ class ChildRunSummary(RunSummary):
 
 
 class RunDetail(RunSummary):
+    output: JsonValue = None
     parent: RunParent | None = None
     children: list[ChildRunSummary] = Field(default_factory=list)
     final_answer: str | None
@@ -308,6 +342,9 @@ class ReportResponse(Contract):
 
 
 class ToolExecuteRequest(Contract):
+    definition: ToolDefinition | None = None
+    run_id: UUID | None = None
+    attempt_id: UUID | None = None
     operation_id: UUID
     input_version_id: UUID
     name: str
@@ -375,6 +412,8 @@ class RunCommandOutput(Contract):
 
 
 class DelegateTask(Contract):
+    agent: str | None = None
+    input: JsonValue = None
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     prompt: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=8000)]
 

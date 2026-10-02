@@ -4,6 +4,23 @@
       "AgentConfig": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_history": {
+            "items": {
+              "$ref": "#/components/schemas/StepResult"
+            },
+            "title": "Agent History",
+            "type": "array"
+          },
           "call_timeout_seconds": {
             "exclusiveMinimum": 0.0,
             "title": "Call Timeout Seconds",
@@ -17,6 +34,12 @@
           "max_attempts": {
             "exclusiveMinimum": 0.0,
             "title": "Max Attempts",
+            "type": "integer"
+          },
+          "max_steps": {
+            "default": 100,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Steps",
             "type": "integer"
           },
           "max_turns": {
@@ -37,6 +60,13 @@
           },
           "sandbox": {
             "$ref": "#/components/schemas/SandboxConfig"
+          },
+          "tool_definitions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ToolDefinition"
+            },
+            "title": "Tool Definitions",
+            "type": "object"
           },
           "tool_schemas": {
             "items": {
@@ -60,6 +90,40 @@
           "call_timeout_seconds"
         ],
         "title": "AgentConfig",
+        "type": "object"
+      },
+      "AgentIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "app_ref": {
+            "minLength": 1,
+            "title": "App Ref",
+            "type": "string"
+          },
+          "build_id": {
+            "minLength": 1,
+            "title": "Build Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "app_ref",
+          "build_id"
+        ],
+        "title": "AgentIdentity",
         "type": "object"
       },
       "Assignment": {
@@ -247,10 +311,32 @@
       "ChildRunSummary": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "child_index": {
             "minimum": 0.0,
             "title": "Child Index",
             "type": "integer"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "created_at": {
             "format": "date-time",
@@ -780,6 +866,23 @@
       "ModelRequest": {
         "additionalProperties": false,
         "properties": {
+          "explicit_input": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/JsonValue"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explicit Input"
+          },
           "history": {
             "items": {
               "discriminator": {
@@ -801,6 +904,31 @@
             "title": "History",
             "type": "array"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Params"
+          },
           "previous_turns": {
             "items": {
               "$ref": "#/components/schemas/PreviousTurn"
@@ -811,6 +939,36 @@
           "prompt": {
             "title": "Prompt",
             "type": "string"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 900.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "tool_schemas": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/JsonValue"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Schemas"
           }
         },
         "required": [
@@ -1104,12 +1262,34 @@
       "RunDetail": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "children": {
             "items": {
               "$ref": "#/components/schemas/ChildRunSummary"
             },
             "title": "Children",
             "type": "array"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           },
           "created_at": {
             "format": "date-time",
@@ -1202,6 +1382,9 @@
             },
             "title": "Operations",
             "type": "array"
+          },
+          "output": {
+            "$ref": "#/components/schemas/JsonValue"
           },
           "parent": {
             "anyOf": [
@@ -1326,6 +1509,28 @@
       "RunSummary": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1461,6 +1666,75 @@
         "title": "SandboxConfig",
         "type": "object"
       },
+      "StepError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "StepError",
+        "type": "object"
+      },
+      "StepResult": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StepError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "model",
+              "tool",
+              "children"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "workspace_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Version Id"
+          }
+        },
+        "required": [
+          "operation_id",
+          "kind"
+        ],
+        "title": "StepResult",
+        "type": "object"
+      },
       "SubmitFollowUpRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1469,7 +1743,22 @@
             "title": "After Run Id",
             "type": "string"
           },
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "input": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
           "prompt": {
+            "default": "",
             "title": "Prompt",
             "type": "string"
           },
@@ -1481,7 +1770,6 @@
         },
         "required": [
           "submission_key",
-          "prompt",
           "after_run_id"
         ],
         "title": "SubmitFollowUpRequest",
@@ -1495,7 +1783,22 @@
             "title": "After Operation Id",
             "type": "string"
           },
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "input": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
           "prompt": {
+            "default": "",
             "title": "Prompt",
             "type": "string"
           },
@@ -1507,7 +1810,6 @@
         },
         "required": [
           "submission_key",
-          "prompt",
           "after_operation_id"
         ],
         "title": "SubmitForkRequest",
@@ -1516,7 +1818,22 @@
       "SubmitRunRequest": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "input": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
           "prompt": {
+            "default": "",
             "title": "Prompt",
             "type": "string"
           },
@@ -1527,8 +1844,7 @@
           }
         },
         "required": [
-          "submission_key",
-          "prompt"
+          "submission_key"
         ],
         "title": "SubmitRunRequest",
         "type": "object"
@@ -1640,6 +1956,52 @@
         "title": "ToolCheckpoint",
         "type": "object"
       },
+      "ToolDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "entrypoint": {
+            "minLength": 1,
+            "title": "Entrypoint",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "takes_context": {
+            "default": false,
+            "title": "Takes Context",
+            "type": "boolean"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "entrypoint",
+          "parameters"
+        ],
+        "title": "ToolDefinition",
+        "type": "object"
+      },
       "ToolError": {
         "additionalProperties": false,
         "properties": {
@@ -1694,6 +2056,19 @@
             "format": "uuid",
             "title": "Input Version Id",
             "type": "string"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "maximum": 900.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
           }
         },
         "required": [

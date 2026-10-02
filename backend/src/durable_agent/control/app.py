@@ -74,6 +74,8 @@ async def readiness(request: Request) -> dict[str, str]:
     },
 )
 async def submit_run(body: SubmitRunRequest, request: Request) -> RunSummary:
+    if body.is_sdk_input:
+        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     runtime = get_runtime(request)
     async with runtime.db.session() as session:
         if existing := await find_submission(session, body):
@@ -133,6 +135,8 @@ async def get_conversation(conversation_id: UUID, request: Request) -> Conversat
 async def submit_follow_up(
     conversation_id: UUID, body: SubmitFollowUpRequest, request: Request
 ) -> RunSummary:
+    if body.is_sdk_input:
+        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     async with get_runtime(request).db.session() as session:
         run = await create_continuation(session, conversation_id, body)
         await session.commit()
@@ -152,6 +156,8 @@ async def submit_follow_up(
     },
 )
 async def fork_run(run_id: UUID, body: SubmitForkRequest, request: Request) -> ConversationSummary:
+    if body.is_sdk_input:
+        raise ControlError(501, "sdk_unavailable", "SDK execution is not installed yet")
     async with get_runtime(request).db.session() as session:
         run = await create_fork(session, run_id, body)
         await session.commit()

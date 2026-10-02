@@ -34,7 +34,7 @@ class ToolCall(Value):
     kind: Literal["tool"] = "tool"
     name: Name
     arguments: JsonObject = Field(default_factory=dict)
-    timeout_seconds: Seconds = 120
+    timeout_seconds: Seconds | None = None
 
 
 class ChildTask(Value):
