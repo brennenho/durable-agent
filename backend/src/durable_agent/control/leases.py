@@ -69,7 +69,20 @@ async def claim(
     if count >= config.max_attempts:
         raise ValueError("Claimable operation has exhausted its attempt budget")
     now = await session.scalar(select(func.clock_timestamp()))
-    deadline = _attempt_deadline(now, operation, run)
+    try:
+        assigned_operation = OPERATION.validate_python(
+            {"kind": operation.kind, "request": operation.request}
+        )
+        deadline = _attempt_deadline(now, operation, run)
+    except (ValueError, KeyError, TypeError):
+        run.status, run.next_attempt_at, run.pause_requested = "failed", None, False
+        run.finished_at = now
+        run.terminal_error = {
+            "code": "invalid_operation",
+            "message": "Saved operation is invalid",
+            "retryable": False,
+        }
+        return None
     run.status, run.next_attempt_at = "running", None
     run.lease_owner = worker_id
     run.lease_generation += 1
@@ -95,7 +108,7 @@ async def claim(
         deadline_at=deadline,
         server_time=now,
         config=config,
-        operation=OPERATION.validate_python({"kind": operation.kind, "request": operation.request}),
+        operation=assigned_operation,
     )
 
 
