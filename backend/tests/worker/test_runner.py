@@ -13,9 +13,15 @@ from durable_agent.worker.services import ServiceClient
 
 
 def exercise(
-    assignment, response_payload, *, report_failure=None, stall_model=False, tool_status=200
+    assignment,
+    response_payload,
+    *,
+    report_failure=None,
+    stall_model=False,
+    stall_tool=False,
+    tool_status=200,
 ):
-    requests = {"model": [], "tool": [], "heartbeat": [], "report": []}
+    requests = {"model": [], "tool": [], "tool_timeouts": [], "heartbeat": [], "report": []}
     cancelled = []
 
     async def run():
@@ -33,6 +39,12 @@ def exercise(
                 )
             if request.url.path == "/tools/execute":
                 requests["tool"].append(body)
+                requests["tool_timeouts"].append(request.extensions["timeout"]["read"])
+                if stall_tool:
+                    try:
+                        await asyncio.Future()
+                    finally:
+                        cancelled.append(True)
                 return httpx.Response(
                     tool_status,
                     json={
@@ -99,13 +111,50 @@ def test_report_retry_reuses_outcome_without_repeating_model(
     assert requests["report"][0]["outcome"]["provider_request_id"] == "req_run"
 
 
-def test_call_deadline_wins_even_while_heartbeats_succeed(assignment, response_payload):
+@pytest.mark.parametrize("kind", ["model", "tool"])
+def test_call_deadline_wins_even_while_heartbeats_succeed(assignment, response_payload, kind):
+    if kind == "tool":
+        assignment.operation = command_operation()
     assignment.deadline_at = assignment.server_time + timedelta(seconds=0.04)
-    run, requests, cancelled = exercise(assignment, response_payload, stall_model=True)
+    run, requests, cancelled = exercise(
+        assignment, response_payload, stall_model=kind == "model", stall_tool=kind == "tool"
+    )
     asyncio.run(run())
     assert requests["heartbeat"]
     assert cancelled == [True]
-    assert requests["report"][0]["outcome"]["error"]["code"] == "call_timeout"
+    outcome = requests["report"][0]["outcome"]
+    assert outcome["status"] == "failed"
+    assert outcome["error"]["code"] == "call_timeout"
+    assert outcome["error"]["retryable"]
+    assert "result" not in outcome
+
+
+def command_operation():
+    return ToolOperation.model_validate(
+        {
+            "kind": "tool",
+            "request": {
+                "call": {
+                    "call_id": "call_command",
+                    "name": "run_command",
+                    "arguments": {"command": "pytest"},
+                },
+                "input_version_id": uuid4(),
+            },
+        }
+    )
+
+
+def test_tool_transport_receives_the_larger_assignment_budget(assignment, response_payload):
+    assignment.operation = command_operation()
+    assignment.deadline_at = assignment.server_time + timedelta(seconds=630)
+    run, requests, _ = exercise(assignment, response_payload)
+    asyncio.run(run())
+    assert assignment.config.call_timeout_seconds == 120
+    assert len(requests["tool_timeouts"]) == 1
+    assert assignment.config.call_timeout_seconds < requests["tool_timeouts"][0] <= 630
+    assert datetime.fromisoformat(requests["tool"][0]["deadline_at"]) == assignment.deadline_at
+    assert requests["report"][0]["outcome"]["status"] == "succeeded"
 
 
 def test_expired_call_budget_does_not_issue_a_model_request(assignment, response_payload):

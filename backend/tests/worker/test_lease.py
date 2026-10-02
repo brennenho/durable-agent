@@ -16,10 +16,13 @@ def services(handler):
     )
 
 
-def test_budget_uses_server_durations_and_claim_start(assignment):
+@pytest.mark.parametrize("budget", [60, 120, 630])
+def test_budget_uses_server_durations_and_claim_start(assignment, budget):
+    assert assignment.config.call_timeout_seconds == 120
+    assignment.deadline_at = assignment.server_time + timedelta(seconds=budget)
     lease = Lease(None, assignment, uuid4(), claimed_at=100)
     assert lease.expires == 130
-    assert lease.deadline == 220
+    assert lease.deadline == 100 + budget
 
 
 def test_late_claim_never_starts_execution(assignment):
@@ -118,7 +121,12 @@ def test_parent_cancellation_cleans_up_execution(assignment):
     asyncio.run(exercise())
 
 
-def test_transient_heartbeat_failure_can_recover_without_extending_call_deadline(assignment):
+@pytest.mark.parametrize("budget", [120, 630])
+def test_transient_heartbeat_failure_can_recover_without_extending_call_deadline(
+    assignment, budget
+):
+    assignment.deadline_at = assignment.server_time + timedelta(seconds=budget)
+
     async def exercise():
         renewed = asyncio.Event()
         calls = []
