@@ -16,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (pathname === "/crash-test") return;
     const controller = new AbortController();
     requestJson<ConversationSummary[]>("/api/conversations", { signal: controller.signal })
       .then((saved) => {
@@ -29,6 +30,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       });
     return () => controller.abort();
   }, [pathname, retry]);
+
+  if (pathname === "/crash-test") return children;
 
   const navigation = (
     <nav aria-label="Previous chats" className="flex h-full min-h-0 flex-col gap-6 p-3">
