@@ -161,3 +161,47 @@ Scenario cancellation and controller shutdown wait for in-flight service recover
 Killing the controller itself can require manual container restart. Reports remain
 on disk; live selection resets when the controller restarts. A baseline pass validates
 saved run structure, not semantic correctness of an arbitrary task's output.
+
+## Dashboard
+
+After enabling hooks with `CRASH_TEST=1 ./scripts/dev-up.sh`, run
+`./scripts/crash-test.sh` and open `http://127.0.0.1:3020/crash-test`. This starts
+only the host controller and Crashboard. The app frontend can be killed independently.
+Use `CRASH_TEST_DASHBOARD_PORT`, `CRASH_TEST_PORT`, and `CRASH_TEST_APP_URL` for
+nondefault ports/links; the hook URL must use the controller's chosen port.
+
+Choose a scenario in Crashboard and arm it before starting a task, or enter an
+existing run ID. Watch status and recovery in the dashboard; use its Cancel button
+to disarm the scenario and wait for any in-flight recovery. No terminal commands
+are needed to run, inspect, or cancel scenarios.
+
+Scenario kills automatically restart services; manual kills stay stopped until
+Start is clicked. Sandbox restart belongs to Tools. Manual controls are disabled
+during a scenario to keep its observations attributable to that scenario.
+
+The shared execution timeline combines application milestones derived from saved
+state with separately labelled controller observations. It retains the last observed
+run through outages; it does not infer missing acceptance or successful recovery.
+Filter by source or download the current observations as JSON. Control/Tools saved
+state remains authoritative; controller journals can miss events and are not an
+application audit log. Restarting the controller resets its live selection, while
+previous JSON reports remain in `.crash-test/reports`.
+
+## Verify with real workers and OpenAI
+
+Use the existing application workers and configured OpenAI model for a live check.
+In Crashboard, arm worker-lost or saved-response-lost, then submit a short task in
+the application. For example:
+
+> Use run_command to run Python that waits three seconds, writes a fresh UUID to
+> crash-proof.txt, and prints that UUID. Then report the UUID and finish.
+
+worker-lost kills the real worker before it reports its result. Its replacement
+recovers the operation after the lease expires. saved-response-lost kills Tools
+just after its result and workspace are saved; the retry must reuse that saved work.
+Inspect the scenario verdict, retry/acceptance timeline, and downloaded file.
+A model response lost before acceptance may require another OpenAI call, with normal
+API usage. An inconclusive result means the requested crash was not verified.
+
+Offline unit tests keep provider-response fixtures under `backend/tests`. Crash Test
+has no alternate worker, special model, or additional application Compose stack.
