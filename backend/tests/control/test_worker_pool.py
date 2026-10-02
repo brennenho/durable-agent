@@ -170,3 +170,31 @@ def test_foreign_worker_response_is_rejected_before_mutation():
             assert all(r.method == "GET" for r in engine.requests)
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("desired", [2, 4])
+@pytest.mark.parametrize("number", [None, "", "invalid", "0", "-1", 3.5, True, "1"])
+def test_invalid_worker_slot_blocks_all_mutations(desired, number):
+    async def exercise():
+        engine = Engine()
+        async with httpx.AsyncClient(
+            base_url="http://docker", transport=httpx.MockTransport(engine.handle)
+        ) as client:
+            pool = DockerWorkers(client, "test", 4)
+            await pool.resize(4)
+            engine.workers["1"]["State"] = "exited"
+            labels = engine.workers["4"]["Labels"]
+            if number is None:
+                del labels[NUMBER]
+            else:
+                labels[NUMBER] = number
+            engine.requests.clear()
+
+            with pytest.raises(WorkerPoolError, match="container 4"):
+                await pool.resize(desired)
+
+            assert all(r.method == "GET" for r in engine.requests)
+            assert engine.workers["1"]["State"] == "exited"
+            assert set(engine.workers) == {"1", "2", "3", "4"}
+
+    asyncio.run(exercise())
