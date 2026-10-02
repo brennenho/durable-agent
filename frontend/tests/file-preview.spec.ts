@@ -10,7 +10,7 @@ const listing = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route(endpoint, (route) =>
     route.fulfill({
       json: {

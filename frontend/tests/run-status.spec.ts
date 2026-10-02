@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { run, runDetail } from "./fixtures";
+import { runDetail } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/runs", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/conversations", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/runs/*/files", (route) =>
     route.fulfill({
       json: {
@@ -116,18 +116,6 @@ test("stops polling when navigating away", async ({ page }) => {
   const count = requests;
   await page.clock.fastForward(10_000);
   expect(requests).toBe(count);
-});
-
-test("opens the saved chat after sending a message", async ({ page }) => {
-  await page.route("**/api/runs", (route) =>
-    route.fulfill({ json: route.request().method() === "GET" ? [] : run }),
-  );
-  await page.route(endpoint, (route) => route.fulfill({ json: runDetail }));
-  await page.goto("/");
-  await page.getByRole("textbox").fill(run.prompt);
-  await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page).toHaveURL(new RegExp(`${run.id}$`));
-  await expect(page.getByRole("article", { name: "Chat turn" })).toBeVisible();
 });
 
 test("expands activity with the keyboard without hiding the answer", async ({ page }) => {

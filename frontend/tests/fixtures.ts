@@ -1,4 +1,9 @@
-import type { RunDetail, RunSummary } from "../src/lib/api";
+import type {
+  ConversationDetail,
+  ConversationSummary,
+  RunDetail,
+  RunSummary,
+} from "../src/lib/api";
 
 export const run: RunSummary = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -18,4 +23,18 @@ export const runDetail: RunDetail = {
   operations: [],
   final_answer: null,
   workspace_version_id: "00000000-0000-4000-8000-000000000002",
+};
+
+export const conversation: ConversationSummary = {
+  id: "00000000-0000-4000-8000-000000000010",
+  title: "Python function and tests",
+  created_at: run.created_at,
+  updated_at: run.created_at,
+  status: run.status,
+  latest_run_id: run.id,
+};
+
+export const conversationDetail: ConversationDetail = {
+  ...conversation,
+  runs: [runDetail],
 };

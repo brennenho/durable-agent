@@ -5,22 +5,22 @@ import { usePathname } from "next/navigation";
 import { PanelLeft, SquarePen, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useEffect, useState, type ReactNode } from "react";
-import { requestJson, type RunSummary } from "../lib/api";
+import { requestJson, type ConversationSummary } from "../lib/api";
 import { Button } from "./ui/button";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [runs, setRuns] = useState<RunSummary[] | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    requestJson<RunSummary[]>("/api/runs", { signal: controller.signal })
+    requestJson<ConversationSummary[]>("/api/conversations", { signal: controller.signal })
       .then((saved) => {
         if (controller.signal.aborted) return;
-        setRuns(saved);
+        setConversations(saved);
         setError(null);
       })
       .catch((cause) => {
@@ -47,7 +47,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </Button>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <p className="m-0 px-3 pb-3 text-xs text-muted-foreground">Recent chats</p>
-        {!runs && !error && <p className="px-3 text-xs text-muted-foreground">Loading chats…</p>}
+        {!conversations && !error && (
+          <p className="px-3 text-xs text-muted-foreground">Loading chats…</p>
+        )}
         {error && (
           <div className="px-3">
             <p role="alert" aria-label="Chat list error" className="text-xs">
@@ -58,22 +60,22 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         )}
-        {runs?.length === 0 && (
+        {conversations?.length === 0 && (
           <p className="px-3 text-xs text-muted-foreground">Your chats will appear here.</p>
         )}
         <ul className="m-0 space-y-1 p-0">
-          {runs?.map((run) => {
-            const href = `/runs/${run.id}`;
+          {conversations?.map((conversation) => {
+            const href = `/chats/${conversation.id}`;
             return (
-              <li key={run.id}>
+              <li key={conversation.id}>
                 <Link
                   href={href}
                   onClick={() => setOpen(false)}
-                  title={run.prompt}
+                  title={conversation.title}
                   aria-current={pathname === href ? "page" : undefined}
                   className="block truncate rounded-md px-3 py-2.5 hover:bg-accent aria-[current=page]:bg-accent"
                 >
-                  {run.prompt}
+                  {conversation.title}
                 </Link>
               </li>
             );
