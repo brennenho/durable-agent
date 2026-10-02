@@ -10,7 +10,13 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
-from durable_agent.contracts import RunCommandArguments, SandboxConfig, ToolError, ToolOutput
+from durable_agent.contracts import (
+    RunCommandArguments,
+    SandboxConfig,
+    ToolError,
+    ToolOutput,
+    ToolSuccess,
+)
 from durable_agent.tools.archives import (
     InvalidWorkspace,
     capture_workspace,
@@ -58,6 +64,7 @@ async def execute_command_tool(
     deadline: float,
     *,
     on_started: Callable[[str], Awaitable[None]] | None = None,
+    decode_output: Callable[[ToolSuccess], ToolOutput] | None = None,
 ) -> tuple[ToolOutput, bytes | None]:
     try:
         args = RunCommandArguments.model_validate(arguments, strict=True)
@@ -98,6 +105,8 @@ async def execute_command_tool(
             )
             if isinstance(output, ToolError):
                 return output, None
+            if decode_output is not None:
+                output = decode_output(output)
             updated = await filesystem(
                 capture_workspace,
                 workspace,

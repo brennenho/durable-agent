@@ -20,7 +20,10 @@ class ToolDeadlineExceeded(TimeoutError):
 
 
 def _input(request: ToolExecuteRequest) -> dict:
-    return request.model_dump(mode="json", include={"name", "arguments", "sandbox"})
+    fields = {"name", "arguments", "sandbox"}
+    if request.definition is not None:
+        fields.update({"definition", "run_id"})
+    return request.model_dump(mode="json", include=fields)
 
 
 async def _locked(session: AsyncSession, request: ToolExecuteRequest) -> ToolRequest:
