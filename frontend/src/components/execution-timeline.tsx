@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { OperationInspection } from "./operation-inspection";
 import { operationName, OperationSummary } from "./activity-state";
 import { InspectionDisclosure } from "./inspection-json";
+import { BranchDialog } from "./branch-dialog";
 
 type Operation = RunDetail["operations"][number];
 
@@ -62,6 +63,7 @@ function OperationRow({ run, operation }: { run: RunDetail; operation: Operation
           </span>
         </summary>
         {open && <OperationInspection run={run} operation={operation} />}
+        {operation.checkpoint && <BranchDialog run={run} operation={operation} />}
       </details>
     </li>
   );

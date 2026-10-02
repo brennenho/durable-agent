@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ApiError, requestJson, type ConversationDetail } from "../lib/api";
 import { ChatTurn } from "./chat-turn";
 import { ChatWorkspace } from "./chat-workspace";
@@ -86,6 +87,16 @@ export function ConversationView({ conversationId }: { conversationId: string })
       }
     >
       <div className="space-y-12">
+        {conversation?.forked_from && (
+          <p className="m-0 text-xs text-muted-foreground">
+            <Link
+              href={`/chats/${encodeURIComponent(conversation.forked_from.conversation_id)}`}
+              className="underline underline-offset-4"
+            >
+              Branched from step {conversation.forked_from.position + 1} in the source chat
+            </Link>
+          </p>
+        )}
         {error && (
           <p role="alert" aria-label="Chat update error">
             {error}
